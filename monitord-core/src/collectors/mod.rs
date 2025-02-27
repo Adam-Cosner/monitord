@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info};
 
 /// Trait that must be implemented by all hardware collectors
 pub trait Collector: Debug + Send + Sync {

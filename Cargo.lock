@@ -1685,6 +1685,7 @@ dependencies = [
  "monitord-protocols",
  "nvml-wrapper",
  "parking_lot",
+ "prost",
  "prost-types",
  "rayon",
  "serde",

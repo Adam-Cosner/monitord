@@ -32,6 +32,7 @@ tracing = "0.1.41"
 
 # Data structures
 monitord-protocols = { path = "../monitord-protocols" }
+prost = "0.13.5"
 
 [lib]
 name = "montitord_core"

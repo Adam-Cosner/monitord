@@ -16,6 +16,7 @@
 
 // Modules defined in their own files
 pub mod collectors;
+pub mod error;
 pub mod ipc;
 pub mod models;
 pub mod subscription;

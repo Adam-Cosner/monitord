@@ -40,6 +40,7 @@ message CpuInfo {
   double global_utilization_percent = 4;
   repeated CoreInfo core_info = 5;
   CpuCache cache_info = 6;
+  optional string scaling_governor = 7;
 }
 
 // Information about each CPU core
