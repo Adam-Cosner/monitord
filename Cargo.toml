@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = [
+    "monitord-core",
+    "monitord-service",
+    "monitord-protocols",
+    "monitord-client"
+]

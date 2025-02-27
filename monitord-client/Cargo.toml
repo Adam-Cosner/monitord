@@ -1,0 +1,25 @@
+[package]
+name = "monitord-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+monitord-protocols = { path = "../monitord-protocols" }
+
+# IPC
+iceoryx2 = "0.5"
+
+
+# Error handling
+thiserror = "2.0.11"
+anyhow = "1.0.96"
+
+# Logging
+tracing = "0.1.41"
+
+# Utilities
+futures = "0.3.31"
+
+[lib]
+name = "monitord_client"
+path = "src/lib.rs"

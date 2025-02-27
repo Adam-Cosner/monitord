@@ -1,0 +1,46 @@
+[package]
+name = "monitord-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# monitord crates
+monitord-core = { path = "../monitord-core" }
+monitord-protocols = { path = "../monitord-protocols" }
+
+# IPC with iceoryx2
+iceoryx2 = "0.5.0"
+
+# Async runtime
+tokio = { version = "1.43.0", features = ["full"] }
+
+# Command-line interface
+clap = { version = "4.5.31", features = ["derive"] }
+config = "0.15.8"
+
+# Error handling
+anyhow = "1.0.96"
+thiserror = "2.0.11"
+
+# Logging
+tracing = "0.1.41"
+tracing-appender = "0.2.3"
+tracing-subscriber = "0.3.19"
+
+# Signal handling
+signal-hook = "0.3.17"
+
+# Unix systems
+[target.'cfg(unix)'.dependencies]
+daemonize = "0.5.0"
+nix = "0.29.0"
+
+# Window systems
+[target.'cfg(windows)'.dependencies]
+windows-service = "0.8.0"
+winapi = { version = "0.3.9", features = ["winsvc"] }
+
+
+[[bin]]
+name = "monitord"
+path = "src/main.rs"

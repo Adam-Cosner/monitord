@@ -1,0 +1,141 @@
+syntax = "proto3";
+
+package monitord.subscription;
+
+// Import the main monitord proto
+import "monitord.proto";
+import "google/protobuf/timestamp.proto";
+
+// Defines the subscription capability for clients
+message SubscriptionRequest {
+  // What type of information to subscribe to
+  SubscriptionType type = 1;
+  
+  // How frequently updates should be sent (in milliseconds)
+  uint32 interval_ms = 2;
+  
+  // Optional filters based on subscription type
+  oneof filter {
+    ProcessFilter process_filter = 3;
+    GpuFilter gpu_filter = 4;
+    NetworkFilter network_filter = 5;
+    StorageFilter storage_filter = 6;
+  }
+}
+
+// Available subscription types
+enum SubscriptionType {
+  ALL = 0;
+  SYSTEM = 1;
+  CPU = 2;
+  MEMORY = 3;
+  GPU = 4;
+  NETWORK = 5;
+  STORAGE = 6;
+  PROCESS = 7;
+}
+
+// Filter for process subscriptions
+message ProcessFilter {
+  repeated uint32 pid = 1;
+  repeated string name = 2;
+  repeated string username = 3;
+  uint32 top_by_cpu = 4;
+  uint32 top_by_memory = 5;
+  uint32 top_by_disk = 6;
+}
+
+// Filter for GPU subscriptions
+message GpuFilter {
+  repeated string name = 1;
+  repeated string vendor = 2;
+  bool include_processes = 3;
+}
+
+// Filter for network subscriptions
+message NetworkFilter {
+  repeated string interface_name = 1;
+}
+
+// Filter for storage subscriptions
+message StorageFilter {
+  repeated string device_name = 1;
+  repeated string mount_point = 2;
+}
+
+// Response to subscription requests
+message SubscriptionResponse {
+  string subscription_id = 1;
+  SubscriptionStatus status = 2;
+  string error_message = 3;
+}
+
+// Status of subscription request
+enum SubscriptionStatus {
+  SUCCESS = 0;
+  INVALID_TYPE = 1;
+  INVALID_INTERVAL = 2;
+  INVALID_FILTER = 3;
+  RESOURCE_NOT_AVAILABLE = 4;
+  INTERNAL_ERROR = 5;
+}
+
+// Service for subscription management
+service SubscriptionService {
+  // Create a new subscription
+  rpc Subscribe(SubscriptionRequest) returns (SubscriptionResponse);
+  
+  // Modify an existing subscription
+  rpc ModifySubscription(ModifySubscriptionRequest) returns (SubscriptionResponse);
+  
+  // Cancel a subscription
+  rpc Unsubscribe(UnsubscribeRequest) returns (UnsubscribeResponse);
+  
+  // List active subscriptions
+  rpc ListSubscriptions(ListSubscriptionsRequest) returns (ListSubscriptionsResponse);
+}
+
+// Request to modify an existing subscription
+message ModifySubscriptionRequest {
+  string subscription_id = 1;
+  uint32 interval_ms = 2;
+  oneof filter {
+    ProcessFilter process_filter = 3;
+    GpuFilter gpu_filter = 4;
+    NetworkFilter network_filter = 5;
+    StorageFilter storage_filter = 6;
+  }
+}
+
+// Request to cancel a subscription
+message UnsubscribeRequest {
+  string subscription_id = 1;
+}
+
+// Response to unsubscribe request
+message UnsubscribeResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// Request to list active subscriptions
+message ListSubscriptionsRequest {}
+
+// Response with list of active subscriptions
+message ListSubscriptionsResponse {
+  repeated ActiveSubscription subscriptions = 1;
+}
+
+// Information about an active subscription
+message ActiveSubscription {
+  string subscription_id = 1;
+  SubscriptionType type = 2;
+  uint32 interval_ms = 3;
+  string created_at = 4; // ISO 8601 formatted timestamp
+  oneof filter {
+    ProcessFilter process_filter = 5;
+    GpuFilter gpu_filter = 6;
+    NetworkFilter network_filter = 7;
+    StorageFilter storage_filter = 8;
+  }
+}

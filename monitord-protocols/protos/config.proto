@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package monitord.config;
+
+// Configuration for the monitord service
+message ServiceConfig {
+  // General service configuration
+  uint32 default_update_interval_ms = 1;
+  uint32 max_clients = 2;
+  bool enable_logging = 3;
+  LogLevel log_level = 4;
+  
+  // Component-specific configurations
+  ProcessCollectionConfig process_config = 5;
+  GpuCollectionConfig gpu_config = 6;
+  NetworkCollectionConfig network_config = 7;
+  StorageCollectionConfig storage_config = 8;
+}
+
+// Log levels
+enum LogLevel {
+  ERROR = 0;
+  WARN = 1;
+  INFO = 2;
+  DEBUG = 3;
+  TRACE = 4;
+}
+
+// Configuration for process collection
+message ProcessCollectionConfig {
+  bool enabled = 1;
+  uint32 collection_interval_ms = 2;
+  uint32 max_processes = 3;
+  bool collect_command_line = 4;
+  bool collect_environment = 5;
+  bool collect_io_statistics = 6;
+}
+
+// Configuration for GPU collection
+message GpuCollectionConfig {
+  bool enabled = 1;
+  uint32 collection_interval_ms = 2;
+  bool collect_nvidia = 3;
+  bool collect_amd = 4;
+  bool collect_intel = 5;
+  bool collect_processes = 6;
+}
+
+// Configuration for network collection
+message NetworkCollectionConfig {
+  bool enabled = 1;
+  uint32 collection_interval_ms = 2;
+  bool collect_packets = 3;
+  bool collect_errors = 4;
+}
+
+// Configuration for storage collection
+message StorageCollectionConfig {
+  bool enabled = 1;
+  uint32 collection_interval_ms = 2;
+  bool collect_smart = 3;
+  bool collect_io_statistics = 4;
+}
+
+// Service for configuration management
+service ConfigService {
+  // Get current configuration
+  rpc GetConfig(GetConfigRequest) returns (ServiceConfig);
+  
+  // Update configuration
+  rpc UpdateConfig(ServiceConfig) returns (UpdateConfigResponse);
+  
+  // Reset configuration to defaults
+  rpc ResetConfig(ResetConfigRequest) returns (ServiceConfig);
+}
+
+// Request to get current configuration
+message GetConfigRequest {}
+
+// Response to update configuration request
+message UpdateConfigResponse {
+  bool success = 1;
+  string error_message = 2;
+  ServiceConfig current_config = 3;
+}
+
+// Request to reset configuration
+message ResetConfigRequest {}
