@@ -1,3 +1,4 @@
+/// CPU Model
 use super::Model;
 use crate::error::ModelError;
 use monitord_protocols::monitord::CoreInfo as ProtoCoreInfo;

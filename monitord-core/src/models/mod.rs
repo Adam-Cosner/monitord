@@ -1,4 +1,5 @@
-//! The model trait is for the representation of data outside of its serialized form
+//! The model trait is for the representation of data outside of its serialized form.
+//! It is also used internally to keep track of data useful for calculations
 use crate::error::ModelError;
 
 pub trait Model {
