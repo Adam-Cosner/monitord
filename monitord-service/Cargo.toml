@@ -5,8 +5,11 @@ edition = "2021"
 
 [dependencies]
 # monitord crates
-monitord-core = { path = "../monitord-core" }
 monitord-protocols = { path = "../monitord-protocols" }
+
+# System information gathering
+sysinfo = "0.33.1"
+raw-cpuid = "11.4.0"
 
 # IPC with iceoryx2
 iceoryx2 = "0.5.0"
@@ -29,6 +32,10 @@ tracing-subscriber = "0.3.19"
 
 # Signal handling
 signal-hook = "0.3.17"
+
+# Utilities
+prost = "0.13.5"
+chrono = "0.4.40"
 
 # Unix systems
 [target.'cfg(unix)'.dependencies]
