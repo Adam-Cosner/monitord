@@ -55,6 +55,11 @@ impl Model for SystemInfo {
             load_average_1m: self.load_average_1m,
             load_average_5m: self.load_average_5m,
             load_average_15m: self.load_average_15m,
+            architecture: self.architecture,
+            boot_time: self.boot_time,
+            vendor: self.vendor,
+            virtualization: self.virtualization,
+            security_features: self.security_features,
         }
     }
 
@@ -72,12 +77,11 @@ impl Model for SystemInfo {
             load_average_5m: proto.load_average_5m,
             load_average_15m: proto.load_average_15m,
             
-            // Initialize additional fields
-            architecture: String::new(),
-            boot_time: 0,
-            vendor: None,
-            virtualization: None,
-            security_features: Vec::new(),
+            architecture: proto.architecture,
+            boot_time: proto.boot_time,
+            vendor: proto.vendor,
+            virtualization: proto.virtualization,
+            security_features: proto.security_features,
         }
     }
 

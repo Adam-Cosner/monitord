@@ -45,6 +45,9 @@ impl Model for MemoryInfo {
             swap_used_bytes: self.swap_used_bytes,
             swap_free_bytes: self.swap_free_bytes,
             dram_info: self.dram_info.map(|d| d.into_proto()),
+            cached_memory_bytes: self.cached_memory_bytes,
+            shared_memory_bytes: self.shared_memory_bytes,
+            memory_load_percent: self.memory_load_percent,
         }
     }
 
@@ -59,10 +62,9 @@ impl Model for MemoryInfo {
             swap_free_bytes: proto.swap_free_bytes,
             dram_info: proto.dram_info.map(DramInfo::from_proto),
             
-            // Initialize additional fields
-            cached_memory_bytes: 0,
-            shared_memory_bytes: 0,
-            memory_load_percent: 0.0,
+            cached_memory_bytes: proto.cached_memory_bytes,
+            shared_memory_bytes: proto.shared_memory_bytes,
+            memory_load_percent: proto.memory_load_percent,
         }
     }
 
@@ -103,6 +105,8 @@ impl Model for DramInfo {
             memory_type: self.memory_type,
             slots_total: self.slots_total,
             slots_used: self.slots_used,
+            manufacturer: self.manufacturer,
+            part_number: self.part_number,
         }
     }
 
@@ -113,9 +117,8 @@ impl Model for DramInfo {
             slots_total: proto.slots_total,
             slots_used: proto.slots_used,
             
-            // Initialize additional fields
-            manufacturer: None,
-            part_number: None,
+            manufacturer: proto.manufacturer,
+            part_number: proto.part_number,
         }
     }
 

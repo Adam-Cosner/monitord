@@ -43,6 +43,11 @@ impl Model for ProcessInfo {
     type ProtoType = ProtoProcessInfo;
 
     fn into_proto(self) -> Self::ProtoType {
+        // Convert environment Vec<(String, String)> to Vec<KeyValuePair>
+        let environment = self.environment.into_iter()
+            .map(|(key, value)| monitord_protocols::monitord::KeyValuePair { key, value })
+            .collect();
+
         ProtoProcessInfo {
             pid: self.pid,
             name: self.name,
@@ -57,6 +62,12 @@ impl Model for ProcessInfo {
             open_files: self.open_files,
             start_time_epoch_seconds: self.start_time_epoch_seconds,
             gpu_usage: self.gpu_usage.map(|gpu| gpu.into_proto()),
+            parent_pid: self.parent_pid,
+            cmdline: self.cmdline,
+            cwd: self.cwd,
+            environment,
+            io_priority: self.io_priority.map(|p| p as u32),
+            nice_value: self.nice_value.map(|n| n as i32),
         }
     }
 
@@ -76,13 +87,12 @@ impl Model for ProcessInfo {
             start_time_epoch_seconds: proto.start_time_epoch_seconds,
             gpu_usage: proto.gpu_usage.map(GpuProcessInfo::from_proto),
             
-            // Initialize additional fields
-            parent_pid: None,
-            cmdline: None,
-            cwd: None,
-            environment: Vec::new(),
-            io_priority: None,
-            nice_value: None,
+            parent_pid: proto.parent_pid,
+            cmdline: proto.cmdline,
+            cwd: proto.cwd,
+            environment: proto.environment.into_iter().map(|kv| (kv.key, kv.value)).collect(),
+            io_priority: proto.io_priority.map(|p| p as u8),
+            nice_value: proto.nice_value.map(|n| n as i8),
         }
     }
 
@@ -119,6 +129,7 @@ impl Model for GpuProcessInfo {
             process_name: self.process_name,
             gpu_utilization_percent: self.gpu_utilization_percent,
             vram_bytes: self.vram_bytes,
+            gpu_device_id: self.gpu_device_id,
         }
     }
 
@@ -129,8 +140,7 @@ impl Model for GpuProcessInfo {
             gpu_utilization_percent: proto.gpu_utilization_percent,
             vram_bytes: proto.vram_bytes,
             
-            // Initialize additional fields
-            gpu_device_id: None,
+            gpu_device_id: proto.gpu_device_id,
         }
     }
 

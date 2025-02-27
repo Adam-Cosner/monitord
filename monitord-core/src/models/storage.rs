@@ -51,6 +51,10 @@ impl Model for StorageInfo {
             io_time_ms: self.io_time_ms,
             temperature_celsius: self.temperature_celsius,
             lifetime_writes_bytes: self.lifetime_writes_bytes,
+            serial_number: self.serial_number,
+            partition_label: self.partition_label,
+            used_space_bytes: self.used_space_bytes,
+            smart_data: self.smart_data.map(|s| s.into_proto()),
         }
     }
 
@@ -69,11 +73,10 @@ impl Model for StorageInfo {
             temperature_celsius: proto.temperature_celsius,
             lifetime_writes_bytes: proto.lifetime_writes_bytes,
             
-            // Initialize additional fields
-            serial_number: None,
-            partition_label: None,
-            used_space_bytes: proto.total_space_bytes - proto.available_space_bytes,
-            smart_data: None,
+            serial_number: proto.serial_number,
+            partition_label: proto.partition_label,
+            used_space_bytes: proto.used_space_bytes,
+            smart_data: proto.smart_data.map(SmartData::from_proto),
         }
     }
 
@@ -95,6 +98,42 @@ impl Model for StorageInfo {
             }
         }
 
+        Ok(())
+    }
+}
+
+// Implement the Model trait for SmartData
+impl Model for SmartData {
+    type ProtoType = monitord_protocols::monitord::SmartData;
+
+    fn into_proto(self) -> Self::ProtoType {
+        monitord_protocols::monitord::SmartData {
+            health_status: self.health_status,
+            power_on_hours: self.power_on_hours,
+            power_cycle_count: self.power_cycle_count,
+            reallocated_sectors: self.reallocated_sectors,
+            remaining_life_percent: self.remaining_life_percent.map(|p| p as u32),
+        }
+    }
+
+    fn from_proto(proto: Self::ProtoType) -> Self {
+        Self {
+            health_status: proto.health_status,
+            power_on_hours: proto.power_on_hours,
+            power_cycle_count: proto.power_cycle_count,
+            reallocated_sectors: proto.reallocated_sectors,
+            remaining_life_percent: proto.remaining_life_percent.map(|p| p as u8),
+        }
+    }
+
+    fn validate(&self) -> Result<(), ModelError> {
+        if let Some(percent) = self.remaining_life_percent {
+            if percent > 100 {
+                return Err(ModelError::Validation(
+                    "Remaining life percentage cannot exceed 100".to_owned(),
+                ));
+            }
+        }
         Ok(())
     }
 }

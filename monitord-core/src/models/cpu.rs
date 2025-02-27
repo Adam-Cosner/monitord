@@ -55,6 +55,8 @@ impl Model for CpuInfo {
                 .collect(),
             cache_info: Some(self.cache.into_proto()),
             scaling_governor: self.scaling_governor,
+            architecture: self.architecture,
+            cpu_flags: self.cpu_flags,
         }
     }
 
@@ -74,8 +76,8 @@ impl Model for CpuInfo {
             cache: CpuCache::from_proto(cache_info),
             scaling_governor: proto.scaling_governor,
 
-            architecture: String::new(),
-            cpu_flags: Vec::new(),
+            architecture: proto.architecture,
+            cpu_flags: proto.cpu_flags,
         }
     }
 
@@ -110,6 +112,8 @@ impl Model for CoreInfo {
             frequency_mhz: self.frequency_mhz,
             utilization_percent: self.utilization,
             temperature_celsius: self.temperature.unwrap_or_default(),
+            min_frequency_mhz: self.min_frequency_mhz,
+            max_frequency_mhz: self.max_frequency_mhz,
         }
     }
 
@@ -119,8 +123,8 @@ impl Model for CoreInfo {
             frequency_mhz: proto.frequency_mhz,
             utilization: proto.utilization_percent,
             temperature: Some(proto.temperature_celsius),
-            min_frequency_mhz: None,
-            max_frequency_mhz: None,
+            min_frequency_mhz: proto.min_frequency_mhz,
+            max_frequency_mhz: proto.max_frequency_mhz,
         }
     }
 

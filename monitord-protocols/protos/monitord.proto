@@ -30,6 +30,11 @@ message SystemInfo {
   double load_average_1m = 9;
   double load_average_5m = 10;
   double load_average_15m = 11;
+  string architecture = 12;
+  uint64 boot_time = 13;
+  optional string vendor = 14;
+  optional string virtualization = 15;
+  repeated string security_features = 16;
 }
 
 // CPU information
@@ -41,6 +46,8 @@ message CpuInfo {
   repeated CoreInfo core_info = 5;
   CpuCache cache_info = 6;
   optional string scaling_governor = 7;
+  string architecture = 8;
+  repeated string cpu_flags = 9;
 }
 
 // Information about each CPU core
@@ -49,6 +56,8 @@ message CoreInfo {
   double frequency_mhz = 2;
   double utilization_percent = 3;
   double temperature_celsius = 4;
+  optional double min_frequency_mhz = 5;
+  optional double max_frequency_mhz = 6;
 }
 
 // CPU cache information
@@ -69,6 +78,9 @@ message MemoryInfo {
   uint64 swap_used_bytes = 6;
   uint64 swap_free_bytes = 7;
   optional DramInfo dram_info = 8;
+  uint64 cached_memory_bytes = 9;
+  uint64 shared_memory_bytes = 10;
+  double memory_load_percent = 11;
 }
 
 // DRAM specific information
@@ -77,6 +89,8 @@ message DramInfo {
   string memory_type = 2;  // DDR4, DDR5, etc.
   uint32 slots_total = 3;
   uint32 slots_used = 4;
+  optional string manufacturer = 5;
+  optional string part_number = 6;
 }
 
 // GPU information
@@ -115,6 +129,7 @@ message GpuProcessInfo {
   string process_name = 2;
   double gpu_utilization_percent = 3;
   uint64 vram_bytes = 4;
+  optional string gpu_device_id = 5;
 }
 
 // Network interface information
@@ -132,6 +147,10 @@ message NetworkInfo {
   uint64 tx_errors = 11;
   uint64 rx_bytes_total = 12;
   uint64 tx_bytes_total = 13;
+  bool is_up = 14;
+  uint32 mtu = 15;
+  repeated string dns_servers = 16;
+  optional uint32 link_speed_mbps = 17;
 }
 
 // Storage device information
@@ -148,6 +167,19 @@ message StorageInfo {
   uint64 io_time_ms = 10;
   optional double temperature_celsius = 11;
   optional uint64 lifetime_writes_bytes = 12;
+  optional string serial_number = 13;
+  optional string partition_label = 14;
+  uint64 used_space_bytes = 15;
+  optional SmartData smart_data = 16;
+}
+
+// S.M.A.R.T. data for storage devices
+message SmartData {
+  string health_status = 1;
+  optional uint64 power_on_hours = 2;
+  optional uint32 power_cycle_count = 3;
+  optional uint32 reallocated_sectors = 4;
+  optional uint32 remaining_life_percent = 5;
 }
 
 // Process information
@@ -165,6 +197,18 @@ message ProcessInfo {
   uint64 open_files = 11;
   int64 start_time_epoch_seconds = 12;
   optional GpuProcessInfo gpu_usage = 13;
+  optional uint32 parent_pid = 14;
+  optional string cmdline = 15;
+  optional string cwd = 16;
+  repeated KeyValuePair environment = 17;
+  optional uint32 io_priority = 18;
+  optional int32 nice_value = 19;
+}
+
+// Key-value pair for environment variables
+message KeyValuePair {
+  string key = 1;
+  string value = 2;
 }
 
 // Service to provide system monitoring data

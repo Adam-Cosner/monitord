@@ -44,6 +44,10 @@ impl Model for NetworkInfo {
             tx_errors: self.tx_errors,
             rx_bytes_total: self.rx_bytes_total,
             tx_bytes_total: self.tx_bytes_total,
+            is_up: self.is_up,
+            mtu: self.mtu,
+            dns_servers: self.dns_servers,
+            link_speed_mbps: self.link_speed_mbps,
         }
     }
 
@@ -63,11 +67,10 @@ impl Model for NetworkInfo {
             rx_bytes_total: proto.rx_bytes_total,
             tx_bytes_total: proto.tx_bytes_total,
             
-            // Initialize additional fields
-            is_up: true,
-            mtu: 0,
-            dns_servers: Vec::new(),
-            link_speed_mbps: None,
+            is_up: proto.is_up,
+            mtu: proto.mtu,
+            dns_servers: proto.dns_servers,
+            link_speed_mbps: proto.link_speed_mbps,
         }
     }
 
