@@ -9,7 +9,7 @@ message ServiceConfig {
   uint32 max_clients = 2;
   bool enable_logging = 3;
   LogLevel log_level = 4;
-  
+
   // Component-specific configurations
   ProcessCollectionConfig process_config = 5;
   GpuCollectionConfig gpu_config = 6;
@@ -66,10 +66,10 @@ message StorageCollectionConfig {
 service ConfigService {
   // Get current configuration
   rpc GetConfig(GetConfigRequest) returns (ServiceConfig);
-  
+
   // Update configuration
   rpc UpdateConfig(ServiceConfig) returns (UpdateConfigResponse);
-  
+
   // Reset configuration to defaults
   rpc ResetConfig(ResetConfigRequest) returns (ServiceConfig);
 }

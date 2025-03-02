@@ -48,6 +48,7 @@ pub mod memory;
 pub mod network;
 pub mod process;
 pub mod storage;
+pub mod system;
 
 pub mod config;
 pub mod error;
