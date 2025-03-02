@@ -1,4 +1,3 @@
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum CollectionError {}
+pub use crate::collectors::error::*;
+pub use crate::communication::error::*;
+pub use crate::platform::error::*;

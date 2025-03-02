@@ -1,5 +1,4 @@
-use chrono::Duration;
-
+use crate::config::CollectorConfig;
 use crate::error::CollectionError;
 use monitord_protocols::protocols::CpuInfo;
 
@@ -7,11 +6,11 @@ use monitord_protocols::protocols::CpuInfo;
 pub struct CpuCollector {
     system: sysinfo::System,
     cpuid: raw_cpuid::CpuId<raw_cpuid::CpuIdReaderNative>,
-    enabled: bool,
+    config: CollectorConfig,
 }
 
 impl CpuCollector {
-    pub fn new(enabled: bool) -> Result<Self, CollectionError> {
+    pub fn new(config: CollectorConfig) -> Result<Self, CollectionError> {
         let system = sysinfo::System::new_with_specifics(
             sysinfo::RefreshKind::nothing().with_cpu(sysinfo::CpuRefreshKind::everything()),
         );
@@ -21,7 +20,7 @@ impl CpuCollector {
         Ok(Self {
             system,
             cpuid,
-            enabled,
+            config,
         })
     }
 }
@@ -33,12 +32,8 @@ impl super::Collector for CpuCollector {
         "cpu"
     }
 
-    fn is_enabled(&self) -> bool {
-        self.enabled
-    }
-
-    fn set_enabled(&mut self, enabled: bool) {
-        self.enabled = enabled;
+    fn config(&self) -> &CollectorConfig {
+        &self.config
     }
 
     fn collect(&mut self) -> Result<Self::CollectedData, CollectionError> {
@@ -46,7 +41,6 @@ impl super::Collector for CpuCollector {
         self.system.refresh_cpu_all();
 
         // Get processor and feature data from cpuid
-        let vendor_info = self.cpuid.get_vendor_info();
         let feature_info = self.cpuid.get_feature_info();
         let extended_features = self.cpuid.get_extended_feature_info();
         let processor_brand = self.cpuid.get_processor_brand_string();
