@@ -10,10 +10,6 @@ pub struct CommunicationConfig {
 pub struct IceoryxConfig {
     // Service name for iceoryx2 communication
     pub service_name: String,
-    // Group name for iceoryx2 communication
-    pub group_name: String,
-    // Instance name for iceoryx2 communication
-    pub instance_name: String,
     // Max buffer size per connection
     pub buffer_size: usize,
     // Custom service options

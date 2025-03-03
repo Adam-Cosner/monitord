@@ -1,3 +1,5 @@
+use config::ServiceConfig;
+
 mod collectors;
 mod communication;
 mod config;
@@ -31,6 +33,9 @@ mod platform {
     pub use windows as native;
 }
 
-fn main() {
-    println!("Hello, world!");
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let service_config = ServiceConfig::load_from_env_or_file();
+    service::ServiceManager::run(service_config).await?;
+    Ok(())
 }

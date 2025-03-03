@@ -1,19 +1,19 @@
 use crate::error::CollectionError;
+use config::MemoryCollectorConfig;
 use monitord_protocols::monitord::DramInfo as ProtoDramInfo;
 use monitord_protocols::monitord::MemoryInfo as ProtoMemoryInfo;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::process::Command;
-
-use super::config::CollectorConfig;
+pub mod config;
 
 pub struct MemoryCollector {
     system: sysinfo::System,
-    config: CollectorConfig,
+    config: MemoryCollectorConfig,
 }
 
 impl MemoryCollector {
-    pub fn new(config: CollectorConfig) -> Result<Self, CollectionError> {
+    pub fn new(config: MemoryCollectorConfig) -> Result<Self, CollectionError> {
         Ok(Self {
             system: sysinfo::System::new_with_specifics(
                 sysinfo::RefreshKind::nothing()
@@ -199,12 +199,13 @@ impl MemoryCollector {
 
 impl super::Collector for MemoryCollector {
     type CollectedData = ProtoMemoryInfo;
+    type CollectorConfig = MemoryCollectorConfig;
 
     fn name(&self) -> &'static str {
         "memory"
     }
 
-    fn config(&self) -> &CollectorConfig {
+    fn config(&self) -> &Self::CollectorConfig {
         &self.config
     }
 

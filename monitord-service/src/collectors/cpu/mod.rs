@@ -1,16 +1,17 @@
-use crate::config::CollectorConfig;
 use crate::error::CollectionError;
+use config::CpuCollectorConfig;
 use monitord_protocols::protocols::CpuInfo;
+pub mod config;
 
 /// Collects CPU information
 pub struct CpuCollector {
     system: sysinfo::System,
     cpuid: raw_cpuid::CpuId<raw_cpuid::CpuIdReaderNative>,
-    config: CollectorConfig,
+    config: CpuCollectorConfig,
 }
 
 impl CpuCollector {
-    pub fn new(config: CollectorConfig) -> Result<Self, CollectionError> {
+    pub fn new(config: CpuCollectorConfig) -> Result<Self, CollectionError> {
         let system = sysinfo::System::new_with_specifics(
             sysinfo::RefreshKind::nothing().with_cpu(sysinfo::CpuRefreshKind::everything()),
         );
@@ -27,16 +28,20 @@ impl CpuCollector {
 
 impl super::Collector for CpuCollector {
     type CollectedData = CpuInfo;
+    type CollectorConfig = CpuCollectorConfig;
 
     fn name(&self) -> &'static str {
         "cpu"
     }
 
-    fn config(&self) -> &CollectorConfig {
+    fn config(&self) -> &Self::CollectorConfig {
         &self.config
     }
 
     fn collect(&mut self) -> Result<Self::CollectedData, CollectionError> {
+        if !self.config.enabled {
+            return Err(CollectionError::Disabled);
+        }
         // Refresh the system
         self.system.refresh_cpu_all();
 
