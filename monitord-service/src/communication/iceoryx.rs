@@ -1,5 +1,5 @@
 use prost::Message;
-use tracing::debug;
+use tracing::{debug, info};
 
 use iceoryx2::{
     port::{publisher::Publisher, subscriber::Subscriber},
@@ -57,6 +57,7 @@ impl IceoryxManager {
             },
             Err(e) => return Err(CommunicationError::InitError(e.to_string())),
         };
+        info!("Initialized config listener");
 
         let system_info_publisher = match node
             .service_builder(
@@ -78,6 +79,7 @@ impl IceoryxManager {
             },
             Err(e) => return Err(CommunicationError::InitError(e.to_string())),
         };
+        info!("Initialized system info publisher");
 
         let cpu_info_publisher = match node
             .service_builder(
@@ -99,6 +101,7 @@ impl IceoryxManager {
             },
             Err(e) => return Err(CommunicationError::InitError(e.to_string())),
         };
+        info!("Initialized CPU info publisher");
 
         let memory_info_publisher = match node
             .service_builder(
@@ -120,6 +123,7 @@ impl IceoryxManager {
             },
             Err(e) => return Err(CommunicationError::InitError(e.to_string())),
         };
+        info!("Initialized memory info publisher");
 
         let gpu_info_publisher = match node
             .service_builder(
@@ -142,6 +146,7 @@ impl IceoryxManager {
             },
             Err(e) => return Err(CommunicationError::InitError(e.to_string())),
         };
+        info!("Initialized GPU info publisher");
 
         let net_info_publisher = match node
             .service_builder(
@@ -164,6 +169,7 @@ impl IceoryxManager {
             },
             Err(e) => return Err(CommunicationError::InitError(e.to_string())),
         };
+        info!("Initialized network info publisher");
 
         let storage_info_publisher = match node
             .service_builder(
@@ -186,6 +192,7 @@ impl IceoryxManager {
             },
             Err(e) => return Err(CommunicationError::InitError(e.to_string())),
         };
+        info!("Initialized storage info publisher");
 
         let process_info_publisher = match node
             .service_builder(
@@ -208,6 +215,7 @@ impl IceoryxManager {
             },
             Err(e) => return Err(CommunicationError::InitError(e.to_string())),
         };
+        info!("Initialized process info publisher");
 
         Ok(Self {
             node,

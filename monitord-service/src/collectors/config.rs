@@ -1,8 +1,8 @@
-use super::process::config::ProcessCollectorConfig;
 pub use super::{
     cpu::config::CpuCollectorConfig, gpu::config::GpuCollectorConfig,
     memory::config::MemoryCollectorConfig, network::config::NetworkCollectorConfig,
-    storage::config::StorageCollectorConfig, system::config::SystemCollectorConfig,
+    process::config::ProcessCollectorConfig, storage::config::StorageCollectorConfig,
+    system::config::SystemCollectorConfig,
 };
 
 #[derive(Debug, Clone)]

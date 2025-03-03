@@ -12,15 +12,8 @@ pub struct IceoryxConfig {
     pub service_name: String,
     // Max buffer size per connection
     pub buffer_size: usize,
-    // Custom service options
-    pub custom_options: Option<IceoryxCustomOptions>,
 }
 
-#[derive(Debug, Clone)]
-pub struct IceoryxCustomOptions {
-    // Any custom options that might be needed
-    pub history_size: usize,
-}
 
 #[derive(Debug, Clone)]
 pub struct GrpcConfig {

@@ -35,7 +35,10 @@ mod platform {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     let service_config = ServiceConfig::load_from_env_or_file();
-    service::ServiceManager::run(service_config).await?;
+    let service_manager = service::ServiceManager::init(service_config)?;
+
+    service_manager.run().await?;
     Ok(())
 }

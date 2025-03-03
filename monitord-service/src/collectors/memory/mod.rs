@@ -5,6 +5,8 @@ use monitord_protocols::monitord::MemoryInfo as ProtoMemoryInfo;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::process::Command;
+use tracing::info;
+
 pub mod config;
 
 pub struct MemoryCollector {
@@ -14,6 +16,7 @@ pub struct MemoryCollector {
 
 impl MemoryCollector {
     pub fn new(config: MemoryCollectorConfig) -> Result<Self, CollectionError> {
+        info!("Initialized memory collector");
         Ok(Self {
             system: sysinfo::System::new_with_specifics(
                 sysinfo::RefreshKind::nothing()

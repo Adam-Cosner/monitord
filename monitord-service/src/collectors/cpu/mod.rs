@@ -1,6 +1,13 @@
 use crate::error::CollectionError;
 use config::CpuCollectorConfig;
 use monitord_protocols::protocols::CpuInfo;
+use tracing::{info, warn};
+
+#[cfg(target_os = "linux")]
+use std::fs;
+#[cfg(target_os = "linux")]
+use std::path::Path;
+
 pub mod config;
 
 /// Collects CPU information
@@ -18,11 +25,153 @@ impl CpuCollector {
 
         let cpuid = raw_cpuid::CpuId::new();
 
+        info!("Initialized CPU collector");
         Ok(Self {
             system,
             cpuid,
             config,
         })
+    }
+
+    #[cfg(target_os = "linux")]
+    /// Get the CPU temperature in Celsius
+    /// This function attempts to read the CPU temperature from the thermal zone
+    /// On Linux, we use /sys/class/thermal/thermal_zone* to get thermal information
+    fn get_cpu_temperature(&self) -> Option<f64> {
+        // Try to find CPU thermal zones
+        // This is a simplified approach that returns the first thermal zone that looks like a CPU
+        for i in 0..20 {
+            // Check the first 20 thermal zones
+            let zone_path = format!("/sys/class/thermal/thermal_zone{}", i);
+            if !Path::new(&zone_path).exists() {
+                continue;
+            }
+
+            // Try to read the type of this thermal zone
+            let type_path = format!("{}/type", zone_path);
+            match fs::read_to_string(&type_path) {
+                Ok(zone_type) => {
+                    // Look for zones that contain CPU, processor, x86, or core in their name
+                    let zone_type = zone_type.trim().to_lowercase();
+                    if zone_type.contains("cpu")
+                        || zone_type.contains("processor")
+                        || zone_type.contains("x86")
+                        || zone_type.contains("core")
+                    {
+                        // Read the temperature
+                        let temp_path = format!("{}/temp", zone_path);
+                        if let Ok(temp_str) = fs::read_to_string(&temp_path) {
+                            if let Ok(temp) = temp_str.trim().parse::<u32>() {
+                                // Temperature is usually reported in millidegrees Celsius
+                                return Some(temp as f64 / 1000.0);
+                            }
+                        }
+                    }
+                }
+                Err(_) => continue,
+            }
+        }
+
+        None
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn get_cpu_temperature(&self) -> Option<f64> {
+        None
+    }
+
+    #[cfg(target_os = "linux")]
+    /// Get the scaling governor for a specific CPU core
+    /// On Linux, this is read from /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+    fn get_scaling_governor(&self, core_id: u32) -> Option<String> {
+        let governor_path = format!(
+            "/sys/devices/system/cpu/cpu{}/cpufreq/scaling_governor",
+            core_id
+        );
+
+        match fs::read_to_string(&governor_path) {
+            Ok(governor) => Some(governor.trim().to_string()),
+            Err(e) => {
+                warn!(
+                    "Failed to read scaling governor for core {}: {}",
+                    core_id, e
+                );
+                None
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn get_scaling_governor(&self, _core_id: u32) -> Option<String> {
+        None
+    }
+
+    #[cfg(target_os = "linux")]
+    /// Get the minimum frequency for a specific CPU core in MHz
+    /// On Linux, this is read from /sys/devices/system/cpu/cpu*/cpufreq/scaling_min_freq
+    fn get_min_frequency(&self, core_id: u32) -> Option<f64> {
+        let freq_path = format!(
+            "/sys/devices/system/cpu/cpu{}/cpufreq/scaling_min_freq",
+            core_id
+        );
+
+        match fs::read_to_string(&freq_path) {
+            Ok(freq_str) => {
+                if let Ok(freq_khz) = freq_str.trim().parse::<u32>() {
+                    // Convert from KHz to MHz
+                    Some(freq_khz as f64 / 1000.0)
+                } else {
+                    warn!("Failed to parse min frequency for core {}", core_id);
+                    None
+                }
+            }
+            Err(e) => {
+                warn!("Failed to read min frequency for core {}: {}", core_id, e);
+                None
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn get_min_frequency(&self, _core_id: u32) -> Option<f64> {
+        None
+    }
+
+    #[cfg(target_os = "linux")]
+    /// Get the maximum frequency for a specific CPU core in MHz
+    /// On Linux, this is read from /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq
+    fn get_max_frequency(&self, core_id: u32) -> Option<f64> {
+        let freq_path = format!(
+            "/sys/devices/system/cpu/cpu{}/cpufreq/scaling_max_freq",
+            core_id
+        );
+
+        match fs::read_to_string(&freq_path) {
+            Ok(freq_str) => {
+                if let Ok(freq_khz) = freq_str.trim().parse::<u32>() {
+                    // Convert from KHz to MHz
+                    Some(freq_khz as f64 / 1000.0)
+                } else {
+                    warn!("Failed to parse max frequency for core {}", core_id);
+                    None
+                }
+            }
+            Err(e) => {
+                warn!("Failed to read max frequency for core {}: {}", core_id, e);
+                None
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn get_max_frequency(&self, _core_id: u32) -> Option<f64> {
+        None
+    }
+
+    /// Get the global scaling governor for the system
+    /// This reads the governor from the first CPU and assumes it's the same for all CPUs
+    fn get_global_scaling_governor(&self) -> Option<String> {
+        self.get_scaling_governor(0)
     }
 }
 
@@ -127,19 +276,23 @@ impl super::Collector for CpuCollector {
         let physical_cores = self.system.physical_core_count().unwrap_or(1) as u32;
         let global_cpu_usage = self.system.global_cpu_usage() as f64;
 
+        // Get the global CPU temperature
+        let cpu_temp = self.get_cpu_temperature();
+
         for (i, cpu) in self.system.cpus().iter().enumerate() {
+            let core_id = i as u32;
             core_info.push(monitord_protocols::monitord::CoreInfo {
-                core_id: i as u32,
+                core_id,
                 frequency_mhz: cpu.frequency() as f64,
                 utilization_percent: cpu.cpu_usage() as f64,
-                temperature_celsius: 0.0, // Could be obtained with additional thermal sensors
-                min_frequency_mhz: None,
-                max_frequency_mhz: None,
+                temperature_celsius: cpu_temp.unwrap_or(0.0), // Use the same temperature for all cores
+                min_frequency_mhz: self.get_min_frequency(core_id),
+                max_frequency_mhz: self.get_max_frequency(core_id),
             });
         }
 
         // Build the CPU info
-        let cpu_info = monitord_protocols::protocols::CpuInfo {
+        let cpu_info = CpuInfo {
             model_name: processor_brand
                 .map_or_else(|| "Unknown".to_string(), |brand| brand.as_str().to_string()),
             physical_cores,
@@ -147,7 +300,7 @@ impl super::Collector for CpuCollector {
             global_utilization_percent: global_cpu_usage,
             core_info,
             cache_info: Some(cache),
-            scaling_governor: None, // Would need to read from /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+            scaling_governor: self.get_global_scaling_governor(),
             architecture: std::env::consts::ARCH.to_string(),
             cpu_flags,
         };
