@@ -113,7 +113,6 @@ impl CommunicationManager {
                                     if let Some(iceoryx) = &self.iceoryx {
                                         iceoryx.lock().await.send_subscribe_response(client_id, response).await?;
                                     }
-                                    todo!()
                                 }
                                 IceoryxSubscriptionRequest::ModifySubscription((client_id, request)) => {
                                     let response = self.subscription_manager.write().await.modify_subscription(request).await?;
