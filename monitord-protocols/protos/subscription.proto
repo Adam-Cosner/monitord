@@ -22,7 +22,7 @@ message SubscriptionRequest {
     StorageFilter storage_filter = 6;
   }
 
-  string subscription_id = 7;
+  string client_id = 7;
 }
 
 // Available subscription types
@@ -132,12 +132,18 @@ message ListSubscriptionsResponse {
 message ActiveSubscription {
   string subscription_id = 1;
   SubscriptionType type = 2;
-  uint32 interval_ms = 3;
-  string created_at = 4; // ISO 8601 formatted timestamp
+  TransportType transport_type = 3;
+  uint32 interval_ms = 4;
+  string created_at = 5; // ISO 8601 formatted timestamp
   oneof filter {
-    ProcessFilter process_filter = 5;
-    GpuFilter gpu_filter = 6;
-    NetworkFilter network_filter = 7;
-    StorageFilter storage_filter = 8;
+    ProcessFilter process_filter = 6;
+    GpuFilter gpu_filter = 7;
+    NetworkFilter network_filter = 8;
+    StorageFilter storage_filter = 9;
   }
+}
+
+enum TransportType {
+  ICEORYX = 0;
+  GRPC = 1;
 }

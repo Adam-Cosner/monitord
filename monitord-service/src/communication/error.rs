@@ -2,6 +2,8 @@ use crate::collectors::error::CollectionError;
 use thiserror::Error;
 use tokio::sync::broadcast::error::SendError;
 
+pub use super::subscription::error::*;
+
 #[derive(Error, Debug)]
 pub enum CommunicationError {
     #[error("Failed to initialize communication layer: {0}")]
@@ -24,6 +26,9 @@ pub enum CommunicationError {
 
     #[error("Invalid configuration: {0}")]
     InvalidConfiguration(String),
+
+    #[error("Subscription error: {0}")]
+    SubscriptionError(#[from] SubscriptionError),
 
     #[error("Collector error: {0}")]
     CollectorError(#[from] CollectionError),

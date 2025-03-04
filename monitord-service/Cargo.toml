@@ -33,6 +33,7 @@ signal-hook = "0.3.17"
 # Utilities
 prost = "0.13.5"
 chrono = "0.4.40"
+uuid = { version = "1.15.1", features = ["v4"] }
 
 # Unix systems
 [target.'cfg(unix)'.dependencies]

@@ -31,12 +31,16 @@ impl ServiceManager {
     pub async fn run(mut self) -> Result<(), ServiceError> {
         let cpu_rx = self.collector_manager.cpu_tx.subscribe();
         let memory_rx = self.collector_manager.memory_tx.subscribe();
+        let iceoryx_subscription_rx = self
+            .communication_manager
+            .iceoryx_subscription_tx
+            .subscribe();
         tokio::select! {
             res = self.collector_manager.run() => match res {
                 Ok(_) => {}
                 Err(e) => return Err(ServiceError::CollectionError(e)),
             },
-            res = self.communication_manager.run(cpu_rx, memory_rx) => {
+            res = self.communication_manager.run(iceoryx_subscription_rx, cpu_rx, memory_rx) => {
                 match res {
                     Ok(_) => {}
                     Err(e) => return Err(ServiceError::CommunicationError(e)),

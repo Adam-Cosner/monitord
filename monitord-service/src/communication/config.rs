@@ -1,9 +1,15 @@
+pub use super::subscription::config::*;
+
 #[derive(Debug, Clone)]
 pub struct CommunicationConfig {
+    // The time between refreshes of the connection listeners
+    pub connection_frequency: tokio::time::Duration,
     // Whether to publish metrics to iceoryx2
     pub iceoryx: Option<IceoryxConfig>,
     // Whether to publish metrics through gRPC
     pub grpc: Option<GrpcConfig>,
+    // The subscription manager
+    pub subscription: SubscriptionConfig,
 }
 
 #[derive(Debug, Clone)]
@@ -13,7 +19,6 @@ pub struct IceoryxConfig {
     // Max buffer size per connection
     pub buffer_size: usize,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct GrpcConfig {

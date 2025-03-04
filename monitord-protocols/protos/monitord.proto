@@ -5,6 +5,16 @@ package monitord;
 // Import timestamp for recording when measurements were taken
 import "google/protobuf/timestamp.proto";
 
+message Connection {
+  // Send the client's pid to the server to ensure it's received back correctly
+  uint32 pid = 1;
+}
+
+message ConnectionResponse {
+  uint32 pid = 1;
+  string client_id = 2;
+}
+
 // Top-level message containing all system information
 message SystemSnapshot {
   google.protobuf.Timestamp timestamp = 1;
@@ -215,22 +225,22 @@ message KeyValuePair {
 service MonitordService {
   // Stream full system snapshots
   rpc StreamSystemSnapshots(SnapshotRequest) returns (stream SystemSnapshot);
-  
+
   // Get a single snapshot
   rpc GetSystemSnapshot(SnapshotRequest) returns (SystemSnapshot);
-  
+
   // Stream just CPU information
   rpc StreamCpuInfo(SnapshotRequest) returns (stream CpuInfo);
-  
+
   // Stream just memory information
   rpc StreamMemoryInfo(SnapshotRequest) returns (stream MemoryInfo);
-  
+
   // Stream just GPU information
   rpc StreamGpuInfo(SnapshotRequest) returns (stream GpuInfo);
-  
+
   // Stream just network information
   rpc StreamNetworkInfo(SnapshotRequest) returns (stream NetworkInfo);
-  
+
   // Stream process information with optional filtering
   rpc StreamProcessInfo(ProcessInfoRequest) returns (stream ProcessInfo);
 }
