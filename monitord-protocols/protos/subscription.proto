@@ -10,10 +10,10 @@ import "google/protobuf/timestamp.proto";
 message SubscriptionRequest {
   // What type of information to subscribe to
   SubscriptionType type = 1;
-  
+
   // How frequently updates should be sent (in milliseconds)
   uint32 interval_ms = 2;
-  
+
   // Optional filters based on subscription type
   oneof filter {
     ProcessFilter process_filter = 3;
@@ -21,6 +21,8 @@ message SubscriptionRequest {
     NetworkFilter network_filter = 5;
     StorageFilter storage_filter = 6;
   }
+
+  string subscription_id = 7;
 }
 
 // Available subscription types
@@ -84,13 +86,13 @@ enum SubscriptionStatus {
 service SubscriptionService {
   // Create a new subscription
   rpc Subscribe(SubscriptionRequest) returns (SubscriptionResponse);
-  
+
   // Modify an existing subscription
   rpc ModifySubscription(ModifySubscriptionRequest) returns (SubscriptionResponse);
-  
+
   // Cancel a subscription
   rpc Unsubscribe(UnsubscribeRequest) returns (UnsubscribeResponse);
-  
+
   // List active subscriptions
   rpc ListSubscriptions(ListSubscriptionsRequest) returns (ListSubscriptionsResponse);
 }

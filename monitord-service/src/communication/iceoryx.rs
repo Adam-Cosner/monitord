@@ -45,6 +45,7 @@ impl IceoryxManager {
                     .unwrap(),
             )
             .publish_subscribe::<[u8]>()
+            .subscriber_max_buffer_size(config.buffer_size)
             .open_or_create()
         {
             Ok(port_factory) => match port_factory

@@ -3,7 +3,7 @@ use super::{
     config::CollectionConfig, cpu::CpuCollector, error::CollectionError, memory::MemoryCollector,
 };
 use monitord_protocols::monitord::*;
-use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::broadcast::Sender;
 use tracing::debug;
 
 pub struct CollectorManager {

@@ -1,4 +1,5 @@
 use config::ServiceConfig;
+use tracing::info;
 
 mod collectors;
 mod communication;

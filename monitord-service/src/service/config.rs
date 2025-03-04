@@ -1,6 +1,7 @@
 use crate::config::{
-    CommunicationConfig, CpuCollectorConfig, GpuCollectorConfig, MemoryCollectorConfig,
-    NetworkCollectorConfig, ProcessCollectorConfig, StorageCollectorConfig, SystemCollectorConfig,
+    CommunicationConfig, CpuCollectorConfig, GpuCollectorConfig, IceoryxConfig,
+    MemoryCollectorConfig, NetworkCollectorConfig, ProcessCollectorConfig, StorageCollectorConfig,
+    SystemCollectorConfig,
 };
 use crate::{config::CollectionConfig, config::PlatformConfig};
 
@@ -34,7 +35,10 @@ impl Default for ServiceConfig {
                 proc_config: ProcessCollectorConfig {},
             },
             communication_config: CommunicationConfig {
-                iceoryx: None,
+                iceoryx: Some(IceoryxConfig {
+                    service_name: "monitord".to_string(),
+                    buffer_size: 1024 * 1024,
+                }),
                 grpc: None,
             },
             platform_config: PlatformConfig {},
