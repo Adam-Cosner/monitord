@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use tokio::sync::RwLock;
 use tokio::time::Instant;
 use tracing::info;
-use uuid::{uuid, Uuid};
+use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub struct Subscription {
