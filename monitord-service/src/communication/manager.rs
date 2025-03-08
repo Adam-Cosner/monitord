@@ -6,7 +6,7 @@ use monitord_protocols::monitord::{
 use monitord_protocols::subscription::{SubscriptionType, TransportType};
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::{Mutex, RwLock};
-use tracing::info;
+use tracing::{debug, info};
 
 pub struct CommunicationManager {
     config: CommunicationConfig,
@@ -53,6 +53,7 @@ impl CommunicationManager {
         mut iceoryx_subscription_rx: Receiver<IceoryxSubscriptionRequest>,
         mut cpu_rx: Receiver<CpuInfo>,
         mut memory_rx: Receiver<MemoryInfo>,
+        mut gpu_rx: Receiver<Vec<GpuInfo>>,
     ) -> Result<(), CommunicationError> {
         tokio::select! {
             cpu_info = async {
@@ -61,6 +62,7 @@ impl CommunicationManager {
                         Ok(info) => self.publish_cpu_info(info).await?,
                         Err(e) => return Err::<(), CommunicationError>(CommunicationError::ReceiveError(e.to_string())),
                     }
+                    tokio::task::yield_now().await;
                 }
             } => {
                 match cpu_info {
@@ -74,6 +76,7 @@ impl CommunicationManager {
                         Ok(info) => self.publish_memory_info(info).await?,
                         Err(e) => return Err::<(), CommunicationError>(CommunicationError::ReceiveError(e.to_string())),
                     }
+                    tokio::task::yield_now().await;
                 }
             } => {
                 match memory_info {
@@ -81,8 +84,21 @@ impl CommunicationManager {
                     Err(e) => return Err(e),
                 }
             }
+            gpu_info = async {
+                loop {
+                    match gpu_rx.recv().await {
+                        Ok(info) => self.publish_gpu_info(&info).await?,
+                        Err(e) => return Err::<(), CommunicationError>(CommunicationError::ReceiveError(e.to_string())),
+                    }
+                    tokio::task::yield_now().await;
+                }
+            } => {
+                match gpu_info {
+                    Ok(_) => {}
+                    Err(e) => return Err(e),
+                }
+            }
             iceoryx_connections = async {
-                info!("Responding to connections");
                 loop {
                     tokio::time::sleep(self.config.connection_frequency).await;
                     match self.iceoryx.as_ref() {
@@ -96,6 +112,7 @@ impl CommunicationManager {
                             tokio::task::yield_now().await;
                         }
                     }
+                    tokio::task::yield_now().await;
                 }
             } => {
                 match iceoryx_connections {

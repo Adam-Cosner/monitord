@@ -2,7 +2,7 @@ use error::CollectionError;
 use prost::Message;
 
 pub trait Collector: Send + Sync {
-    type CollectedData: Message + Send + Sync;
+    type CollectedData: Send + Sync;
     type CollectorConfig;
 
     fn name(&self) -> &'static str;

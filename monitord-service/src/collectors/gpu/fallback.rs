@@ -1,17 +1,15 @@
 use crate::error::CollectionError;
 use monitord_protocols::monitord::GpuInfo;
 
-pub struct NvidiaGpuCollector {
-    nvml: nvml_wrapper::Nvml,
-}
+pub struct FallbackGpuCollector {}
 
-impl NvidiaGpuCollector {
+impl FallbackGpuCollector {
     pub fn new() -> Result<Self, CollectionError> {
-        Err(CollectionError::Disabled)
+        todo!()
     }
 }
 
-impl super::VendorGpuCollector for NvidiaGpuCollector {
+impl super::VendorGpuCollector for FallbackGpuCollector {
     fn init(&mut self) -> Result<(), CollectionError> {
         todo!()
     }

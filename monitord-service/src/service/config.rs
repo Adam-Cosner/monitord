@@ -25,11 +25,7 @@ impl Default for ServiceConfig {
                     enabled: true,
                     interval: chrono::Duration::seconds(1),
                 },
-                gpu_config: GpuCollectorConfig {
-                    amd_enabled: false,
-                    nvidia_enabled: false,
-                    intel_enabled: false,
-                },
+                gpu_config: GpuCollectorConfig::default(),
                 disk_config: StorageCollectorConfig {},
                 net_config: NetworkCollectorConfig {},
                 proc_config: ProcessCollectorConfig {},
