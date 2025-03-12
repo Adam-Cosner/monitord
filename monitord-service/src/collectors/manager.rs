@@ -5,7 +5,7 @@ use super::{
 use crate::collectors::gpu::GpuCollector;
 use monitord_protocols::monitord::*;
 use tokio::sync::broadcast::Sender;
-use tracing::debug;
+use tracing::{debug, info};
 
 pub struct CollectorManager {
     cpu_collector: CpuCollector,
@@ -74,6 +74,7 @@ impl CollectorManager {
                         return Err::<(), CollectionError>(CollectionError::Disabled);
                     }
                     let collected_data = self.gpu_collector.collect()?;
+                    info!("Collected GPU Data: {:?}", collected_data);
                     self.gpu_tx.send(collected_data).unwrap();
                     tokio::time::sleep(self.gpu_collector.config().interval.to_std().unwrap()).await;
                 }

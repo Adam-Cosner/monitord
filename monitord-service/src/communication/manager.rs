@@ -148,6 +148,7 @@ impl CommunicationManager {
                         }
                         Err(e) => return Err::<(), CommunicationError>(CommunicationError::ReceiveError(e.to_string())),
                     }
+                    tokio::task::yield_now().await;
                 }
             } => {
                 match iceoryx_subscriptions {

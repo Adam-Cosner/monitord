@@ -1,3 +1,6 @@
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use tracing::{info, warn};
 use crate::collectors::gpu::VendorGpuCollector;
 use crate::error::CollectionError;
 use monitord_protocols::monitord::{GpuDriverInfo, GpuInfo, GpuProcessInfo};
@@ -48,16 +51,82 @@ impl AmdGpuCollector {
     }
 
     fn collect_processes(&self) -> Result<Vec<GpuProcessInfo>, CollectionError> {
-        // todo
-        Ok(vec![])
+        let mut processes = Vec::new();
+
+        // On AMD GPUs, process information is more challenging to gather than NVIDIA
+        // We can try to get information from the render nodes
+        for device_path in &self.devices {
+            let device_path = Path::new(device_path);
+
+            // Get the card number from the path (e.g., /sys/class/drm/card0 -> 0)
+            let card_name = device_path.file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("unknown");
+
+            let card_number = card_name.strip_prefix("card")
+                .and_then(|num| num.parse::<u32>().ok())
+                .unwrap_or(0);
+
+            // Check for processes that might be using this GPU
+            if let Ok(output) = Command::new("lsof")
+                .args(&["-F", "pc", &format!("/dev/dri/renderD{}", 128 + card_number)])
+                .output() {
+
+                if output.status.success() {
+                    let output_str = String::from_utf8_lossy(&output.stdout);
+                    let mut current_pid = 0;
+                    let mut current_command = String::new();
+
+                    for line in output_str.lines() {
+                        if line.starts_with('p') {
+                            // New process
+                            if current_pid > 0 && !current_command.is_empty() {
+                                processes.push(GpuProcessInfo {
+                                    pid: current_pid,
+                                    process_name: current_command.clone(),
+                                    gpu_utilization_percent: 0.0, // AMD doesn't provide per-process utilization easily
+                                    vram_bytes: 0,                // AMD doesn't provide per-process VRAM easily
+                                    gpu_device_id: Some(card_name.to_string()),
+                                });
+                            }
+
+                            // Parse PID
+                            current_pid = line[1..].parse::<u32>().unwrap_or(0);
+                            current_command = String::new();
+                        } else if line.starts_with('c') {
+                            // Command
+                            current_command = line[1..].to_string();
+                        }
+                    }
+
+                    // Add the last process
+                    if current_pid > 0 && !current_command.is_empty() {
+                        processes.push(GpuProcessInfo {
+                            pid: current_pid,
+                            process_name: current_command,
+                            gpu_utilization_percent: 0.0,
+                            vram_bytes: 0,
+                            gpu_device_id: Some(card_name.to_string()),
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok(processes)
     }
 
     fn get_amd_device_name(device_path: &std::path::Path) -> Result<String, CollectionError> {
+        // First try to read the product name
+        if let Ok(product) = std::fs::read_to_string(device_path.join("device/product_name")) {
+            return Ok(product.trim().to_string());
+        }
 
         // If product file doesn't exist, try to read the device model ID
         if let Ok(device_id) = std::fs::read_to_string(device_path.join("device/device")) {
             // Convert device ID to a more friendly name using a lookup table
-
+            // This is a simplified approach - a full implementation would have a mapping table
+            // for known AMD GPU device IDs to their marketing names
             return Ok(format!("AMD GPU {}", device_id.trim()));
         }
 
@@ -125,28 +194,119 @@ impl AmdGpuCollector {
     }
 
     fn get_power_usage(device_path: &std::path::Path) -> Option<f64> {
-        // todo
+        // Power usage for AMD GPUs can be found in:
+        // /sys/class/drm/card0/device/hwmon/hwmon*/power1_input (in microwatts)
+        let hwmon_dir = device_path.join("device/hwmon");
+        if hwmon_dir.exists() {
+            if let Ok(entries) = std::fs::read_dir(&hwmon_dir) {
+                for entry in entries.flatten() {
+                    let power_path = entry.path().join("power1_average");
+                    if power_path.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&power_path) {
+                            if let Ok(power_uw) = content.trim().parse::<u64>() {
+                                // Convert from microwatts to watts
+                                return Some(power_uw as f64 / 1_000_000.0);
+                            }
+                        }
+                    }
+                    let power_input = entry.path().join("power1_input");
+                    if power_input.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&power_input) {
+                            if let Ok(power_uw) = content.trim().parse::<u64>() {
+                                // Convert from microwatts to watts
+                                return Some(power_uw as f64 / 1_000_000.0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
         None
     }
 
     fn get_core_frequency(device_path: &std::path::Path) -> Option<f64> {
-        // todo
+        // Check in hwmon directory for frequency sensors
+        let hwmon_dir = device_path.join("device/hwmon");
+        if hwmon_dir.exists() {
+            if let Ok(entries) = std::fs::read_dir(&hwmon_dir) {
+                for entry in entries.flatten() {
+                    let freq_path = entry.path().join("freq1_input");
+                    if freq_path.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&freq_path) {
+                            if let Ok(freq_hz) = content.trim().parse::<u64>() {
+                                // Convert from Hz to MHz
+                                return Some(freq_hz as f64 / 1_000_000.0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         None
     }
 
     fn get_memory_frequency(device_path: &std::path::Path) -> Option<f64> {
-        // todo
+        // Check in hwmon directory for frequency sensors
+        let hwmon_dir = device_path.join("device/hwmon");
+        if hwmon_dir.exists() {
+            if let Ok(entries) = std::fs::read_dir(&hwmon_dir) {
+                for entry in entries.flatten() {
+                    let freq_path = entry.path().join("freq2_input");
+                    if freq_path.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&freq_path) {
+                            if let Ok(freq_hz) = content.trim().parse::<u64>() {
+                                // Convert from Hz to MHz
+                                return Some(freq_hz as f64 / 1_000_000.0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         None
     }
 
     fn get_userspace_driver() -> String {
-        // todo
-        "".to_owned()
+        if let Ok(output) = Command::new("vulkaninfo").output() {
+            if output.status.success() {
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                for line in output_str.lines() {
+                    if line.contains("driverName") && line.contains("AMD") {
+                        if line.contains("RADV") {
+                            return "Mesa RADV (Vulkan)".to_string();
+                        } else if line.contains("AMDVLK") {
+                            return "AMDVLK (Vulkan)".to_string();
+                        } else if line.contains("AMD Proprietary") {
+                            return "AMD Proprietary (Vulkan)".to_string();
+                        }
+                    }
+                }
+            }
+        }
+
+        "Unknown".to_string()
     }
 
     fn get_userspace_driver_version() -> String {
-        // todo
-        "".to_owned()
+        // Device should support Vulkan
+        if let Ok(output) = Command::new("vulkaninfo").output() {
+            if output.status.success() {
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                for line in output_str.lines() {
+                    if line.contains("driverVersion") {
+                        let parts: Vec<&str> = line.split(':').collect();
+                        if parts.len() >= 2 {
+                            return parts[1].trim().to_string();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Default unknown version
+        "Unknown".to_string()
     }
 
     fn get_driver_info(&self) -> GpuDriverInfo {
@@ -161,9 +321,9 @@ impl AmdGpuCollector {
         let mut gpus = Vec::new();
 
         // Check each directory in /sys/class/drm for AMD GPUs
-        if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
-            for entry in entries.flatten() {
-                let path = entry.path();
+
+            for entry in self.devices.iter() {
+                let path = PathBuf::from(entry);
 
                 // Skip entries that don't represent physical devices (like renderD*)
                 if !path.join("device").exists() {
@@ -200,12 +360,11 @@ impl AmdGpuCollector {
                             memory_frequency_mhz: Self::get_memory_frequency(&path),
                             driver_info: Some(self.get_driver_info()),
                             encoder_info: None, // AMD GPU doesn't support reporting encoder info
-                            process_info: self.collect_processes()?, // This would need another method to populate
+                            process_info: self.collect_processes()?,
                         });
                     }
                 }
             }
-        }
 
         if gpus.is_empty() {
             return Err(CollectionError::Generic("No AMD GPUs found using sysfs".to_string()));
@@ -222,7 +381,7 @@ impl VendorGpuCollector for AmdGpuCollector {
     fn init(&mut self) -> Result<(), CollectionError> {
         // Manually parse the sysfs for the devices
         if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
-            for entry in entries.flatten() {
+            for entry in entries.flatten().filter(|e| e.path().file_name().unwrap().to_str().unwrap().contains("card")) {
                 let path = entry.path();
                 if path.join("device/vendor").exists() {
                     if let Ok(vendor) = std::fs::read_to_string(path.join("device/vendor")) {
