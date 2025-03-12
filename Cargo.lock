@@ -879,7 +879,7 @@ dependencies = [
  "log",
  "presser",
  "thiserror 1.0.69",
- "windows 0.57.0",
+ "windows 0.58.0",
 ]
 
 [[package]]
@@ -1536,8 +1536,6 @@ dependencies = [
  "nvml-wrapper",
  "prost",
  "raw-cpuid",
- "rocm_smi_lib",
- "rocm_smi_lib_sys",
  "signal-hook",
  "sysinfo",
  "thiserror 2.0.11",
@@ -2095,27 +2093,6 @@ name = "renderdoc-sys"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
-
-[[package]]
-name = "rocm_smi_lib"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e90c379853ea4b2dd3fbe8cf35abc3e1a47f606fc83696af1d970a105f8b0a13"
-dependencies = [
- "lazy_static",
- "libc",
- "rocm_smi_lib_sys",
-]
-
-[[package]]
-name = "rocm_smi_lib_sys"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0b3fa4a7732c9acf005c25f679e03a8d2e7ce4589175002de1affe0d50976f7"
-dependencies = [
- "libc",
- "libloading",
-]
 
 [[package]]
 name = "ron"
