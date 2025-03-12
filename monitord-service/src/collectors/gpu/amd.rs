@@ -30,7 +30,7 @@ impl AmdGpuCollector {
 
     fn is_amdgpu_available() -> bool {
         // Check sysfs for AMDGPU devices
-            if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
+            if let Ok(entries) = std::fs::read_dir("/host-sys/class/drm") {
                 for entry in entries {
                     if let Ok(entry) = entry {
                         let path = entry.path();
@@ -380,7 +380,7 @@ impl AmdGpuCollector {
 impl VendorGpuCollector for AmdGpuCollector {
     fn init(&mut self) -> Result<(), CollectionError> {
         // Manually parse the sysfs for the devices
-        if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
+        if let Ok(entries) = std::fs::read_dir("/host-sys/class/drm") {
             for entry in entries.flatten().filter(|e| e.path().file_name().unwrap().to_str().unwrap().contains("card")) {
                 let path = entry.path();
                 if path.join("device/vendor").exists() {
