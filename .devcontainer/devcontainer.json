@@ -29,7 +29,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "apt update && apt install -y libclang-dev llvm-dev libssl-dev pkg-config protobuf-compiler",
+	"postCreateCommand": "apt update && apt install -y libclang-dev llvm-dev libssl-dev pkg-config protobuf-compiler libdrm-dev libdrm-amdgpu1 mesa-common-dev",
 
 	// Configure tool-specific properties.
   "customizations" : {
