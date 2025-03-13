@@ -27,7 +27,10 @@ impl Default for ServiceConfig {
                 },
                 gpu_config: GpuCollectorConfig::default(),
                 disk_config: StorageCollectorConfig {},
-                net_config: NetworkCollectorConfig {},
+                net_config: NetworkCollectorConfig {
+                    enabled: true,
+                    interval: chrono::Duration::seconds(1),
+                },
                 proc_config: ProcessCollectorConfig {},
             },
             communication_config: CommunicationConfig {

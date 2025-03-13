@@ -3,9 +3,10 @@ use super::{
     config::CollectionConfig, cpu::CpuCollector, error::CollectionError, memory::MemoryCollector,
 };
 use crate::collectors::gpu::GpuCollector;
+use crate::collectors::network::NetworkCollector;
 use monitord_protocols::monitord::*;
 use tokio::sync::broadcast::Sender;
-use tracing::{debug, info};
+use tracing::info;
 
 pub struct CollectorManager {
     cpu_collector: CpuCollector,
@@ -16,6 +17,9 @@ pub struct CollectorManager {
 
     gpu_collector: GpuCollector,
     pub gpu_tx: Sender<Vec<GpuInfo>>,
+
+    network_collector: NetworkCollector,
+    pub network_tx: Sender<Vec<NetworkInfo>>,
 }
 
 impl CollectorManager {
@@ -23,6 +27,7 @@ impl CollectorManager {
         let (cpu_tx, _) = tokio::sync::broadcast::channel(1);
         let (memory_tx, _) = tokio::sync::broadcast::channel(1);
         let (gpu_tx, _) = tokio::sync::broadcast::channel(1);
+        let (network_tx, _) = tokio::sync::broadcast::channel(1);
         Ok(Self {
             cpu_collector: CpuCollector::new(config.cpu_config)?,
             cpu_tx,
@@ -30,6 +35,8 @@ impl CollectorManager {
             memory_tx,
             gpu_collector: GpuCollector::new(config.gpu_config)?,
             gpu_tx,
+            network_collector: NetworkCollector::new(config.net_config)?,
+            network_tx,
         })
     }
 
@@ -74,7 +81,6 @@ impl CollectorManager {
                         return Err::<(), CollectionError>(CollectionError::Disabled);
                     }
                     let collected_data = self.gpu_collector.collect()?;
-                    info!("Collected GPU Data: {:?}", collected_data);
                     self.gpu_tx.send(collected_data).unwrap();
                     tokio::time::sleep(self.gpu_collector.config().interval.to_std().unwrap()).await;
                 }
@@ -82,7 +88,24 @@ impl CollectorManager {
                 match res {
                     Ok(_) => {}
                     Err(e) => return Err(e),
-                }}
+                }
+            }
+            // Net Collector
+            res = async {
+                loop {
+                    if !self.network_collector.config().enabled {
+                        return Err::<(), CollectionError>(CollectionError::Disabled);
+                    }
+                    let collected_data = self.network_collector.collect()?;
+                    self.network_tx.send(collected_data).unwrap();
+                    tokio::time::sleep(self.network_collector.config().interval.to_std().unwrap()).await;
+                }
+            } => {
+                match res {
+                    Ok(_) => {}
+                    Err(e) => return Err(e),
+                }
+            }
 
         }
         Ok(())
