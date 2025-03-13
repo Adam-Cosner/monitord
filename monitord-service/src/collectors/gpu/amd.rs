@@ -1,14 +1,16 @@
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use tracing::{info, warn};
 use crate::collectors::gpu::VendorGpuCollector;
 use crate::error::CollectionError;
 use monitord_protocols::monitord::{GpuDriverInfo, GpuInfo, GpuProcessInfo};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use tracing::info;
 
 #[cfg(target_os = "linux")]
 pub struct AmdGpuCollector {
     wgpu_instance: wgpu::Instance,
     devices: Vec<String>,
+    usages: HashMap<u32, (std::time::Instant, HashMap<String, u128>)>,
 }
 
 #[cfg(target_os = "linux")]
@@ -21,6 +23,7 @@ impl AmdGpuCollector {
         let mut collector = Self {
             wgpu_instance,
             devices: vec![],
+            usages: HashMap::new(),
         };
 
         collector.init()?;
@@ -30,84 +33,108 @@ impl AmdGpuCollector {
 
     fn is_amdgpu_available() -> bool {
         // Check sysfs for AMDGPU devices
-            if let Ok(entries) = std::fs::read_dir("/host-sys/class/drm") {
-                for entry in entries {
-                    if let Ok(entry) = entry {
-                        let path = entry.path();
-                        if path.join("device/vendor").exists() {
-                            if let Ok(vendor) = std::fs::read_to_string(path.join("device/vendor"))
-                            {
-                                // AMD Vendor ID
-                                if vendor.trim() == "0x1002" {
-                                    return true;
-                                }
+        if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    if path.join("device/vendor").exists() {
+                        if let Ok(vendor) = std::fs::read_to_string(path.join("device/vendor")) {
+                            // AMD Vendor ID
+                            if vendor.trim() == "0x1002" {
+                                return true;
                             }
                         }
                     }
                 }
             }
+        }
 
         false
     }
 
-    fn collect_processes(&self) -> Result<Vec<GpuProcessInfo>, CollectionError> {
+    fn collect_processes(&mut self) -> Result<Vec<GpuProcessInfo>, CollectionError> {
         let mut processes = Vec::new();
 
-        // On AMD GPUs, process information is more challenging to gather than NVIDIA
-        // We can try to get information from the render nodes
-        for device_path in &self.devices {
-            let device_path = Path::new(device_path);
+        // Parse fdinfo in processes to gather metrics
+        for proc in
+            std::fs::read_dir("/proc").map_err(|e| CollectionError::Generic(e.to_string()))?
+        {
+            if let Ok(proc) = proc {
+                let path = proc.path();
+                let pid = match proc.file_name().to_string_lossy().parse::<u32>() {
+                    Ok(pid) => pid,
+                    Err(_) => continue,
+                };
+                let process_name = std::fs::read_to_string(path.join("comm"))
+                    .map_err(|e| CollectionError::ProcessError(e.to_string()))
+                    .unwrap_or_default()
+                    .trim()
+                    .to_owned();
 
-            // Get the card number from the path (e.g., /sys/class/drm/card0 -> 0)
-            let card_name = device_path.file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("unknown");
+                let timestamp = std::time::Instant::now();
 
-            let card_number = card_name.strip_prefix("card")
-                .and_then(|num| num.parse::<u32>().ok())
-                .unwrap_or(0);
+                // Metrics
+                let mut accumulated_per_device_usages: HashMap<String, u128> = HashMap::new();
+                let mut accumulated_per_device_vram: HashMap<String, u64> = HashMap::new();
 
-            // Check for processes that might be using this GPU
-            if let Ok(output) = Command::new("lsof")
-                .args(&["-F", "pc", &format!("/dev/dri/renderD{}", 128 + card_number)])
-                .output() {
+                if let Ok(fdinfo_dir) = path.join("fdinfo").read_dir() {
+                    for fdinfo in fdinfo_dir {
+                        if let Ok(fdinfo) = fdinfo {
+                            if let Ok(content) = std::fs::read_to_string(fdinfo.path()) {
+                                // Read the drm pdev line
+                                if let Some(drm_pdev_line) =
+                                    content.lines().find(|l| l.starts_with("drm-pdev:"))
+                                {
+                                    // Try and find the usage line
+                                    let usage = content
+                                        .lines()
+                                        .find(|l| l.starts_with("drm-engine-gfx:"))
+                                        .and_then(|drm_engine_gfx_line| {
+                                            drm_engine_gfx_line
+                                                .split_whitespace()
+                                                .nth(1)
+                                                .map(|usage| usage.parse::<u128>().ok())
+                                                .flatten()
+                                        })
+                                        .unwrap_or_default();
 
-                if output.status.success() {
-                    let output_str = String::from_utf8_lossy(&output.stdout);
-                    let mut current_pid = 0;
-                    let mut current_command = String::new();
-
-                    for line in output_str.lines() {
-                        if line.starts_with('p') {
-                            // New process
-                            if current_pid > 0 && !current_command.is_empty() {
-                                processes.push(GpuProcessInfo {
-                                    pid: current_pid,
-                                    process_name: current_command.clone(),
-                                    gpu_utilization_percent: 0.0, // AMD doesn't provide per-process utilization easily
-                                    vram_bytes: 0,                // AMD doesn't provide per-process VRAM easily
-                                    gpu_device_id: Some(card_name.to_string()),
-                                });
+                                    if let Some(drm_pdev) = drm_pdev_line.split_whitespace().nth(1)
+                                    {
+                                        if let Some(accumulated_usage) =
+                                            accumulated_per_device_usages
+                                                .get_mut(&drm_pdev.to_string())
+                                        {
+                                            *accumulated_usage += usage;
+                                        } else {
+                                            accumulated_per_device_usages
+                                                .insert(drm_pdev.to_string(), usage);
+                                        }
+                                    }
+                                }
                             }
-
-                            // Parse PID
-                            current_pid = line[1..].parse::<u32>().unwrap_or(0);
-                            current_command = String::new();
-                        } else if line.starts_with('c') {
-                            // Command
-                            current_command = line[1..].to_string();
                         }
                     }
+                }
 
-                    // Add the last process
-                    if current_pid > 0 && !current_command.is_empty() {
-                        processes.push(GpuProcessInfo {
-                            pid: current_pid,
-                            process_name: current_command,
-                            gpu_utilization_percent: 0.0,
-                            vram_bytes: 0,
-                            gpu_device_id: Some(card_name.to_string()),
-                        });
+                if let Some((old_timestamp, old_usages)) = self.usages.insert(
+                    pid,
+                    (timestamp.clone(), accumulated_per_device_usages.clone()),
+                ) {
+                    for (drm_pdev, accumulated_usage) in accumulated_per_device_usages.iter() {
+                        let vram_bytes = *accumulated_per_device_vram.get(drm_pdev).unwrap();
+                        if let Some(previous_usage) = old_usages.get(drm_pdev) {
+                            let delta_time = (timestamp - old_timestamp).as_nanos();
+                            let delta_usages = *accumulated_usage - *previous_usage;
+                            let usage = delta_usages as f64 / delta_time as f64 * 100.0;
+                            processes.push(GpuProcessInfo{
+                                pid,
+                                process_name: process_name.clone(),
+                                gpu_utilization_percent: usage,
+                                vram_bytes,
+                                gpu_device_id: Some(drm_pdev.clone()),
+
+                            });
+                        }
                     }
                 }
             }
@@ -143,7 +170,9 @@ impl AmdGpuCollector {
                 return Ok(bytes);
             }
         }
-        Err(CollectionError::Generic("Failed to read VRAM size".to_string()))
+        Err(CollectionError::Generic(
+            "Failed to read VRAM size".to_string(),
+        ))
     }
 
     fn get_vram_used(device_path: &std::path::Path) -> Result<u64, CollectionError> {
@@ -155,7 +184,9 @@ impl AmdGpuCollector {
                 return Ok(bytes);
             }
         }
-        Err(CollectionError::Generic("Failed to read VRAM usage".to_string()))
+        Err(CollectionError::Generic(
+            "Failed to read VRAM usage".to_string(),
+        ))
     }
 
     fn get_gpu_busy(device_path: &std::path::Path) -> Result<f64, CollectionError> {
@@ -167,7 +198,9 @@ impl AmdGpuCollector {
                 return Ok(percent);
             }
         }
-        Err(CollectionError::Generic("Failed to read GPU utilization".to_string()))
+        Err(CollectionError::Generic(
+            "Failed to read GPU utilization".to_string(),
+        ))
     }
 
     fn get_temperature(device_path: &std::path::Path) -> Result<f64, CollectionError> {
@@ -190,7 +223,9 @@ impl AmdGpuCollector {
                 }
             }
         }
-        Err(CollectionError::Generic("Failed to read temperature".to_string()))
+        Err(CollectionError::Generic(
+            "Failed to read temperature".to_string(),
+        ))
     }
 
     fn get_power_usage(device_path: &std::path::Path) -> Option<f64> {
@@ -317,71 +352,80 @@ impl AmdGpuCollector {
         }
     }
 
-    fn collect_sysfs(&self) -> Result<Vec<GpuInfo>, CollectionError> {
+    fn collect_sysfs(&mut self) -> Result<Vec<GpuInfo>, CollectionError> {
         let mut gpus = Vec::new();
 
         // Check each directory in /sys/class/drm for AMD GPUs
+        let devices = self.devices.clone();
 
-            for entry in self.devices.iter() {
-                let path = PathBuf::from(entry);
+        for entry in devices.into_iter() {
+            let path = PathBuf::from(entry);
 
-                // Skip entries that don't represent physical devices (like renderD*)
-                if !path.join("device").exists() {
-                    continue;
-                }
-
-                // Check if this is an AMD GPU
-                if let Ok(vendor) = std::fs::read_to_string(path.join("device/vendor")) {
-                    if vendor.trim() == "0x1002" {
-                        // This is an AMD GPU
-                        let name = Self::get_amd_device_name(&path)
-                            .unwrap_or_else(|_| "Unknown AMD GPU".to_string());
-
-                        // Get VRAM information
-                        let vram_total = Self::get_vram_size(&path).unwrap_or(0);
-
-                        // Read other metrics like core and memory utilization,
-                        // temperatures, frequencies, etc.
-
-                        gpus.push(GpuInfo {
-                            name,
-                            vendor: "AMD".to_string(),
-                            vram_total_bytes: vram_total,
-                            vram_used_bytes: Self::get_vram_used(&path).unwrap_or(0),
-                            core_utilization_percent: Self::get_gpu_busy(&path).unwrap_or(0.0),
-                            memory_utilization_percent: if vram_total > 0 {
-                                Self::get_vram_used(&path).unwrap_or(0) as f64 / vram_total as f64 * 100.0
-                            } else {
-                                0.0
-                            },
-                            temperature_celsius: Self::get_temperature(&path).unwrap_or(0.0),
-                            power_usage_watts: Self::get_power_usage(&path),
-                            core_frequency_mhz: Self::get_core_frequency(&path),
-                            memory_frequency_mhz: Self::get_memory_frequency(&path),
-                            driver_info: Some(self.get_driver_info()),
-                            encoder_info: None, // AMD GPU doesn't support reporting encoder info
-                            process_info: self.collect_processes()?,
-                        });
-                    }
-                }
+            // Skip entries that don't represent physical devices (like renderD*)
+            if !path.join("device").exists() {
+                continue;
             }
 
+            // Check if this is an AMD GPU
+            if let Ok(vendor) = std::fs::read_to_string(path.join("device/vendor")) {
+                if vendor.trim() == "0x1002" {
+                    // This is an AMD GPU
+                    let name = Self::get_amd_device_name(&path)
+                        .unwrap_or_else(|_| "Unknown AMD GPU".to_string());
+
+                    // Get VRAM information
+                    let vram_total = Self::get_vram_size(&path).unwrap_or(0);
+
+                    // Read other metrics like core and memory utilization,
+                    // temperatures, frequencies, etc.
+
+                    gpus.push(GpuInfo {
+                        name,
+                        vendor: "AMD".to_string(),
+                        vram_total_bytes: vram_total,
+                        vram_used_bytes: Self::get_vram_used(&path).unwrap_or(0),
+                        core_utilization_percent: Self::get_gpu_busy(&path).unwrap_or(0.0),
+                        memory_utilization_percent: if vram_total > 0 {
+                            Self::get_vram_used(&path).unwrap_or(0) as f64 / vram_total as f64
+                                * 100.0
+                        } else {
+                            0.0
+                        },
+                        temperature_celsius: Self::get_temperature(&path).unwrap_or(0.0),
+                        power_usage_watts: Self::get_power_usage(&path),
+                        core_frequency_mhz: Self::get_core_frequency(&path),
+                        memory_frequency_mhz: Self::get_memory_frequency(&path),
+                        driver_info: Some(self.get_driver_info()),
+                        encoder_info: None, // AMD GPU doesn't support reporting encoder info
+                        process_info: self.collect_processes()?,
+                    });
+                }
+            }
+        }
+
         if gpus.is_empty() {
-            return Err(CollectionError::Generic("No AMD GPUs found using sysfs".to_string()));
+            return Err(CollectionError::Generic(
+                "No AMD GPUs found using sysfs".to_string(),
+            ));
         }
 
         Ok(gpus)
     }
-
-
 }
 
 #[cfg(target_os = "linux")]
 impl VendorGpuCollector for AmdGpuCollector {
     fn init(&mut self) -> Result<(), CollectionError> {
         // Manually parse the sysfs for the devices
-        if let Ok(entries) = std::fs::read_dir("/host-sys/class/drm") {
-            for entry in entries.flatten().filter(|e| e.path().file_name().unwrap().to_str().unwrap().contains("card")) {
+        if let Ok(entries) = std::fs::read_dir("/sys/class/drm") {
+            for entry in entries.flatten().filter(|e| {
+                e.path()
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .contains("card")
+            }) {
                 let path = entry.path();
                 if path.join("device/vendor").exists() {
                     if let Ok(vendor) = std::fs::read_to_string(path.join("device/vendor")) {

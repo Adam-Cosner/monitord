@@ -5,12 +5,6 @@
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
 	"image": "mcr.microsoft.com/devcontainers/rust:1-1-bookworm",
 
-    "mounts": [
-      "source=/proc,target=/host-proc,type=bind",
-      "source=/sys,target=/host-sys,type=bind",
-      "source=/dev,target=/host-dev,type=bind"
-    ],
-
 	// Use 'mounts' to make the cargo cache persistent in a Docker Volume.
 	// "mounts": [
 	// 	{
@@ -29,7 +23,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "apt update && apt install -y libclang-dev llvm-dev libssl-dev pkg-config protobuf-compiler libdrm-dev libdrm-amdgpu1 mesa-common-dev",
+	"postCreateCommand": "apt update && apt install -y libclang-dev llvm-dev libssl-dev pkg-config protobuf-compiler",
 
 	// Configure tool-specific properties.
   "customizations" : {
@@ -38,9 +32,11 @@
     }
   },
   "runArgs": [
-    "--privileged"
-  ]
+    "--privileged",
+    "--cap-add=SYS_PTRACE",
+    "--security-opt", "seccomp=unconfined"
+  ],
 
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-	// "remoteUser": "root"
+  "remoteUser": "root"
 }

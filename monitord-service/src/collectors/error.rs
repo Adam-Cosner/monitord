@@ -8,4 +8,8 @@ pub enum CollectionError {
     Disabled,
     #[error("channel error: {0}")]
     ChannelError(String),
+    #[error("process error: {0}")]
+    ProcessError(String),
+    #[error("read error: {0}")]
+    ReadError(String),
 }

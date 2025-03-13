@@ -42,7 +42,7 @@ impl CpuCollector {
         // This is a simplified approach that returns the first thermal zone that looks like a CPU
         for i in 0..20 {
             // Check the first 20 thermal zones
-            let zone_path = format!("/host-sys/class/thermal/thermal_zone{}", i);
+            let zone_path = format!("/sys/class/thermal/thermal_zone{}", i);
             if !Path::new(&zone_path).exists() {
                 continue;
             }
@@ -85,7 +85,7 @@ impl CpuCollector {
     /// On Linux, this is read from /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
     fn get_scaling_governor(&self, core_id: u32) -> Option<String> {
         let governor_path = format!(
-            "/host-sys/devices/system/cpu/cpu{}/cpufreq/scaling_governor",
+            "/sys/devices/system/cpu/cpu{}/cpufreq/scaling_governor",
             core_id
         );
 
@@ -111,7 +111,7 @@ impl CpuCollector {
     /// On Linux, this is read from /sys/devices/system/cpu/cpu*/cpufreq/scaling_min_freq
     fn get_min_frequency(&self, core_id: u32) -> Option<f64> {
         let freq_path = format!(
-            "/host-sys/devices/system/cpu/cpu{}/cpufreq/scaling_min_freq",
+            "/sys/devices/system/cpu/cpu{}/cpufreq/scaling_min_freq",
             core_id
         );
 
@@ -142,7 +142,7 @@ impl CpuCollector {
     /// On Linux, this is read from /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq
     fn get_max_frequency(&self, core_id: u32) -> Option<f64> {
         let freq_path = format!(
-            "/host-sys/devices/system/cpu/cpu{}/cpufreq/scaling_max_freq",
+            "/sys/devices/system/cpu/cpu{}/cpufreq/scaling_max_freq",
             core_id
         );
 
