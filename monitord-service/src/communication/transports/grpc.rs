@@ -2,7 +2,6 @@
 
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::Arc;
 use tokio::sync::Mutex;
 use crate::communication::core::traits::Transport;
 use crate::communication::core::models::{ClientConnection, TransportType};
