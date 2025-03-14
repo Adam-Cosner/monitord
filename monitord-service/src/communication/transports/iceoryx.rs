@@ -3,17 +3,22 @@ use crate::communication::core::ClientConnection;
 use crate::communication::Transport;
 use crate::config::IceoryxConfig;
 use crate::error::{CommunicationError};
+use iceoryx2::prelude::*;
+use crate::communication::transports::common::TopicFormatter;
 
 /// Implementation of the Transport trait for iceoryx2
 pub struct IceoryxTransport {
     config: IceoryxConfig,
+    topic_formatter: TopicFormatter,
     active: bool,
-
+    node: Node<ipc::Service>,
 }
 
 impl IceoryxTransport {
     pub fn new(config: IceoryxConfig) -> Result<Self, CommunicationError> {
-        todo!()
+        let topic_formatter = TopicFormatter::new(&config.service_name);
+        let node = NodeBuilder::default().create().map_err(|e| CommunicationError::Transport(e.to_string()))?;
+        Ok(Self { topic_formatter, config, active: false, node })
     }
 }
 
@@ -21,8 +26,9 @@ impl IceoryxTransport {
 impl Transport for IceoryxTransport {
     async fn initialize(&mut self) -> Result<(), CommunicationError> {
         // TODO: Start iceoryx2 and set up channels
-        self.active = true;
 
+
+        self.active = true;
         Ok(())
     }
 
