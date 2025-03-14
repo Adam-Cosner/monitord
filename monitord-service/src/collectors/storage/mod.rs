@@ -26,6 +26,6 @@ impl super::Collector for StorageCollector {
     }
 
     fn collect(&mut self) -> Result<Self::CollectedData, CollectionError> {
-        todo!()
+        Ok(vec![])
     }
 }

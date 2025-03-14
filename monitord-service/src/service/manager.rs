@@ -33,6 +33,9 @@ impl ServiceManager {
         let memory_rx = self.collector_manager.memory_tx.subscribe();
         let gpu_rx = self.collector_manager.gpu_tx.subscribe();
         let net_rx = self.collector_manager.network_tx.subscribe();
+        let proc_rx = self.collector_manager.process_tx.subscribe();
+        let storage_rx = self.collector_manager.storage_tx.subscribe();
+        let system_rx = self.collector_manager.system_tx.subscribe();
         let iceoryx_subscription_rx = self
             .communication_manager
             .iceoryx_subscription_tx
@@ -42,7 +45,7 @@ impl ServiceManager {
                 Ok(_) => {}
                 Err(e) => return Err(ServiceError::Collection(e)),
             },
-            res = self.communication_manager.run(iceoryx_subscription_rx, cpu_rx, memory_rx, gpu_rx, net_rx) => {
+            res = self.communication_manager.run(iceoryx_subscription_rx, cpu_rx, memory_rx, gpu_rx, net_rx, proc_rx, storage_rx, system_rx) => {
                 match res {
                     Ok(_) => {}
                     Err(e) => return Err(ServiceError::Communication(e)),

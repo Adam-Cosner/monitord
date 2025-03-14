@@ -55,6 +55,9 @@ impl CommunicationManager {
         mut memory_rx: Receiver<MemoryInfo>,
         mut gpu_rx: Receiver<Vec<GpuInfo>>,
         mut net_rx: Receiver<Vec<NetworkInfo>>,
+        mut proc_rx: Receiver<Vec<ProcessInfo>>,
+        mut storage_rx: Receiver<Vec<StorageInfo>>,
+        mut system_rx: Receiver<SystemInfo>,
     ) -> Result<(), CommunicationError> {
         tokio::select! {
             cpu_info = async {
@@ -110,6 +113,20 @@ impl CommunicationManager {
             } => {
                 match net_info {
                     Ok(_) => {}
+                    Err(e) => return Err(e),
+                }
+            }
+            proc_info = async {
+                loop {
+                    match proc_rx.recv().await {
+                        Ok(info) => self.publish_process_info(&info).await?,
+                        Err(e) => return Err::<(), CommunicationError>(CommunicationError::Receive(e.to_string()))
+                    }
+                    tokio::task::yield_now().await;
+                }
+            } => {
+                match proc_info {
+                    Ok(_) => {},
                     Err(e) => return Err(e),
                 }
             }
