@@ -1,7 +1,6 @@
 use crate::error::CollectionError;
 use config::GpuCollectorConfig;
 use monitord_protocols::protocols::GpuInfo;
-use std::sync::Arc;
 use tracing::{info, warn};
 
 pub mod config;

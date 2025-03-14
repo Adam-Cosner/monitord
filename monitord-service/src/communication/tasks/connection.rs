@@ -4,7 +4,6 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tokio::time::Duration;
 use crate::communication::core::traits::Transport;
-use crate::communication::core::models::ClientConnection;
 use crate::communication::subscription::manager::SubscriptionManager;
 use crate::communication::error::CommunicationError;
 use crate::communication::core::traits::MessageHandler;
@@ -36,7 +35,7 @@ pub fn spawn_connection_handler(task: ConnectionTask) -> JoinHandle<Result<(), C
 
         loop {
             // Check for shutdown signal
-            if let Ok(_) = shutdown.try_recv() {
+            if shutdown.try_recv().is_ok() {
                 break;
             }
 

@@ -4,9 +4,6 @@ pub(crate) mod iceoryx;
 pub(crate) mod grpc;
 mod common;
 
-pub use iceoryx::IceoryxTransport;
-pub use grpc::GrpcTransport;
-pub use common::{TopicFormatter, TransportUtils};
 
 use crate::communication::config::CommunicationConfig;
 use crate::communication::core::traits::Transport;

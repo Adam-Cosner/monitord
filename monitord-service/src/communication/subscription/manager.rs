@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 use tokio::sync::RwLock;
-use crate::communication::error::CommunicationError;
-use crate::communication::subscription::models::{Subscription, SubscriptionFilter};
+use crate::communication::subscription::models::Subscription;
 use crate::communication::subscription::error::SubscriptionError;
 use crate::communication::core::models::TransportType;
-use monitord_protocols::subscription::{SubscriptionRequest, SubscriptionResponse, UnsubscribeRequest, UnsubscribeResponse};
+use monitord_protocols::subscription::{SubscriptionRequest, SubscriptionResponse};
 use crate::communication::core::DataType;
 use crate::communication::subscription::SubscriptionConfig;
 

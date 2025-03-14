@@ -1,6 +1,5 @@
 //! Protobuf implementation of the MessageHandler trait
 
-use prost::Message;
 use crate::communication::core::traits::{MessageHandler, MessageType};
 use crate::communication::error::CommunicationError;
 

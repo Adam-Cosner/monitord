@@ -1,6 +1,5 @@
 use crate::communication::core::ClientConnection;
 use crate::communication::error::CommunicationError;
-use crate::communication::subscription::models::Subscription;
 use async_trait::async_trait;
 
 /// Transport trait defines the interface for different transport mechanisms

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 use crate::communication::core::traits::Transport;
-use crate::communication::core::models::{ClientConnection, TransportType};
+use crate::communication::core::models::ClientConnection;
 use crate::communication::config::GrpcConfig;
 use crate::communication::error::CommunicationError;
 

@@ -516,7 +516,7 @@ async fn process_message<T: Message + Clone + Send + 'static>(
             // Format the topic name
             let topic = format!(
                 "{}/{}",
-                data_type.to_string(),
+                data_type,
                 subscription.id
             );
 
@@ -581,7 +581,7 @@ async fn process_gpu_info(
             // Format the topic name
             let topic = format!(
                 "{}/{}/{}",
-                data_type.to_string(),
+                data_type,
                 gpu.name.replace(" ", "_"),
                 subscription.id
             );
@@ -642,7 +642,7 @@ async fn process_network_info(
             // Format the topic name
             let topic = format!(
                 "{}/{}/{}",
-                data_type.to_string(),
+                data_type,
                 network.interface_name,
                 subscription.id
             );
@@ -720,7 +720,7 @@ async fn process_process_info(
             // Format the topic name
             let topic = format!(
                 "{}/{}/{}",
-                data_type.to_string(),
+                data_type,
                 process.pid,
                 subscription.id
             );
@@ -784,7 +784,7 @@ async fn process_storage_info(
             // Format the topic name
             let topic = format!(
                 "{}/{}/{}",
-                data_type.to_string(),
+                data_type,
                 storage.device_name.replace("/", "_"),
                 subscription.id
             );

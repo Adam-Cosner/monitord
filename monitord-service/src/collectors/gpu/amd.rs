@@ -2,13 +2,11 @@ use crate::collectors::gpu::VendorGpuCollector;
 use crate::error::CollectionError;
 use monitord_protocols::monitord::{GpuDriverInfo, GpuInfo, GpuProcessInfo};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
-use tracing::info;
 
 #[cfg(target_os = "linux")]
 pub struct AmdGpuCollector {
-    wgpu_instance: wgpu::Instance,
     devices: Vec<String>,
     usages: HashMap<u32, (std::time::Instant, HashMap<String, u128>)>,
 }
@@ -19,9 +17,7 @@ impl AmdGpuCollector {
         if !Self::is_amdgpu_available() {
             return Err(CollectionError::Generic("No AMD GPUs in system".to_owned()));
         }
-        let wgpu_instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::from_env_or_default());
         let mut collector = Self {
-            wgpu_instance,
             devices: vec![],
             usages: HashMap::new(),
         };
@@ -75,7 +71,7 @@ impl AmdGpuCollector {
 
                 // Metrics
                 let mut accumulated_per_device_usages: HashMap<String, u128> = HashMap::new();
-                let mut accumulated_per_device_vram: HashMap<String, u64> = HashMap::new();
+                let accumulated_per_device_vram: HashMap<String, u64> = HashMap::new();
 
                 if let Ok(fdinfo_dir) = path.join("fdinfo").read_dir() {
                     for fdinfo in fdinfo_dir {
@@ -93,8 +89,7 @@ impl AmdGpuCollector {
                                             drm_engine_gfx_line
                                                 .split_whitespace()
                                                 .nth(1)
-                                                .map(|usage| usage.parse::<u128>().ok())
-                                                .flatten()
+                                                .and_then(|usage| usage.parse::<u128>().ok())
                                         })
                                         .unwrap_or_default();
 
@@ -118,7 +113,7 @@ impl AmdGpuCollector {
 
                 if let Some((old_timestamp, old_usages)) = self.usages.insert(
                     pid,
-                    (timestamp.clone(), accumulated_per_device_usages.clone()),
+                    (timestamp, accumulated_per_device_usages.clone()),
                 ) {
                     for (drm_pdev, accumulated_usage) in accumulated_per_device_usages.iter() {
                         let vram_bytes = *accumulated_per_device_vram.get(drm_pdev).unwrap();

@@ -1,7 +1,7 @@
 //! Registry for dynamic loading of transport providers
 
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 use crate::communication::core::traits::Transport;
 use crate::communication::error::CommunicationError;
 use crate::communication::config::CommunicationConfig;

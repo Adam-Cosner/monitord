@@ -39,7 +39,7 @@ impl CommunicationManager {
 
     /// Run the communication manager
     pub async fn run(
-        mut self,
+        self,
         cpu_rx: Receiver<CpuInfo>,
         memory_rx: Receiver<MemoryInfo>,
         gpu_rx: Receiver<Vec<GpuInfo>>,
