@@ -5,7 +5,7 @@ use monitord_protocols::monitord::MemoryInfo as ProtoMemoryInfo;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::process::Command;
-use tracing::info;
+use tracing::{debug, info};
 
 pub mod config;
 
@@ -216,6 +216,7 @@ impl super::Collector for MemoryCollector {
         if !self.config.enabled {
             return Err(CollectionError::Disabled);
         }
+        debug!("Collecting memory information");
         self.system.refresh_memory();
 
         // Get DRAM information if available

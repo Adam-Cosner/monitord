@@ -123,10 +123,7 @@ impl super::Collector for GpuCollector {
         }
 
         if gpu_infos.is_empty() {
-            warn!("No GPU information collected");
-            return Err(CollectionError::Generic(
-                "No GPU information collected".to_string(),
-            ));
+            warn!("No GPU information collected!");
         }
 
         Ok(gpu_infos)

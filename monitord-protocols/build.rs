@@ -1,8 +1,8 @@
 use std::env;
-use std::path::{Path, PathBuf};
-use std::io::Result;
 use std::fs::File;
+use std::io::Result;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 
 fn main() -> Result<()> {
     // Tell Cargo to rerun this build script if proto files or the build script change
@@ -59,17 +59,26 @@ fn generate_mod_file(out_dir: &Path) -> Result<()> {
     // Re-export the generated protobuf modules
     writeln!(file, "// Main protobuf modules")?;
     writeln!(file, "pub mod monitord {{")?;
-    writeln!(file, "    include!(concat!(env!(\"OUT_DIR\"), \"/monitord.rs\"));")?;
+    writeln!(
+        file,
+        "    include!(concat!(env!(\"OUT_DIR\"), \"/monitord.rs\"));"
+    )?;
     writeln!(file, "}}")?;
     writeln!(file, "")?;
 
     writeln!(file, "pub mod subscription {{")?;
-    writeln!(file, "    include!(concat!(env!(\"OUT_DIR\"), \"/monitord.subscription.rs\"));")?;
+    writeln!(
+        file,
+        "    include!(concat!(env!(\"OUT_DIR\"), \"/monitord.subscription.rs\"));"
+    )?;
     writeln!(file, "}}")?;
     writeln!(file, "")?;
 
     writeln!(file, "pub mod config {{")?;
-    writeln!(file, "    include!(concat!(env!(\"OUT_DIR\"), \"/monitord.config.rs\"));")?;
+    writeln!(
+        file,
+        "    include!(concat!(env!(\"OUT_DIR\"), \"/monitord.config.rs\"));"
+    )?;
     writeln!(file, "}}")?;
     writeln!(file, "")?;
 
@@ -91,12 +100,30 @@ fn generate_mod_file(out_dir: &Path) -> Result<()> {
 
     // Service clients and servers
     writeln!(file, "    // Service clients and servers")?;
-    writeln!(file, "    pub use super::monitord::monitord_service_client::MonitordServiceClient;")?;
-    writeln!(file, "    pub use super::monitord::monitord_service_server::MonitordServiceServer;")?;
-    writeln!(file, "    pub use super::subscription::subscription_service_client::SubscriptionServiceClient;")?;
-    writeln!(file, "    pub use super::subscription::subscription_service_server::SubscriptionServiceServer;")?;
-    writeln!(file, "    pub use super::config::config_service_client::ConfigServiceClient;")?;
-    writeln!(file, "    pub use super::config::config_service_server::ConfigServiceServer;")?;
+    writeln!(
+        file,
+        "    pub use super::monitord::monitord_service_client::MonitordServiceClient;"
+    )?;
+    writeln!(
+        file,
+        "    pub use super::monitord::monitord_service_server::MonitordServiceServer;"
+    )?;
+    writeln!(
+        file,
+        "    pub use super::subscription::subscription_service_client::SubscriptionServiceClient;"
+    )?;
+    writeln!(
+        file,
+        "    pub use super::subscription::subscription_service_server::SubscriptionServiceServer;"
+    )?;
+    writeln!(
+        file,
+        "    pub use super::config::config_service_client::ConfigServiceClient;"
+    )?;
+    writeln!(
+        file,
+        "    pub use super::config::config_service_server::ConfigServiceServer;"
+    )?;
     writeln!(file, "")?;
 
     // Add prost_types re-export for timestamp conversion

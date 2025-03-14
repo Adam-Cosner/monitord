@@ -26,12 +26,18 @@ impl Default for ServiceConfig {
                     interval: chrono::Duration::seconds(1),
                 },
                 gpu_config: GpuCollectorConfig::default(),
-                disk_config: StorageCollectorConfig {},
+                disk_config: StorageCollectorConfig {
+                    enabled: true,
+                    interval: chrono::Duration::seconds(1),
+                },
                 net_config: NetworkCollectorConfig {
                     enabled: true,
                     interval: chrono::Duration::seconds(1),
                 },
-                proc_config: ProcessCollectorConfig {},
+                proc_config: ProcessCollectorConfig {
+                    enabled: true,
+                    interval: chrono::Duration::seconds(1),
+                },
             },
             communication_config: CommunicationConfig {
                 connection_frequency: tokio::time::Duration::from_millis(100),

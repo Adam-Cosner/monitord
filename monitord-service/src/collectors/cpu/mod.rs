@@ -1,7 +1,7 @@
 use crate::error::CollectionError;
 use config::CpuCollectorConfig;
 use monitord_protocols::protocols::CpuInfo;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 #[cfg(target_os = "linux")]
 use std::fs;
@@ -191,6 +191,8 @@ impl super::Collector for CpuCollector {
         if !self.config.enabled {
             return Err(CollectionError::Disabled);
         }
+        debug!("Collecting CPU information");
+        
         // Refresh the system
         self.system.refresh_cpu_all();
 

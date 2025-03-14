@@ -12,15 +12,15 @@ impl ServiceManager {
     pub fn init(config: ServiceConfig) -> Result<Self, ServiceError> {
         let communication_manager = match CommunicationManager::init(config.communication_config) {
             Ok(manager) => manager,
-            Err(e) => return Err(ServiceError::CommunicationError(e)),
+            Err(e) => return Err(ServiceError::Communication(e)),
         };
         let collector_manager = match CollectorManager::init(config.collection_config) {
             Ok(manager) => manager,
-            Err(e) => return Err(ServiceError::CollectionError(e)),
+            Err(e) => return Err(ServiceError::Collection(e)),
         };
         match crate::platform::native::register_service(config.platform_config) {
             Ok(_) => {}
-            Err(e) => return Err(ServiceError::PlatformError(e)),
+            Err(e) => return Err(ServiceError::Platform(e)),
         }
         Ok(Self {
             communication_manager,
@@ -40,12 +40,12 @@ impl ServiceManager {
         tokio::select! {
             res = self.collector_manager.run() => match res {
                 Ok(_) => {}
-                Err(e) => return Err(ServiceError::CollectionError(e)),
+                Err(e) => return Err(ServiceError::Collection(e)),
             },
             res = self.communication_manager.run(iceoryx_subscription_rx, cpu_rx, memory_rx, gpu_rx, net_rx) => {
                 match res {
                     Ok(_) => {}
-                    Err(e) => return Err(ServiceError::CommunicationError(e)),
+                    Err(e) => return Err(ServiceError::Communication(e)),
                 }
             }
         }

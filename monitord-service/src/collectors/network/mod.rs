@@ -1,3 +1,4 @@
+use tracing::debug;
 use crate::error::CollectionError;
 use monitord_protocols::monitord::NetworkInfo;
 
@@ -33,15 +34,20 @@ impl super::Collector for NetworkCollector {
         if !self.config.enabled {
             return Err(CollectionError::Disabled);
         }
+        debug!("Collecting network information");
         self.nets.refresh(true);
-        
+
         let mut networks = Vec::new();
         for (interface_name, data) in self.nets.iter() {
             networks.push(NetworkInfo {
                 interface_name: interface_name.clone(),
                 driver: "".to_string(),
                 mac_address: data.mac_address().to_string(),
-                ip_addresses: data.ip_networks().iter().map(|ip| ip.addr.to_string()).collect(),
+                ip_addresses: data
+                    .ip_networks()
+                    .iter()
+                    .map(|ip| ip.addr.to_string())
+                    .collect(),
                 max_bandwidth_bytes_per_sec: 0, // not provided by sysinfo
                 rx_bytes_per_sec: data.received(),
                 tx_bytes_per_sec: data.transmitted(),
@@ -53,7 +59,7 @@ impl super::Collector for NetworkCollector {
                 tx_bytes_total: data.total_transmitted(),
                 is_up: true, // not provided by sysinfo
                 mtu: data.mtu() as u32,
-                dns_servers: vec![], // not provided by sysinfo
+                dns_servers: vec![],   // not provided by sysinfo
                 link_speed_mbps: None, // not provided by sysinfo
             })
         }

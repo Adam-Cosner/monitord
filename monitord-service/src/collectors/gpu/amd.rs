@@ -66,7 +66,7 @@ impl AmdGpuCollector {
                     Err(_) => continue,
                 };
                 let process_name = std::fs::read_to_string(path.join("comm"))
-                    .map_err(|e| CollectionError::ProcessError(e.to_string()))
+                    .map_err(|e| CollectionError::Process(e.to_string()))
                     .unwrap_or_default()
                     .trim()
                     .to_owned();
@@ -126,13 +126,12 @@ impl AmdGpuCollector {
                             let delta_time = (timestamp - old_timestamp).as_nanos();
                             let delta_usages = *accumulated_usage - *previous_usage;
                             let usage = delta_usages as f64 / delta_time as f64 * 100.0;
-                            processes.push(GpuProcessInfo{
+                            processes.push(GpuProcessInfo {
                                 pid,
                                 process_name: process_name.clone(),
                                 gpu_utilization_percent: usage,
                                 vram_bytes,
                                 gpu_device_id: Some(drm_pdev.clone()),
-
                             });
                         }
                     }

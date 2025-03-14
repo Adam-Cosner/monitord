@@ -46,7 +46,7 @@ impl IceoryxManager {
     pub fn init(config: IceoryxConfig) -> Result<Self, CommunicationError> {
         let node = match NodeBuilder::new().create::<ipc::Service>() {
             Ok(node) => node,
-            Err(e) => return Err(CommunicationError::IceoryxError(e.to_string())),
+            Err(e) => return Err(CommunicationError::Iceoryx(e.to_string())),
         };
 
         let config_listener = match node
@@ -66,9 +66,9 @@ impl IceoryxManager {
                 .create()
             {
                 Ok(config_listener) => config_listener,
-                Err(e) => return Err(CommunicationError::InitError(e.to_string())),
+                Err(e) => return Err(CommunicationError::Init(e.to_string())),
             },
-            Err(e) => return Err(CommunicationError::InitError(e.to_string())),
+            Err(e) => return Err(CommunicationError::Init(e.to_string())),
         };
         info!("Initialized config listener");
 
@@ -89,9 +89,9 @@ impl IceoryxManager {
                 .create()
             {
                 Ok(connection_listener) => connection_listener,
-                Err(e) => return Err(CommunicationError::InitError(e.to_string())),
+                Err(e) => return Err(CommunicationError::Init(e.to_string())),
             },
-            Err(e) => return Err(CommunicationError::InitError(e.to_string())),
+            Err(e) => return Err(CommunicationError::Init(e.to_string())),
         };
         info!("Initialized connection listener");
 
@@ -111,9 +111,9 @@ impl IceoryxManager {
                 .create()
             {
                 Ok(connection_publisher) => connection_publisher,
-                Err(e) => return Err(CommunicationError::InitError(e.to_string())),
+                Err(e) => return Err(CommunicationError::Init(e.to_string())),
             },
-            Err(e) => return Err(CommunicationError::InitError(e.to_string())),
+            Err(e) => return Err(CommunicationError::Init(e.to_string())),
         };
 
         Ok(Self {
@@ -144,14 +144,14 @@ impl IceoryxManager {
                                 debug!("Sent connection response to {count} clients");
                                 Ok(())
                             }
-                            Err(e) => return Err(CommunicationError::SendError(e.to_string())),
+                            Err(e) => return Err(CommunicationError::Send(e.to_string())),
                         },
-                        Err(e) => return Err(CommunicationError::IceoryxError(e.to_string())),
+                        Err(e) => return Err(CommunicationError::Iceoryx(e.to_string())),
                     }
                 }
                 None => Ok(()),
             },
-            Err(e) => return Err(CommunicationError::ReceiveError(e.to_string())),
+            Err(e) => return Err(CommunicationError::Receive(e.to_string())),
         }
     }
 
@@ -160,11 +160,11 @@ impl IceoryxManager {
             Ok(sample) => match sample {
                 Some(sample) => match ServiceConfig::decode(sample.payload()) {
                     Ok(config) => Ok(Some(config)),
-                    Err(e) => return Err(CommunicationError::DeserializationError(e.to_string())),
+                    Err(e) => return Err(CommunicationError::Deserialization(e.to_string())),
                 },
                 None => Ok(None),
             },
-            Err(e) => Err(CommunicationError::ReceiveError(e.to_string())),
+            Err(e) => Err(CommunicationError::Receive(e.to_string())),
         }
     }
 
@@ -192,9 +192,9 @@ impl IceoryxManager {
                             publishers.insert(topic.to_string(), Arc::new(publisher));
                             Arc::clone(publishers.get(&topic.to_string()).unwrap())
                         }
-                        Err(e) => return Err(CommunicationError::InitError(e.to_string())),
+                        Err(e) => return Err(CommunicationError::Init(e.to_string())),
                     },
-                    Err(e) => return Err(CommunicationError::InitError(e.to_string())),
+                    Err(e) => return Err(CommunicationError::Init(e.to_string())),
                 },
             ),
         }
@@ -210,9 +210,9 @@ impl IceoryxManager {
         match publisher.loan_slice_uninit(info.len()) {
             Ok(sample) => match sample.write_from_slice(info).send() {
                 Ok(count) => debug!("Sent info snapshot to {count} clients"),
-                Err(e) => return Err(CommunicationError::SendError(e.to_string())),
+                Err(e) => return Err(CommunicationError::Send(e.to_string())),
             },
-            Err(e) => return Err(CommunicationError::IceoryxError(e.to_string())),
+            Err(e) => return Err(CommunicationError::Iceoryx(e.to_string())),
         }
         Ok(())
     }

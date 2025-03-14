@@ -7,19 +7,19 @@ pub use super::subscription::error::*;
 #[derive(Error, Debug)]
 pub enum CommunicationError {
     #[error("Failed to initialize communication layer: {0}")]
-    InitError(String),
+    Init(String),
 
     #[error("Failed to send message: {0}")]
-    SendError(String),
+    Send(String),
 
     #[error("Failed to receive message: {0}")]
-    ReceiveError(String),
+    Receive(String),
 
     #[error("Serialization error: {0}")]
-    SerializationError(String),
+    Serialization(String),
 
     #[error("Deserialization error: {0}")]
-    DeserializationError(String),
+    Deserialization(String),
 
     #[error("Invalid subscription: {0}")]
     InvalidSubscription(String),
@@ -28,20 +28,20 @@ pub enum CommunicationError {
     InvalidConfiguration(String),
 
     #[error("Subscription error: {0}")]
-    SubscriptionError(#[from] SubscriptionError),
+    Subscription(#[from] SubscriptionError),
 
     #[error("Collector error: {0}")]
-    CollectorError(#[from] CollectionError),
+    Collector(#[from] CollectionError),
 
     #[error("GRPC error: {0}")]
-    GrpcError(String),
+    Grpc(String),
 
     #[error("Iceoryx error: {0}")]
-    IceoryxError(String),
+    Iceoryx(String),
 }
 
 impl<T> From<SendError<T>> for CommunicationError {
     fn from(err: SendError<T>) -> Self {
-        CommunicationError::SendError(err.to_string())
+        CommunicationError::Send(err.to_string())
     }
 }

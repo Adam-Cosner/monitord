@@ -54,14 +54,14 @@ impl CommunicationManager {
         mut cpu_rx: Receiver<CpuInfo>,
         mut memory_rx: Receiver<MemoryInfo>,
         mut gpu_rx: Receiver<Vec<GpuInfo>>,
-        mut net_rx: Receiver<Vec<NetworkInfo>>
+        mut net_rx: Receiver<Vec<NetworkInfo>>,
     ) -> Result<(), CommunicationError> {
         tokio::select! {
             cpu_info = async {
                 loop {
                     match cpu_rx.recv().await {
                         Ok(info) => self.publish_cpu_info(info).await?,
-                        Err(e) => return Err::<(), CommunicationError>(CommunicationError::ReceiveError(e.to_string())),
+                        Err(e) => return Err::<(), CommunicationError>(CommunicationError::Receive(e.to_string())),
                     }
                     tokio::task::yield_now().await;
                 }
@@ -75,7 +75,7 @@ impl CommunicationManager {
                 loop {
                     match memory_rx.recv().await {
                         Ok(info) => self.publish_memory_info(info).await?,
-                        Err(e) => return Err::<(), CommunicationError>(CommunicationError::ReceiveError(e.to_string())),
+                        Err(e) => return Err::<(), CommunicationError>(CommunicationError::Receive(e.to_string())),
                     }
                     tokio::task::yield_now().await;
                 }
@@ -89,7 +89,7 @@ impl CommunicationManager {
                 loop {
                     match gpu_rx.recv().await {
                         Ok(info) => self.publish_gpu_info(&info).await?,
-                        Err(e) => return Err::<(), CommunicationError>(CommunicationError::ReceiveError(e.to_string())),
+                        Err(e) => return Err::<(), CommunicationError>(CommunicationError::Receive(e.to_string())),
                     }
                     tokio::task::yield_now().await;
                 }
@@ -103,7 +103,7 @@ impl CommunicationManager {
                 loop {
                     match net_rx.recv().await {
                         Ok(info) => self.publish_network_info(&info).await?,
-                        Err(e) => return Err::<(), CommunicationError>(CommunicationError::ReceiveError(e.to_string()))
+                        Err(e) => return Err::<(), CommunicationError>(CommunicationError::Receive(e.to_string()))
                     }
                     tokio::task::yield_now().await;
                 }
@@ -161,7 +161,7 @@ impl CommunicationManager {
                             }
 
                         }
-                        Err(e) => return Err::<(), CommunicationError>(CommunicationError::ReceiveError(e.to_string())),
+                        Err(e) => return Err::<(), CommunicationError>(CommunicationError::Receive(e.to_string())),
                     }
                     tokio::task::yield_now().await;
                 }

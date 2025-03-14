@@ -7,9 +7,9 @@ pub enum CollectionError {
     #[error("collector disabled")]
     Disabled,
     #[error("channel error: {0}")]
-    ChannelError(String),
+    Channel(String),
     #[error("process error: {0}")]
-    ProcessError(String),
+    Process(String),
     #[error("read error: {0}")]
-    ReadError(String),
+    Read(String),
 }

@@ -1,4 +1,5 @@
 #[derive(Debug, Clone)]
 pub struct ProcessCollectorConfig {
-    // todo
+    pub enabled: bool,
+    pub interval: chrono::Duration,
 }
