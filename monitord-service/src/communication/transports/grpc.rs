@@ -20,8 +20,6 @@ pub struct GrpcTransport {
 impl GrpcTransport {
     /// Create a new gRPC transport
     pub fn new(config: GrpcConfig) -> Result<Self, CommunicationError> {
-        // TODO: Initialize gRPC server
-
         Ok(Self {
             config,
             active: false,
