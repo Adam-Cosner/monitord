@@ -1,9 +1,11 @@
-use crate::collectors::error::CollectionError;
+//! Error types for communication module
+
 use thiserror::Error;
 use tokio::sync::broadcast::error::SendError;
+use crate::communication::subscription::error::SubscriptionError;
+use crate::collectors::error::CollectionError;
 
-pub use super::subscription::error::*;
-
+/// Error types for the communication module
 #[derive(Error, Debug)]
 pub enum CommunicationError {
     #[error("Failed to initialize communication layer: {0}")]
@@ -33,15 +35,24 @@ pub enum CommunicationError {
     #[error("Collector error: {0}")]
     Collector(#[from] CollectionError),
 
-    #[error("GRPC error: {0}")]
-    Grpc(String),
+    #[error("Transport error: {0}")]
+    Transport(String),
 
-    #[error("Iceoryx error: {0}")]
-    Iceoryx(String),
+    #[error("Task error: {0}")]
+    Task(String),
+
+    #[error("Registry error: {0}")]
+    Registry(String),
 }
 
 impl<T> From<SendError<T>> for CommunicationError {
     fn from(err: SendError<T>) -> Self {
         CommunicationError::Send(err.to_string())
+    }
+}
+
+impl From<tokio::task::JoinError> for CommunicationError {
+    fn from(err: tokio::task::JoinError) -> Self {
+        CommunicationError::Task(err.to_string())
     }
 }

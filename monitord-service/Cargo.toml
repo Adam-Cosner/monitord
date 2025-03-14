@@ -18,6 +18,7 @@ iceoryx2 = "0.5.0"
 
 # Async runtime
 tokio = { version = "1.43.0", features = ["full"] }
+async-trait = "0.1.87"
 
 # Command-line interface
 config = "0.15.8"
@@ -36,6 +37,7 @@ signal-hook = "0.3.17"
 prost = "0.13.5"
 chrono = "0.4.40"
 uuid = { version = "1.15.1", features = ["v4"] }
+byteorder = "1.5.0"
 
 # Unix systems
 [target.'cfg(unix)'.dependencies]

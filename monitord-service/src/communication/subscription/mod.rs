@@ -1,6 +1,11 @@
-pub mod config;
-pub mod error;
-mod manager;
+//! Subscription management module
 
-pub use manager::Subscription;
+pub mod manager;
+pub mod models;
+pub mod error;
+pub mod config;
+
 pub use manager::SubscriptionManager;
+pub use models::{Subscription, SubscriptionFilter};
+pub use error::SubscriptionError;
+pub use config::SubscriptionConfig;

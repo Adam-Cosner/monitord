@@ -10,7 +10,7 @@ pub struct ServiceManager {
 
 impl ServiceManager {
     pub fn init(config: ServiceConfig) -> Result<Self, ServiceError> {
-        let communication_manager = match CommunicationManager::init(config.communication_config) {
+        let communication_manager = match CommunicationManager::new(config.communication_config, Box::new(crate::communication::handlers::ProtobufHandler {})) {
             Ok(manager) => manager,
             Err(e) => return Err(ServiceError::Communication(e)),
         };
@@ -36,16 +36,12 @@ impl ServiceManager {
         let proc_rx = self.collector_manager.process_tx.subscribe();
         let storage_rx = self.collector_manager.storage_tx.subscribe();
         let system_rx = self.collector_manager.system_tx.subscribe();
-        let iceoryx_subscription_rx = self
-            .communication_manager
-            .iceoryx_subscription_tx
-            .subscribe();
         tokio::select! {
             res = self.collector_manager.run() => match res {
                 Ok(_) => {}
                 Err(e) => return Err(ServiceError::Collection(e)),
             },
-            res = self.communication_manager.run(iceoryx_subscription_rx, cpu_rx, memory_rx, gpu_rx, net_rx, proc_rx, storage_rx, system_rx) => {
+            res = self.communication_manager.run(cpu_rx, memory_rx, gpu_rx, net_rx, proc_rx, storage_rx, system_rx) => {
                 match res {
                     Ok(_) => {}
                     Err(e) => return Err(ServiceError::Communication(e)),
