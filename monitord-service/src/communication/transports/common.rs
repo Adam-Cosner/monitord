@@ -3,6 +3,7 @@
 use crate::communication::core::models::DataType;
 
 /// Utility for formatting topic names consistently
+#[derive(Debug, Clone)]
 pub struct TopicFormatter {
     service_prefix: String,
 }
