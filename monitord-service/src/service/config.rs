@@ -39,19 +39,7 @@ impl Default for ServiceConfig {
                     interval: chrono::Duration::seconds(1),
                 },
             },
-            communication_config: CommunicationConfig {
-                connection_frequency: tokio::time::Duration::from_millis(100),
-                iceoryx: Some(IceoryxConfig {
-                    service_name: "monitord".to_string(),
-                    buffer_size: 1024 * 1024,
-                }),
-                grpc: None,
-                subscription: SubscriptionConfig {
-                    max_subscriptions_per_client: 1000,
-                    default_timeout_seconds: 10,
-                    require_authentication: false,
-                },
-            },
+            communication_config: CommunicationConfig::default(),
             platform_config: PlatformConfig {},
         }
     }

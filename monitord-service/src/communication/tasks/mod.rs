@@ -1,5 +1,5 @@
 //! Task-based concurrency for communication
 
-mod connection;
-mod data;
+pub(crate) mod connection;
+pub(crate) mod data;
 

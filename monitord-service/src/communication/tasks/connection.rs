@@ -13,11 +13,11 @@ pub struct ConnectionTask {
     /// Connection listening frequency
     pub frequency: Duration,
     /// Available transports
-    pub transports: Vec<Box<dyn Transport>>,
+    pub transports: Vec<Arc<dyn Transport>>,
     /// Subscription manager
     pub subscription_manager: Arc<SubscriptionManager>,
     /// Message handler
-    pub message_handler: Box<dyn MessageHandler>,
+    pub message_handler: Arc<dyn MessageHandler>,
     /// Channel for shutdown signals
     pub shutdown: tokio::sync::broadcast::Receiver<()>,
 }
