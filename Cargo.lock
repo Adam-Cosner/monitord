@@ -1504,6 +1504,7 @@ name = "monitord-client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "futures",
  "iceoryx2",
  "monitord-protocols",

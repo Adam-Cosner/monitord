@@ -9,7 +9,6 @@ monitord-protocols = { path = "../monitord-protocols" }
 # IPC
 iceoryx2 = "0.5"
 
-
 # Error handling
 thiserror = "2.0.11"
 anyhow = "1.0.96"
@@ -19,6 +18,7 @@ tracing = "0.1.41"
 
 # Utilities
 futures = "0.3.31"
+async-trait = "0.1.77"
 
 [lib]
 name = "monitord_client"
