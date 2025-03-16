@@ -8,19 +8,33 @@ monitord-protocols = { path = "../monitord-protocols" }
 
 # Transport
 iceoryx2 = "0.5"
-tonic = "0.12.3"
+tonic = { version = "0.12.3" }
+
+# Serialization
+prost = "0.13.5"
 
 # Error handling
 thiserror = "2.0.11"
-anyhow = "1.0.96"
+anyhow = { version = "1.0.96", optional = true }
 
 # Logging
 tracing = "0.1.41"
+tracing-subscriber = "0.3.18"
 
 # Utilities
-futures = "0.3.31"
+futures = { version = "0.3.31", features = ["thread-pool"] }
 async-trait = "0.1.77"
+uuid = { version = "1.16.0", features = ["v4"] }
+
+[dev-dependencies]
+tokio = { version = "1.44.1", features = ["full"], optional = true }
+async-std = { version = "1.13.1", optional = true}
+smol = { version = "2.0.2", optional = true }
 
 [lib]
 name = "monitord_client"
 path = "src/lib.rs"
+
+[[example]]
+name = "system_info"
+path = "examples/system_info.rs"

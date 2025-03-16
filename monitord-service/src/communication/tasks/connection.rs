@@ -54,6 +54,18 @@ pub fn spawn_connection_handler(
                             connection.pid,
                             transport.name()
                         );
+                        
+                        // Send connection confirmation message to the client
+                        // Just a simple empty response is enough
+                        match transport.send_response(&connection.client_id, &[]).await {
+                            Ok(_) => {
+                                tracing::debug!("Sent connection confirmation to client: {}", connection.client_id);
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to send connection confirmation to client {}: {}", 
+                                                connection.client_id, e);
+                            }
+                        }
                     }
                     Ok(None) => {
                         // No new connections
