@@ -1,12 +1,12 @@
 //! Connection handling tasks
 
+use crate::communication::core::traits::MessageHandler;
+use crate::communication::core::traits::Transport;
+use crate::communication::error::CommunicationError;
+use crate::communication::subscription::manager::SubscriptionManager;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tokio::time::Duration;
-use crate::communication::core::traits::Transport;
-use crate::communication::subscription::manager::SubscriptionManager;
-use crate::communication::error::CommunicationError;
-use crate::communication::core::traits::MessageHandler;
 
 /// Connection task parameters
 pub struct ConnectionTask {
@@ -23,7 +23,9 @@ pub struct ConnectionTask {
 }
 
 /// Spawn a task to handle client connections
-pub fn spawn_connection_handler(task: ConnectionTask) -> JoinHandle<Result<(), CommunicationError>> {
+pub fn spawn_connection_handler(
+    task: ConnectionTask,
+) -> JoinHandle<Result<(), CommunicationError>> {
     tokio::spawn(async move {
         let ConnectionTask {
             frequency,

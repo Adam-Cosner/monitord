@@ -2,18 +2,22 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use uuid::Uuid;
 use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
-use crate::communication::subscription::models::Subscription;
+use crate::communication::core::models::{DataType, TransportType};
 use crate::communication::subscription::error::SubscriptionError;
-use crate::communication::core::models::{TransportType, DataType};
+use crate::communication::subscription::models::Subscription;
 use crate::communication::subscription::SubscriptionConfig;
 
-use monitord_protocols::subscription::{SubscriptionRequest, SubscriptionResponse, SubscriptionStatus, subscription_request::Filter, ActiveSubscription, TransportType as ProtoTransportType, active_subscription, modify_subscription_request};
 use monitord_protocols::subscription::{
-    UnsubscribeRequest, UnsubscribeResponse, ModifySubscriptionRequest,
-    ListSubscriptionsRequest, ListSubscriptionsResponse
+    active_subscription, modify_subscription_request, subscription_request::Filter,
+    ActiveSubscription, SubscriptionRequest, SubscriptionResponse, SubscriptionStatus,
+    TransportType as ProtoTransportType,
+};
+use monitord_protocols::subscription::{
+    ListSubscriptionsRequest, ListSubscriptionsResponse, ModifySubscriptionRequest,
+    UnsubscribeRequest, UnsubscribeResponse,
 };
 
 /// Manages client subscriptions to different data streams
@@ -55,12 +59,17 @@ impl SubscriptionManager {
     ) -> Result<SubscriptionResponse, SubscriptionError> {
         // Convert protocol subscription type to internal type
         let subscription_type = request.r#type.try_into().map_err(|_| {
-            SubscriptionError::InvalidType(format!("Invalid subscription type: {}", request.r#type as i32))
+            SubscriptionError::InvalidType(format!(
+                "Invalid subscription type: {}",
+                request.r#type as i32
+            ))
         })?;
 
         // Validate the interval (must be > 0)
         if request.interval_ms == 0 {
-            return Err(SubscriptionError::InvalidInterval("Interval must be greater than zero".to_string()));
+            return Err(SubscriptionError::InvalidInterval(
+                "Interval must be greater than zero".to_string(),
+            ));
         }
 
         // Validate the filter (if any)
@@ -71,7 +80,9 @@ impl SubscriptionManager {
 
         // Check if the client has reached their subscription limit
         let mut client_subs = self.client_subscriptions.write().await;
-        let client_sub_ids = client_subs.entry(client_id.clone()).or_insert_with(HashSet::new);
+        let client_sub_ids = client_subs
+            .entry(client_id.clone())
+            .or_insert_with(HashSet::new);
 
         if client_sub_ids.len() >= self.config.max_subscriptions_per_client {
             return Err(SubscriptionError::TooManySubscriptions);
@@ -101,11 +112,18 @@ impl SubscriptionManager {
             .insert(subscription.id.clone());
 
         // If it's ALL type, also add to each specific type
-        if matches!(subscription_type, monitord_protocols::subscription::SubscriptionType::All) {
+        if matches!(
+            subscription_type,
+            monitord_protocols::subscription::SubscriptionType::All
+        ) {
             for data_type in [
-                DataType::Cpu, DataType::Memory, DataType::Gpu,
-                DataType::Network, DataType::Process, DataType::Storage,
-                DataType::System
+                DataType::Cpu,
+                DataType::Memory,
+                DataType::Gpu,
+                DataType::Network,
+                DataType::Process,
+                DataType::Storage,
+                DataType::System,
             ] {
                 data_type_subs
                     .entry(data_type)
@@ -121,7 +139,10 @@ impl SubscriptionManager {
             error_message: String::new(),
         };
 
-        info!("Created subscription {} for client {}", subscription.id, client_id);
+        info!(
+            "Created subscription {} for client {}",
+            subscription.id, client_id
+        );
         Ok(response)
     }
 
@@ -134,9 +155,9 @@ impl SubscriptionManager {
 
         // Find the subscription
         let mut subscriptions = self.subscriptions.write().await;
-        let subscription = subscriptions.get_mut(&subscription_id).ok_or_else(|| {
-            SubscriptionError::NotFound(subscription_id.clone())
-        })?;
+        let subscription = subscriptions
+            .get_mut(&subscription_id)
+            .ok_or_else(|| SubscriptionError::NotFound(subscription_id.clone()))?;
 
         // Update interval if provided
         if request.interval_ms > 0 {
@@ -147,10 +168,18 @@ impl SubscriptionManager {
         if let Some(filter) = request.filter {
             // Validate the filter
             let filter = match &filter {
-                modify_subscription_request::Filter::GpuFilter(filter) => Filter::GpuFilter(filter.clone()),
-                modify_subscription_request::Filter::StorageFilter(filter) => Filter::StorageFilter(filter.clone()),
-                modify_subscription_request::Filter::ProcessFilter(filter) => Filter::ProcessFilter(filter.clone()),
-                modify_subscription_request::Filter::NetworkFilter(filter) => Filter::NetworkFilter(filter.clone())
+                modify_subscription_request::Filter::GpuFilter(filter) => {
+                    Filter::GpuFilter(filter.clone())
+                }
+                modify_subscription_request::Filter::StorageFilter(filter) => {
+                    Filter::StorageFilter(filter.clone())
+                }
+                modify_subscription_request::Filter::ProcessFilter(filter) => {
+                    Filter::ProcessFilter(filter.clone())
+                }
+                modify_subscription_request::Filter::NetworkFilter(filter) => {
+                    Filter::NetworkFilter(filter.clone())
+                }
             };
             Self::validate_filter(&filter, subscription.subscription_type)?;
             subscription.filter = Some(filter);
@@ -175,9 +204,9 @@ impl SubscriptionManager {
 
         // Find and remove the subscription
         let mut subscriptions = self.subscriptions.write().await;
-        let subscription = subscriptions.remove(&subscription_id).ok_or_else(|| {
-            SubscriptionError::NotFound(subscription_id.clone())
-        })?;
+        let subscription = subscriptions
+            .remove(&subscription_id)
+            .ok_or_else(|| SubscriptionError::NotFound(subscription_id.clone()))?;
 
         // Update client subscriptions
         let mut client_subs = self.client_subscriptions.write().await;
@@ -203,11 +232,18 @@ impl SubscriptionManager {
         }
 
         // If it was ALL type, remove from each specific type
-        if matches!(subscription.subscription_type, monitord_protocols::subscription::SubscriptionType::All) {
+        if matches!(
+            subscription.subscription_type,
+            monitord_protocols::subscription::SubscriptionType::All
+        ) {
             for data_type in [
-                DataType::Cpu, DataType::Memory, DataType::Gpu,
-                DataType::Network, DataType::Process, DataType::Storage,
-                DataType::System
+                DataType::Cpu,
+                DataType::Memory,
+                DataType::Gpu,
+                DataType::Network,
+                DataType::Process,
+                DataType::Storage,
+                DataType::System,
             ] {
                 if let Some(type_subs) = data_type_subs.get_mut(&data_type) {
                     type_subs.remove(&subscription_id);
@@ -226,7 +262,10 @@ impl SubscriptionManager {
             error_message: String::new(),
         };
 
-        info!("Removed subscription {} for client {}", subscription_id, subscription.client_id);
+        info!(
+            "Removed subscription {} for client {}",
+            subscription_id, subscription.client_id
+        );
         Ok(response)
     }
 
@@ -250,10 +289,18 @@ impl SubscriptionManager {
                 created_at: format!("{:?}", sub.created_at),
                 filter: match &sub.filter {
                     None => None,
-                    Some(Filter::GpuFilter(filter)) => Some(active_subscription::Filter::GpuFilter(filter.clone())),
-                    Some(Filter::NetworkFilter(filter)) => Some(active_subscription::Filter::NetworkFilter(filter.clone())),
-                    Some(Filter::ProcessFilter(filter)) => Some(active_subscription::Filter::ProcessFilter(filter.clone())),
-                    Some(Filter::StorageFilter(filter)) => Some(active_subscription::Filter::StorageFilter(filter.clone()))
+                    Some(Filter::GpuFilter(filter)) => {
+                        Some(active_subscription::Filter::GpuFilter(filter.clone()))
+                    }
+                    Some(Filter::NetworkFilter(filter)) => {
+                        Some(active_subscription::Filter::NetworkFilter(filter.clone()))
+                    }
+                    Some(Filter::ProcessFilter(filter)) => {
+                        Some(active_subscription::Filter::ProcessFilter(filter.clone()))
+                    }
+                    Some(Filter::StorageFilter(filter)) => {
+                        Some(active_subscription::Filter::StorageFilter(filter.clone()))
+                    }
                 },
             })
             .collect();
@@ -266,9 +313,10 @@ impl SubscriptionManager {
     }
 
     /// Get all subscriptions for a specific data type
-    pub async fn get_subscriptions_for_type(&self, data_type: DataType)
-                                            -> Result<Vec<Subscription>, SubscriptionError>
-    {
+    pub async fn get_subscriptions_for_type(
+        &self,
+        data_type: DataType,
+    ) -> Result<Vec<Subscription>, SubscriptionError> {
         // Check for cleanup
         self.cleanup_stale_subscriptions().await?;
 
@@ -291,24 +339,42 @@ impl SubscriptionManager {
     /// Validate a subscription filter
     fn validate_filter(
         filter: &Filter,
-        subscription_type: monitord_protocols::subscription::SubscriptionType
+        subscription_type: monitord_protocols::subscription::SubscriptionType,
     ) -> Result<(), SubscriptionError> {
         // Check if the filter type matches the subscription type
         match (filter, subscription_type) {
-            (Filter::ProcessFilter(_), monitord_protocols::subscription::SubscriptionType::Process) |
-            (Filter::ProcessFilter(_), monitord_protocols::subscription::SubscriptionType::All) => Ok(()),
+            (
+                Filter::ProcessFilter(_),
+                monitord_protocols::subscription::SubscriptionType::Process,
+            )
+            | (Filter::ProcessFilter(_), monitord_protocols::subscription::SubscriptionType::All) => {
+                Ok(())
+            }
 
-            (Filter::GpuFilter(_), monitord_protocols::subscription::SubscriptionType::Gpu) |
-            (Filter::GpuFilter(_), monitord_protocols::subscription::SubscriptionType::All) => Ok(()),
+            (Filter::GpuFilter(_), monitord_protocols::subscription::SubscriptionType::Gpu)
+            | (Filter::GpuFilter(_), monitord_protocols::subscription::SubscriptionType::All) => {
+                Ok(())
+            }
 
-            (Filter::NetworkFilter(_), monitord_protocols::subscription::SubscriptionType::Network) |
-            (Filter::NetworkFilter(_), monitord_protocols::subscription::SubscriptionType::All) => Ok(()),
+            (
+                Filter::NetworkFilter(_),
+                monitord_protocols::subscription::SubscriptionType::Network,
+            )
+            | (Filter::NetworkFilter(_), monitord_protocols::subscription::SubscriptionType::All) => {
+                Ok(())
+            }
 
-            (Filter::StorageFilter(_), monitord_protocols::subscription::SubscriptionType::Storage) |
-            (Filter::StorageFilter(_), monitord_protocols::subscription::SubscriptionType::All) => Ok(()),
+            (
+                Filter::StorageFilter(_),
+                monitord_protocols::subscription::SubscriptionType::Storage,
+            )
+            | (Filter::StorageFilter(_), monitord_protocols::subscription::SubscriptionType::All) => {
+                Ok(())
+            }
 
             _ => Err(SubscriptionError::InvalidFilter(format!(
-                "Filter type does not match subscription type: {:?}", subscription_type
+                "Filter type does not match subscription type: {:?}",
+                subscription_type
             ))),
         }
     }
@@ -348,8 +414,11 @@ impl SubscriptionManager {
 
             match self.unsubscribe(req).await {
                 Ok(_) => {
-                    info!("Removed stale subscription {} for client {}", sub_id, client_id);
-                },
+                    info!(
+                        "Removed stale subscription {} for client {}",
+                        sub_id, client_id
+                    );
+                }
                 Err(e) => {
                     warn!("Error removing stale subscription {}: {}", sub_id, e);
                 }
@@ -360,7 +429,10 @@ impl SubscriptionManager {
     }
 
     /// Get all subscriptions for a client
-    pub async fn get_client_subscriptions(&self, client_id: &str) -> Result<Vec<Subscription>, SubscriptionError> {
+    pub async fn get_client_subscriptions(
+        &self,
+        client_id: &str,
+    ) -> Result<Vec<Subscription>, SubscriptionError> {
         let client_subs = self.client_subscriptions.read().await;
         let subscriptions = self.subscriptions.read().await;
 
@@ -378,7 +450,10 @@ impl SubscriptionManager {
     }
 
     /// Mark a subscription as having received data
-    pub async fn mark_subscription_received(&self, subscription_id: &str) -> Result<(), SubscriptionError> {
+    pub async fn mark_subscription_received(
+        &self,
+        subscription_id: &str,
+    ) -> Result<(), SubscriptionError> {
         let mut subscriptions = self.subscriptions.write().await;
 
         if let Some(subscription) = subscriptions.get_mut(subscription_id) {

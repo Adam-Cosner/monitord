@@ -1,6 +1,6 @@
-use tracing::debug;
 use crate::error::CollectionError;
 use monitord_protocols::monitord::ProcessInfo;
+use tracing::debug;
 
 pub mod config;
 

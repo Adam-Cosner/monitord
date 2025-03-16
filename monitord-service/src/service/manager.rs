@@ -1,8 +1,8 @@
-use std::sync::Arc;
 use crate::collectors::CollectorManager;
 use crate::communication::CommunicationManager;
 use crate::config::ServiceConfig;
 use crate::error::ServiceError;
+use std::sync::Arc;
 
 pub struct ServiceManager {
     communication_manager: CommunicationManager,
@@ -11,7 +11,10 @@ pub struct ServiceManager {
 
 impl ServiceManager {
     pub fn init(config: ServiceConfig) -> Result<Self, ServiceError> {
-        let communication_manager = match CommunicationManager::new(config.communication_config, Arc::new(crate::communication::handlers::ProtobufHandler {})) {
+        let communication_manager = match CommunicationManager::new(
+            config.communication_config,
+            Arc::new(crate::communication::handlers::ProtobufHandler {}),
+        ) {
             Ok(manager) => manager,
             Err(e) => return Err(ServiceError::Communication(e)),
         };

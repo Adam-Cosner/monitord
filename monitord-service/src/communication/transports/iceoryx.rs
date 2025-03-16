@@ -1,13 +1,20 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tokio::sync::{mpsc, oneshot};
 use std::thread::JoinHandle;
-use tokio::time::{Duration, Instant};
-use tracing::{debug, error, info, warn};
+use tokio::sync::oneshot;
+use tokio::time::Instant;
+use tracing::{debug, error, info};
 
-use iceoryx2::port::{publisher::*, subscriber::*};
+/// Represents an active client connection with its last activity time
+#[derive(Debug)]
+struct ClientConnectionState {
+    /// When the client was last active
+    last_active: Instant,
+    /// Publisher for sending responses to this client
+    publisher: Publisher<ipc::Service, [u8], ()>,
+}
+
+use iceoryx2::port::publisher::*;
 use iceoryx2::prelude::*;
 
 use crate::communication::core::models::TransportType;
@@ -37,8 +44,6 @@ enum IceoryxCommand {
 
 /// Implementation of the Transport trait for iceoryx2
 pub struct IceoryxTransport {
-    config: IceoryxConfig,
-    topic_formatter: TopicFormatter,
     active: bool,
     command_tx: std::sync::mpsc::Sender<IceoryxCommand>,
     worker_handle: Option<JoinHandle<()>>,
@@ -51,16 +56,11 @@ impl IceoryxTransport {
         // Create a channel for sending commands to the worker thread
         let (command_tx, command_rx) = std::sync::mpsc::channel();
 
-        // Clone config for the worker thread
-        let worker_config = config.clone();
-        let worker_topic_formatter = topic_formatter.clone();
-
         // Spawn a worker thread that will handle the actual iceoryx operations
-        let worker_handle = std::thread::spawn(move || { Self::run_worker(worker_config, worker_topic_formatter, command_rx )} );
+        let worker_handle =
+            std::thread::spawn(move || Self::run_worker(config, topic_formatter, command_rx));
 
         Ok(Self {
-            config,
-            topic_formatter,
             active: false,
             command_tx,
             worker_handle: Some(worker_handle),
@@ -71,7 +71,7 @@ impl IceoryxTransport {
     fn run_worker(
         config: IceoryxConfig,
         topic_formatter: TopicFormatter,
-        mut command_rx: std::sync::mpsc::Receiver<IceoryxCommand>,
+        command_rx: std::sync::mpsc::Receiver<IceoryxCommand>,
     ) {
         use iceoryx2::prelude::*;
 
@@ -88,8 +88,7 @@ impl IceoryxTransport {
         };
 
         let mut publishers: HashMap<String, Publisher<ipc::Service, [u8], ()>> = HashMap::new();
-        let mut client_connections: HashMap<String, (Instant, Publisher<ipc::Service, [u8], ()>)> =
-            HashMap::new();
+        let mut client_connections: HashMap<String, ClientConnectionState> = HashMap::new();
 
         // Set up connection subscriber
         let connection_topic = topic_formatter.format_connection_topic("requests");
@@ -229,8 +228,13 @@ impl IceoryxTransport {
                         };
 
                         // Store the client connection
-                        client_connections
-                            .insert(client_id.clone(), (Instant::now(), response_publisher));
+                        client_connections.insert(
+                            client_id.clone(),
+                            ClientConnectionState {
+                                last_active: Instant::now(),
+                                publisher: response_publisher,
+                            },
+                        );
 
                         // Return the new connection
                         let _ = response_tx.send(Some(ClientConnection {
@@ -251,19 +255,28 @@ impl IceoryxTransport {
                     response_tx,
                 } => {
                     // Find the publisher for this client
-                    let result = if let Some((_, publisher)) = client_connections.get(&client_id) {
+                    let result = if let Some(connection) = client_connections.get_mut(&client_id) {
+                        // Update last active time
+                        connection.last_active = Instant::now();
+
                         // Send the response
-                        match publisher.loan_slice_uninit(payload.len()) {
+                        match connection.publisher.loan_slice_uninit(payload.len()) {
                             Ok(sample) => {
                                 match sample.write_from_slice(payload.as_slice()).send() {
                                     Ok(_) => {
                                         debug!("Sent response to client: {}", client_id);
                                         Ok(())
                                     }
-                                    Err(e) => Err(format!("Failed to send response to client {}: {}", client_id, e))
+                                    Err(e) => Err(format!(
+                                        "Failed to send response to client {}: {}",
+                                        client_id, e
+                                    )),
                                 }
                             }
-                            Err(e) => Err(format!("Failed to loan data slice for response to client {}: {}", client_id, e))
+                            Err(e) => Err(format!(
+                                "Failed to loan data slice for response to client {}: {}",
+                                client_id, e
+                            )),
                         }
                     } else {
                         Err(format!("Client not found: {}", client_id))
@@ -304,17 +317,14 @@ impl Transport for IceoryxTransport {
         }
 
         // Create a oneshot channel for the response
-        let (response_tx, response_rx) = tokio::sync::oneshot::channel();
+        let (response_tx, response_rx) = oneshot::channel();
 
         // Send command to worker thread
-        if let Err(e) = self
-            .command_tx
-            .send(IceoryxCommand::Publish {
-                topic: topic.to_string(),
-                payload: payload.to_vec(),
-                response_tx,
-            })
-        {
+        if let Err(e) = self.command_tx.send(IceoryxCommand::Publish {
+            topic: topic.to_string(),
+            payload: payload.to_vec(),
+            response_tx,
+        }) {
             return Err(CommunicationError::Transport(format!(
                 "Failed to send publish command: {}",
                 e
@@ -340,7 +350,7 @@ impl Transport for IceoryxTransport {
         }
 
         // Create a oneshot channel for the response
-        let (response_tx, response_rx) = tokio::sync::oneshot::channel();
+        let (response_tx, response_rx) = oneshot::channel();
 
         // Send command to worker thread
         if let Err(e) = self
@@ -375,17 +385,14 @@ impl Transport for IceoryxTransport {
         }
 
         // Create a oneshot channel for the response
-        let (response_tx, response_rx) = tokio::sync::oneshot::channel();
+        let (response_tx, response_rx) = oneshot::channel();
 
         // Send command to worker thread
-        if let Err(e) = self
-            .command_tx
-            .send(IceoryxCommand::SendResponse {
-                client_id: client_id.to_string(),
-                payload: response.to_vec(),
-                response_tx,
-            })
-        {
+        if let Err(e) = self.command_tx.send(IceoryxCommand::SendResponse {
+            client_id: client_id.to_string(),
+            payload: response.to_vec(),
+            response_tx,
+        }) {
             return Err(CommunicationError::Transport(format!(
                 "Failed to send response command: {}",
                 e

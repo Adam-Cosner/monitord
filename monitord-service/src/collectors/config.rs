@@ -5,7 +5,7 @@ pub use super::{
     system::config::SystemCollectorConfig,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CollectionConfig {
     pub sys_config: SystemCollectorConfig,
     pub cpu_config: CpuCollectorConfig,

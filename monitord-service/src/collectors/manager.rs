@@ -1,15 +1,45 @@
+//! Collector manager for coordinating all system monitoring collectors
+//!
+//! The CollectorManager initializes and manages the lifecycle of all collector
+//! instances, handling their configuration and data distribution.
+
 use super::Collector;
 use super::{
-    config::CollectionConfig, cpu::CpuCollector, error::CollectionError, memory::MemoryCollector,
+    config::CollectionConfig, cpu::CpuCollector, error::CollectionError, gpu::GpuCollector,
+    memory::MemoryCollector, network::NetworkCollector, process::ProcessCollector,
+    storage::StorageCollector, system::SystemCollector,
 };
-use crate::collectors::gpu::GpuCollector;
-use crate::collectors::network::NetworkCollector;
-use crate::collectors::process::ProcessCollector;
 use monitord_protocols::monitord::*;
 use tokio::sync::broadcast::Sender;
-use crate::collectors::storage::StorageCollector;
-use crate::collectors::system::SystemCollector;
 
+/// Create a collector task that can be run in a tokio::select! statement
+///
+/// Follows a common pattern:
+/// 1. Check if the collector is enabled
+/// 2. Collect data
+/// 3. Send to channel
+/// 4. Sleep for the configured interval
+///
+/// Returns a future that can be used in a tokio::select! statement
+macro_rules! collector_task {
+    ($collector:expr, $tx:expr) => {
+        async {
+            loop {
+                if !$collector.config().enabled {
+                    return Err::<(), CollectionError>(CollectionError::Disabled);
+                }
+                let collected_data = $collector.collect()?;
+                let _ = $tx.send(collected_data);
+                tokio::time::sleep($collector.config().interval.to_std().unwrap()).await;
+            }
+        }
+    };
+}
+
+/// Manager for all system monitoring collectors
+///
+/// Coordinates the initialization, configuration, and operation of all collector
+/// instances in the system, providing broadcast channels for distributing collected data.
 pub struct CollectorManager {
     cpu_collector: CpuCollector,
     pub cpu_tx: Sender<CpuInfo>,
@@ -34,6 +64,10 @@ pub struct CollectorManager {
 }
 
 impl CollectorManager {
+    /// Initialize a new collector manager with the provided configuration
+    ///
+    /// Creates all collector instances and their associated broadcast channels
+    /// for distributing collected data to subscribers.
     pub fn init(config: CollectionConfig) -> Result<Self, CollectionError> {
         let (cpu_tx, _) = tokio::sync::broadcast::channel(1);
         let (memory_tx, _) = tokio::sync::broadcast::channel(1);
@@ -60,105 +94,33 @@ impl CollectorManager {
         })
     }
 
+    /// Run all enabled collectors in parallel
+    ///
+    /// Each collector runs in its own async task, collecting data at the configured
+    /// interval and broadcasting it through its associated channel.
     pub async fn run(&mut self) -> Result<(), CollectionError> {
         tokio::select! {
-            // CPU Collector
-            res = async {
-                loop {
-                    if !self.cpu_collector.config().enabled {
-                        return Err::<(), CollectionError>(CollectionError::Disabled);
-                    }
-                    let collected_data = self.cpu_collector.collect()?;
-                    self.cpu_tx.send(collected_data).unwrap();
-                    tokio::time::sleep(self.cpu_collector.config().interval.to_std().unwrap()).await;
-                }
-            } => {
-                match res {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
+            res = collector_task!(&mut self.cpu_collector, &self.cpu_tx) => {
+                res?;
             }
-            // Memory collector
-            res = async {
-                loop {
-                    if !self.memory_collector.config().enabled {
-                        return Err::<(), CollectionError>(CollectionError::Disabled);
-                    }
-                    let collected_data = self.memory_collector.collect()?;
-                    self.memory_tx.send(collected_data).unwrap();
-                    tokio::time::sleep(self.memory_collector.config().interval.to_std().unwrap()).await;
-                }
-            } => {
-                match res {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
+            res = collector_task!(&mut self.memory_collector, &self.memory_tx) => {
+                res?;
             }
-            // GPU Collector
-            res = async {
-                loop {
-                    if !self.gpu_collector.config().enabled {
-                        return Err::<(), CollectionError>(CollectionError::Disabled);
-                    }
-                    let collected_data = self.gpu_collector.collect()?;
-                    self.gpu_tx.send(collected_data).unwrap();
-                    tokio::time::sleep(self.gpu_collector.config().interval.to_std().unwrap()).await;
-                }
-            } => {
-                match res {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
+            res = collector_task!(&mut self.gpu_collector, &self.gpu_tx) => {
+                res?;
             }
-            // Net Collector
-            res = async {
-                loop {
-                    if !self.network_collector.config().enabled {
-                        return Err::<(), CollectionError>(CollectionError::Disabled);
-                    }
-                    let collected_data = self.network_collector.collect()?;
-                    self.network_tx.send(collected_data).unwrap();
-                    tokio::time::sleep(self.network_collector.config().interval.to_std().unwrap()).await;
-                }
-            } => {
-                match res {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
+            res = collector_task!(&mut self.network_collector, &self.network_tx) => {
+                res?;
             }
-            // Process Collector
-            res = async {
-                loop {
-                    if !self.process_collector.config().enabled {
-                        return Err::<(), CollectionError>(CollectionError::Disabled);
-                    }
-                    let collected_data = self.process_collector.collect()?;
-                    self.process_tx.send(collected_data).unwrap();
-                    tokio::time::sleep(self.process_collector.config().interval.to_std().unwrap()).await;
-                }
-            } => {
-                match res {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
+            res = collector_task!(&mut self.process_collector, &self.process_tx) => {
+                res?;
             }
-            // Storage Collector
-            res = async {
-                loop {
-                    if !self.storage_collector.config().enabled {
-                        return Err::<(), CollectionError>(CollectionError::Disabled);
-                    }
-                    let collected_data = self.storage_collector.collect()?;
-                    self.storage_tx.send(collected_data).unwrap();
-                    tokio::time::sleep(self.storage_collector.config().interval.to_std().unwrap()).await;
-                }
-            } => {
-                match res {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
+            res = collector_task!(&mut self.storage_collector, &self.storage_tx) => {
+                res?;
             }
-
+            res = collector_task!(&mut self.system_collector, &self.system_tx) => {
+                res?;
+            }
         }
         Ok(())
     }

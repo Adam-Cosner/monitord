@@ -111,10 +111,10 @@ impl AmdGpuCollector {
                     }
                 }
 
-                if let Some((old_timestamp, old_usages)) = self.usages.insert(
-                    pid,
-                    (timestamp, accumulated_per_device_usages.clone()),
-                ) {
+                if let Some((old_timestamp, old_usages)) = self
+                    .usages
+                    .insert(pid, (timestamp, accumulated_per_device_usages.clone()))
+                {
                     for (drm_pdev, accumulated_usage) in accumulated_per_device_usages.iter() {
                         let vram_bytes = *accumulated_per_device_vram.get(drm_pdev).unwrap();
                         if let Some(previous_usage) = old_usages.get(drm_pdev) {

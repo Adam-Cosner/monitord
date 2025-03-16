@@ -1,15 +1,18 @@
 //! Registry for dynamic loading of transport providers
 
-use std::collections::HashMap;
-use std::sync::RwLock;
+use crate::communication::config::CommunicationConfig;
 use crate::communication::core::traits::Transport;
 use crate::communication::error::CommunicationError;
-use crate::communication::config::CommunicationConfig;
+use std::collections::HashMap;
+use std::sync::RwLock;
 
 /// Factory for creating transport instances
 pub trait TransportFactory: Send + Sync + 'static {
     /// Create a new transport instance
-    fn create_transport(&self, config: &CommunicationConfig) -> Result<Box<dyn Transport>, CommunicationError>;
+    fn create_transport(
+        &self,
+        config: &CommunicationConfig,
+    ) -> Result<Box<dyn Transport>, CommunicationError>;
 
     /// Get the name of the transport type
     fn name(&self) -> &str;
@@ -43,8 +46,10 @@ impl TransportRegistry {
     }
 
     /// Create transports from configuration
-    pub fn create_transports(&self, config: &CommunicationConfig)
-                             -> Result<Vec<Box<dyn Transport>>, CommunicationError> {
+    pub fn create_transports(
+        &self,
+        config: &CommunicationConfig,
+    ) -> Result<Vec<Box<dyn Transport>>, CommunicationError> {
         let factories = self.factories.read().map_err(|e| {
             CommunicationError::Registry(format!("Failed to acquire read lock: {}", e))
         })?;
@@ -64,7 +69,7 @@ impl TransportRegistry {
 
         if transports.is_empty() {
             return Err(CommunicationError::Registry(
-                "No transports could be created".into()
+                "No transports could be created".into(),
             ));
         }
 

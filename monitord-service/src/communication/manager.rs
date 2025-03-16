@@ -6,20 +6,19 @@ use tokio::sync::RwLock;
 use tokio::task::{JoinHandle, JoinSet};
 use tracing::{debug, error, info, warn};
 
-use crate::communication::core::traits::{MessageHandler, Transport};
+use crate::communication::config::CommunicationConfig;
 use crate::communication::core::models::DataType;
 use crate::communication::core::traits::MessageType;
+use crate::communication::core::traits::{MessageHandler, Transport};
 use crate::communication::error::CommunicationError;
-use crate::communication::config::CommunicationConfig;
-use crate::communication::subscription::manager::SubscriptionManager;
 use crate::communication::subscription::config::SubscriptionConfig;
+use crate::communication::subscription::manager::SubscriptionManager;
 use crate::communication::tasks::connection;
 use crate::communication::tasks::data::{self, DataTask};
 use crate::communication::transports;
 
 use monitord_protocols::monitord::{
-    CpuInfo, MemoryInfo, GpuInfo, NetworkInfo, ProcessInfo,
-    StorageInfo, SystemInfo
+    CpuInfo, GpuInfo, MemoryInfo, NetworkInfo, ProcessInfo, StorageInfo, SystemInfo,
 };
 
 /// Main communication manager that coordinates transports and message handling
@@ -46,11 +45,11 @@ impl CommunicationManager {
     ) -> Result<Self, CommunicationError> {
         // Initialize transports
         let transports = transports::create_transports(&config)?;
-        
-        
 
         if transports.is_empty() {
-            return Err(CommunicationError::Init("No transport mechanisms could be initialized".into()));
+            return Err(CommunicationError::Init(
+                "No transport mechanisms could be initialized".into(),
+            ));
         }
 
         // Initialize the subscription manager
@@ -114,7 +113,7 @@ impl CommunicationManager {
                 subscription_manager: subscription_manager_arc.clone(),
                 message_handler: message_handler_arc.clone(),
                 shutdown: self.shutdown_sender.subscribe(),
-            }
+            },
         ));
 
         // Spawn data handlers
@@ -143,14 +142,14 @@ impl CommunicationManager {
                 Ok(Ok(_)) => {
                     // Task completed successfully
                     debug!("Task completed successfully");
-                },
+                }
                 Ok(Err(e)) => {
                     // Task returned an error
                     error!("Task error: {}", e);
                     // Signal all other tasks to shut down
                     let _ = self.shutdown_sender.send(());
                     return Err(CommunicationError::Task(e.to_string()));
-                },
+                }
                 Err(e) => {
                     // Task panicked or was cancelled
                     error!("Task join error: {}", e);
@@ -166,7 +165,9 @@ impl CommunicationManager {
     }
 
     /// Create a subscription task
-    async fn create_subscription_tasks(&self) -> Result<Vec<JoinHandle<Result<(), CommunicationError>>>, CommunicationError> {
+    async fn create_subscription_tasks(
+        &self,
+    ) -> Result<Vec<JoinHandle<Result<(), CommunicationError>>>, CommunicationError> {
         let mut tasks = Vec::new();
 
         // Here we would typically set up background tasks to handle subscription operations
@@ -200,9 +201,10 @@ impl CommunicationManager {
         // Check if all transports are active
         for transport in &self.transports {
             if !transport.is_active() {
-                return Err(CommunicationError::Transport(
-                    format!("Transport {} is not active", transport.name())
-                ));
+                return Err(CommunicationError::Transport(format!(
+                    "Transport {} is not active",
+                    transport.name()
+                )));
             }
         }
 
@@ -210,9 +212,10 @@ impl CommunicationManager {
         let task_handles = self.task_handles.read().await;
         for (i, handle) in task_handles.iter().enumerate() {
             if handle.is_finished() {
-                return Err(CommunicationError::Task(
-                    format!("Task {} has stopped unexpectedly", i)
-                ));
+                return Err(CommunicationError::Task(format!(
+                    "Task {} has stopped unexpectedly",
+                    i
+                )));
             }
         }
 
@@ -226,7 +229,10 @@ impl CommunicationManager {
 
     /// Get the names of active transports
     pub fn transport_names(&self) -> Vec<String> {
-        self.transports.iter().map(|t| t.name().to_string()).collect()
+        self.transports
+            .iter()
+            .map(|t| t.name().to_string())
+            .collect()
     }
 }
 

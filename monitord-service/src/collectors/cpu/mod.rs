@@ -192,7 +192,7 @@ impl super::Collector for CpuCollector {
             return Err(CollectionError::Disabled);
         }
         debug!("Collecting CPU information");
-        
+
         // Refresh the system
         self.system.refresh_cpu_all();
 

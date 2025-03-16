@@ -42,11 +42,17 @@ pub enum MessageType {
 }
 
 pub trait MessageHandler: Send + Sync + 'static {
-    fn serialize_bytes(&self, message_type: MessageType, message_bytes: Vec<u8>)
-                       -> Result<Vec<u8>, CommunicationError>;
+    fn serialize_bytes(
+        &self,
+        message_type: MessageType,
+        message_bytes: Vec<u8>,
+    ) -> Result<Vec<u8>, CommunicationError>;
 
-    fn deserialize_bytes(&self, message_type: MessageType, data: &[u8])
-                         -> Result<Vec<u8>, CommunicationError>;
+    fn deserialize_bytes(
+        &self,
+        message_type: MessageType,
+        data: &[u8],
+    ) -> Result<Vec<u8>, CommunicationError>;
 }
 
 /// Helper functions for MessageHandler
@@ -57,7 +63,7 @@ pub mod message_utils {
     pub fn serialize<T: Message, H: MessageHandler + ?Sized>(
         handler: &H,
         message_type: MessageType,
-        message: &T
+        message: &T,
     ) -> Result<Vec<u8>, CommunicationError> {
         let bytes = message.encode_to_vec();
         handler.serialize_bytes(message_type, bytes)
@@ -66,10 +72,9 @@ pub mod message_utils {
     pub fn deserialize<T: Message + Default, H: MessageHandler>(
         handler: &H,
         message_type: MessageType,
-        data: &[u8]
+        data: &[u8],
     ) -> Result<T, CommunicationError> {
         let bytes = handler.deserialize_bytes(message_type, data)?;
-        T::decode(&bytes[..])
-            .map_err(|e| CommunicationError::Deserialization(e.to_string()))
+        T::decode(&bytes[..]).map_err(|e| CommunicationError::Deserialization(e.to_string()))
     }
 }

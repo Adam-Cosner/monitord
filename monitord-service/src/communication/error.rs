@@ -1,9 +1,9 @@
 //! Error types for communication module
 
+use crate::collectors::error::CollectionError;
+use crate::communication::subscription::error::SubscriptionError;
 use thiserror::Error;
 use tokio::sync::broadcast::error::SendError;
-use crate::communication::subscription::error::SubscriptionError;
-use crate::collectors::error::CollectionError;
 
 /// Error types for the communication module
 #[derive(Error, Debug)]

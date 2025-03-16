@@ -5,20 +5,20 @@
 //! handler function that processes incoming data and publishes it to subscribed clients
 //! using the appropriate transport mechanisms.
 
+use prost::Message;
 use std::sync::Arc;
 use tokio::sync::broadcast::Receiver;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
-use prost::Message;
 
-use crate::communication::core::traits::{message_utils, MessageType, Transport};
-use crate::communication::core::traits::MessageHandler;
 use crate::communication::core::models::{DataType, TransportType};
+use crate::communication::core::traits::MessageHandler;
+use crate::communication::core::traits::{message_utils, MessageType, Transport};
+use crate::communication::error::CommunicationError;
 use crate::communication::subscription::manager::SubscriptionManager;
 use crate::communication::subscription::models::Subscription;
-use crate::communication::error::CommunicationError;
 use monitord_protocols::monitord::{
-    CpuInfo, MemoryInfo, GpuInfo, NetworkInfo, ProcessInfo, StorageInfo, SystemInfo
+    CpuInfo, GpuInfo, MemoryInfo, NetworkInfo, ProcessInfo, StorageInfo, SystemInfo,
 };
 
 /// Parameters for data handling tasks
@@ -479,7 +479,10 @@ async fn process_message<T: Message + Clone + Send + 'static>(
     message_handler: &Arc<dyn MessageHandler>,
 ) -> Result<(), CommunicationError> {
     // Get relevant subscriptions
-    let subscriptions = match subscription_manager.get_subscriptions_for_type(data_type).await {
+    let subscriptions = match subscription_manager
+        .get_subscriptions_for_type(data_type)
+        .await
+    {
         Ok(subs) => subs,
         Err(e) => {
             error!("Failed to get subscriptions: {}", e);
@@ -492,11 +495,7 @@ async fn process_message<T: Message + Clone + Send + 'static>(
     }
 
     // Serialize the data once
-    let payload = match message_utils::serialize(
-        message_handler.as_ref(),
-        message_type,
-        data
-    ) {
+    let payload = match message_utils::serialize(message_handler.as_ref(), message_type, data) {
         Ok(bytes) => bytes,
         Err(e) => {
             error!("Failed to serialize data: {}", e);
@@ -508,17 +507,13 @@ async fn process_message<T: Message + Clone + Send + 'static>(
     for subscription in subscriptions {
         // Find the right transport
         let transport = transports.iter().find(|t| {
-            matches!(subscription.transport, TransportType::Iceoryx) && t.name() == "iceoryx" ||
-                matches!(subscription.transport, TransportType::Grpc) && t.name() == "grpc"
+            matches!(subscription.transport, TransportType::Iceoryx) && t.name() == "iceoryx"
+                || matches!(subscription.transport, TransportType::Grpc) && t.name() == "grpc"
         });
 
         if let Some(transport) = transport {
             // Format the topic name
-            let topic = format!(
-                "{}/{}",
-                data_type,
-                subscription.id
-            );
+            let topic = format!("{}/{}", data_type, subscription.id);
 
             // Publish the data
             if let Err(e) = transport.publish(&topic, &payload).await {
@@ -527,7 +522,10 @@ async fn process_message<T: Message + Clone + Send + 'static>(
                 debug!("Published data to topic {}", topic);
             }
         } else {
-            warn!("No matching transport found for subscription {}", subscription.id);
+            warn!(
+                "No matching transport found for subscription {}",
+                subscription.id
+            );
         }
     }
 
@@ -544,11 +542,7 @@ async fn process_gpu_info(
     message_handler: &Arc<dyn MessageHandler>,
 ) -> Result<(), CommunicationError> {
     // Serialize the data once
-    let payload = match message_utils::serialize(
-        message_handler.as_ref(),
-        message_type,
-        gpu
-    ) {
+    let payload = match message_utils::serialize(message_handler.as_ref(), message_type, gpu) {
         Ok(bytes) => bytes,
         Err(e) => {
             error!("Failed to serialize GPU data: {}", e);
@@ -560,7 +554,10 @@ async fn process_gpu_info(
     for subscription in subscriptions {
         // Check if this GPU matches the subscription filter
         if let Some(filter) = &subscription.filter {
-            if let monitord_protocols::subscription::subscription_request::Filter::GpuFilter(gpu_filter) = filter {
+            if let monitord_protocols::subscription::subscription_request::Filter::GpuFilter(
+                gpu_filter,
+            ) = filter
+            {
                 // Skip if GPU name or vendor doesn't match filter
                 if !gpu_filter.name.is_empty() && !gpu_filter.name.contains(&gpu.name) {
                     continue;
@@ -573,8 +570,8 @@ async fn process_gpu_info(
 
         // Find the right transport
         let transport = transports.iter().find(|t| {
-            matches!(subscription.transport, TransportType::Iceoryx) && t.name() == "iceoryx" ||
-                matches!(subscription.transport, TransportType::Grpc) && t.name() == "grpc"
+            matches!(subscription.transport, TransportType::Iceoryx) && t.name() == "iceoryx"
+                || matches!(subscription.transport, TransportType::Grpc) && t.name() == "grpc"
         });
 
         if let Some(transport) = transport {
@@ -608,11 +605,7 @@ async fn process_network_info(
     message_handler: &Arc<dyn MessageHandler>,
 ) -> Result<(), CommunicationError> {
     // Serialize the data once
-    let payload = match message_utils::serialize(
-        message_handler.as_ref(),
-        message_type,
-        network
-    ) {
+    let payload = match message_utils::serialize(message_handler.as_ref(), message_type, network) {
         Ok(bytes) => bytes,
         Err(e) => {
             error!("Failed to serialize Network data: {}", e);
@@ -624,9 +617,14 @@ async fn process_network_info(
     for subscription in subscriptions {
         // Check if this interface matches the subscription filter
         if let Some(filter) = &subscription.filter {
-            if let monitord_protocols::subscription::subscription_request::Filter::NetworkFilter(net_filter) = filter {
+            if let monitord_protocols::subscription::subscription_request::Filter::NetworkFilter(
+                net_filter,
+            ) = filter
+            {
                 // Skip if interface name doesn't match filter
-                if !net_filter.interface_name.is_empty() && !net_filter.interface_name.contains(&network.interface_name) {
+                if !net_filter.interface_name.is_empty()
+                    && !net_filter.interface_name.contains(&network.interface_name)
+                {
                     continue;
                 }
             }
@@ -634,24 +632,25 @@ async fn process_network_info(
 
         // Find the right transport
         let transport = transports.iter().find(|t| {
-            matches!(subscription.transport, TransportType::Iceoryx) && t.name() == "iceoryx" ||
-                matches!(subscription.transport, TransportType::Grpc) && t.name() == "grpc"
+            matches!(subscription.transport, TransportType::Iceoryx) && t.name() == "iceoryx"
+                || matches!(subscription.transport, TransportType::Grpc) && t.name() == "grpc"
         });
 
         if let Some(transport) = transport {
             // Format the topic name
             let topic = format!(
                 "{}/{}/{}",
-                data_type,
-                network.interface_name,
-                subscription.id
+                data_type, network.interface_name, subscription.id
             );
 
             // Publish the data
             if let Err(e) = transport.publish(&topic, &payload).await {
                 error!("Failed to publish Network data to {}: {}", topic, e);
             } else {
-                debug!("Published Network data for {} to topic {}", network.interface_name, topic);
+                debug!(
+                    "Published Network data for {} to topic {}",
+                    network.interface_name, topic
+                );
             }
         }
     }
@@ -669,11 +668,7 @@ async fn process_process_info(
     message_handler: &Arc<dyn MessageHandler>,
 ) -> Result<(), CommunicationError> {
     // Serialize the data once
-    let payload = match message_utils::serialize(
-        message_handler.as_ref(),
-        message_type,
-        process
-    ) {
+    let payload = match message_utils::serialize(message_handler.as_ref(), message_type, process) {
         Ok(bytes) => bytes,
         Err(e) => {
             error!("Failed to serialize Process data: {}", e);
@@ -685,7 +680,10 @@ async fn process_process_info(
     for subscription in subscriptions {
         // Check if this process matches the subscription filter
         if let Some(filter) = &subscription.filter {
-            if let monitord_protocols::subscription::subscription_request::Filter::ProcessFilter(proc_filter) = filter {
+            if let monitord_protocols::subscription::subscription_request::Filter::ProcessFilter(
+                proc_filter,
+            ) = filter
+            {
                 // Skip if process doesn't match filter criteria
                 if !proc_filter.pid.is_empty() && !proc_filter.pid.contains(&process.pid) {
                     continue;
@@ -693,18 +691,27 @@ async fn process_process_info(
                 if !proc_filter.name.is_empty() && !proc_filter.name.contains(&process.name) {
                     continue;
                 }
-                if !proc_filter.username.is_empty() && !proc_filter.username.contains(&process.username) {
+                if !proc_filter.username.is_empty()
+                    && !proc_filter.username.contains(&process.username)
+                {
                     continue;
                 }
 
                 // Skip if not in top processes by resource usage
-                if proc_filter.top_by_cpu > 0 && process.cpu_usage_percent < proc_filter.top_by_cpu as f64 {
+                if proc_filter.top_by_cpu > 0
+                    && process.cpu_usage_percent < proc_filter.top_by_cpu as f64
+                {
                     continue;
                 }
-                if proc_filter.top_by_memory > 0 && process.physical_memory_bytes < proc_filter.top_by_memory as u64 {
+                if proc_filter.top_by_memory > 0
+                    && process.physical_memory_bytes < proc_filter.top_by_memory as u64
+                {
                     continue;
                 }
-                if proc_filter.top_by_disk > 0 && (process.disk_read_bytes_per_sec + process.disk_write_bytes_per_sec) < proc_filter.top_by_disk as u64 {
+                if proc_filter.top_by_disk > 0
+                    && (process.disk_read_bytes_per_sec + process.disk_write_bytes_per_sec)
+                        < proc_filter.top_by_disk as u64
+                {
                     continue;
                 }
             }
@@ -712,24 +719,22 @@ async fn process_process_info(
 
         // Find the right transport
         let transport = transports.iter().find(|t| {
-            matches!(subscription.transport, TransportType::Iceoryx) && t.name() == "iceoryx" ||
-                matches!(subscription.transport, TransportType::Grpc) && t.name() == "grpc"
+            matches!(subscription.transport, TransportType::Iceoryx) && t.name() == "iceoryx"
+                || matches!(subscription.transport, TransportType::Grpc) && t.name() == "grpc"
         });
 
         if let Some(transport) = transport {
             // Format the topic name
-            let topic = format!(
-                "{}/{}/{}",
-                data_type,
-                process.pid,
-                subscription.id
-            );
+            let topic = format!("{}/{}/{}", data_type, process.pid, subscription.id);
 
             // Publish the data
             if let Err(e) = transport.publish(&topic, &payload).await {
                 error!("Failed to publish Process data to {}: {}", topic, e);
             } else {
-                debug!("Published Process data for {} (pid {}) to topic {}", process.name, process.pid, topic);
+                debug!(
+                    "Published Process data for {} (pid {}) to topic {}",
+                    process.name, process.pid, topic
+                );
             }
         }
     }
@@ -747,11 +752,7 @@ async fn process_storage_info(
     message_handler: &Arc<dyn MessageHandler>,
 ) -> Result<(), CommunicationError> {
     // Serialize the data once
-    let payload = match message_utils::serialize(
-        message_handler.as_ref(),
-        message_type,
-        storage
-    ) {
+    let payload = match message_utils::serialize(message_handler.as_ref(), message_type, storage) {
         Ok(bytes) => bytes,
         Err(e) => {
             error!("Failed to serialize Storage data: {}", e);
@@ -763,12 +764,19 @@ async fn process_storage_info(
     for subscription in subscriptions {
         // Check if this storage device matches the subscription filter
         if let Some(filter) = &subscription.filter {
-            if let monitord_protocols::subscription::subscription_request::Filter::StorageFilter(storage_filter) = filter {
+            if let monitord_protocols::subscription::subscription_request::Filter::StorageFilter(
+                storage_filter,
+            ) = filter
+            {
                 // Skip if device doesn't match filter criteria
-                if !storage_filter.device_name.is_empty() && !storage_filter.device_name.contains(&storage.device_name) {
+                if !storage_filter.device_name.is_empty()
+                    && !storage_filter.device_name.contains(&storage.device_name)
+                {
                     continue;
                 }
-                if !storage_filter.mount_point.is_empty() && !storage_filter.mount_point.contains(&storage.mount_point) {
+                if !storage_filter.mount_point.is_empty()
+                    && !storage_filter.mount_point.contains(&storage.mount_point)
+                {
                     continue;
                 }
             }
@@ -776,8 +784,8 @@ async fn process_storage_info(
 
         // Find the right transport
         let transport = transports.iter().find(|t| {
-            matches!(subscription.transport, TransportType::Iceoryx) && t.name() == "iceoryx" ||
-                matches!(subscription.transport, TransportType::Grpc) && t.name() == "grpc"
+            matches!(subscription.transport, TransportType::Iceoryx) && t.name() == "iceoryx"
+                || matches!(subscription.transport, TransportType::Grpc) && t.name() == "grpc"
         });
 
         if let Some(transport) = transport {
@@ -793,7 +801,10 @@ async fn process_storage_info(
             if let Err(e) = transport.publish(&topic, &payload).await {
                 error!("Failed to publish Storage data to {}: {}", topic, e);
             } else {
-                debug!("Published Storage data for {} to topic {}", storage.device_name, topic);
+                debug!(
+                    "Published Storage data for {} to topic {}",
+                    storage.device_name, topic
+                );
             }
         }
     }

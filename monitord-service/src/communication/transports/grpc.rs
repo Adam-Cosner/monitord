@@ -1,12 +1,12 @@
 //! gRPC implementation of the Transport trait
 
+use crate::communication::config::GrpcConfig;
+use crate::communication::core::models::ClientConnection;
+use crate::communication::core::traits::Transport;
+use crate::communication::error::CommunicationError;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
-use crate::communication::core::traits::Transport;
-use crate::communication::core::models::ClientConnection;
-use crate::communication::config::GrpcConfig;
-use crate::communication::error::CommunicationError;
 
 /// Implementation of the Transport trait for gRPC
 pub struct GrpcTransport {
@@ -41,7 +41,9 @@ impl Transport for GrpcTransport {
 
     async fn publish(&self, topic: &str, payload: &[u8]) -> Result<(), CommunicationError> {
         if !self.active {
-            return Err(CommunicationError::Transport("gRPC transport is not active".into()));
+            return Err(CommunicationError::Transport(
+                "gRPC transport is not active".into(),
+            ));
         }
 
         // TODO: Implement gRPC publishing logic
@@ -51,7 +53,9 @@ impl Transport for GrpcTransport {
 
     async fn listen_for_connections(&self) -> Result<Option<ClientConnection>, CommunicationError> {
         if !self.active {
-            return Err(CommunicationError::Transport("gRPC transport is not active".into()));
+            return Err(CommunicationError::Transport(
+                "gRPC transport is not active".into(),
+            ));
         }
 
         // TODO: Implement connection handling for gRPC
@@ -59,9 +63,15 @@ impl Transport for GrpcTransport {
         Ok(None)
     }
 
-    async fn send_response(&self, client_id: &str, response: &[u8]) -> Result<(), CommunicationError> {
+    async fn send_response(
+        &self,
+        client_id: &str,
+        response: &[u8],
+    ) -> Result<(), CommunicationError> {
         if !self.active {
-            return Err(CommunicationError::Transport("gRPC transport is not active".into()));
+            return Err(CommunicationError::Transport(
+                "gRPC transport is not active".into(),
+            ));
         }
 
         // TODO: Implement response sending for gRPC

@@ -1,5 +1,5 @@
-use monitord_protocols::monitord::SystemInfo;
 use crate::error::CollectionError;
+use monitord_protocols::monitord::SystemInfo;
 
 pub mod config;
 
@@ -9,7 +9,7 @@ pub struct SystemCollector {
 
 impl SystemCollector {
     pub fn new(config: config::SystemCollectorConfig) -> Result<Self, CollectionError> {
-        Ok(Self {config})
+        Ok(Self { config })
     }
 }
 
@@ -33,8 +33,8 @@ impl super::Collector for SystemCollector {
             os_name: sysinfo::System::distribution_id(),
             os_version: sysinfo::System::os_version().unwrap_or_default(),
             kernel_version: sysinfo::System::kernel_version().unwrap_or_default(),
-            process_count: 0, // todo
-            thread_count: 0, // todo
+            process_count: 0,   // todo
+            thread_count: 0,    // todo
             open_file_count: 0, // todo
             uptime_seconds: sysinfo::System::uptime(),
             load_average_1m: load_average.one,
@@ -42,8 +42,8 @@ impl super::Collector for SystemCollector {
             load_average_15m: load_average.fifteen,
             architecture: sysinfo::System::cpu_arch(),
             boot_time: sysinfo::System::boot_time(),
-            vendor: None, // todo
-            virtualization: None, // todo
+            vendor: None,              // todo
+            virtualization: None,      // todo
             security_features: vec![], // todo
         })
     }

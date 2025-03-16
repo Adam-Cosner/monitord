@@ -1,12 +1,9 @@
 //! Data models for subscription management
 
-use std::time::Instant;
-use crate::communication::core::models::TransportType;
 use crate::communication::core::models::DataType;
-use monitord_protocols::subscription::{
-    subscription_request::Filter,
-    SubscriptionType,
-};
+use crate::communication::core::models::TransportType;
+use monitord_protocols::subscription::{subscription_request::Filter, SubscriptionType};
+use std::time::Instant;
 
 /// Represents a client subscription
 #[derive(Debug, Clone)]
