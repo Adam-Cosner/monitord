@@ -6,8 +6,9 @@ edition = "2021"
 [dependencies]
 monitord-protocols = { path = "../monitord-protocols" }
 
-# IPC
+# Transport
 iceoryx2 = "0.5"
+tonic = "0.12.3"
 
 # Error handling
 thiserror = "2.0.11"

@@ -1509,6 +1509,7 @@ dependencies = [
  "iceoryx2",
  "monitord-protocols",
  "thiserror 2.0.11",
+ "tonic",
  "tracing",
 ]
 
