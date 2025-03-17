@@ -1,6 +1,7 @@
 use crate::error::{TransportError};
 
 /// Transport trait defines the interface for the transport mechanisms
+#[allow(async_fn_in_trait)]
 pub trait Transport: Send + Sync + 'static {
     /// Initialize the transport mechanism
     async fn initialize(&mut self) -> Result<(), TransportError>;

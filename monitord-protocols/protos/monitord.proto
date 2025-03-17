@@ -5,24 +5,14 @@ package monitord;
 // Import timestamp for recording when measurements were taken
 import "google/protobuf/timestamp.proto";
 
-message Connection {
-  // Send the client's pid to the server to ensure it's received back correctly
-  uint32 pid = 1;
-}
-
-message ConnectionResponse {
-  uint32 pid = 1;
-  string client_id = 2;
-}
-
 // Top-level message containing all system information
 message SystemSnapshot {
   google.protobuf.Timestamp timestamp = 1;
   SystemInfo system_info = 2;
   CpuInfo cpu_info = 3;
   MemoryInfo memory_info = 4;
-  repeated GpuInfo gpu_info = 5;
-  repeated NetworkInfo network_info = 6;
+  GpuList gpu_info = 5;
+  NetworkList network_info = 6;
   repeated ProcessInfo processes = 7;
   repeated StorageInfo storage_devices = 8;
 }
@@ -103,6 +93,11 @@ message DramInfo {
   optional string part_number = 6;
 }
 
+// Information on all GPUs
+message GpuList {
+  repeated GpuInfo gpus = 1;
+}
+
 // GPU information
 message GpuInfo {
   string name = 1;
@@ -142,6 +137,11 @@ message GpuProcessInfo {
   optional string gpu_device_id = 5;
 }
 
+// Information on all networks
+message NetworkList {
+  repeated NetworkInfo nets = 1;
+}
+
 // Network interface information
 message NetworkInfo {
   string interface_name = 1;
@@ -161,6 +161,11 @@ message NetworkInfo {
   uint32 mtu = 15;
   repeated string dns_servers = 16;
   optional uint32 link_speed_mbps = 17;
+}
+
+// Information on all storage devices
+message StorageList {
+  repeated StorageInfo storages = 1;
 }
 
 // Storage device information
@@ -190,6 +195,11 @@ message SmartData {
   optional uint32 power_cycle_count = 3;
   optional uint32 reallocated_sectors = 4;
   optional uint32 remaining_life_percent = 5;
+}
+
+// Information on all processes
+message ProcessList {
+  repeated ProcessInfo processes = 1;
 }
 
 // Process information

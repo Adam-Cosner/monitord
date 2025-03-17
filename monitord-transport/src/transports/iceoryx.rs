@@ -23,7 +23,7 @@ enum IceoryxCommand {
 pub struct IceoryxTransport {
     active: bool,
     command_tx: mpsc::Sender<IceoryxCommand>,
-    worker_handle: Option<JoinHandle<()>>,
+    _worker_handle: Option<JoinHandle<()>>,
 }
 
 impl IceoryxTransport {
@@ -34,7 +34,7 @@ impl IceoryxTransport {
         Ok(Self {
             active: false,
             command_tx,
-            worker_handle: Some(worker_handle),
+            _worker_handle: Some(worker_handle),
         })
     }
 
