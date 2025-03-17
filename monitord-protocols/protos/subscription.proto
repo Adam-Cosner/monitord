@@ -146,4 +146,5 @@ message ActiveSubscription {
 enum TransportType {
   ICEORYX = 0;
   GRPC = 1;
+  INTRA = 2;
 }

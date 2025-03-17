@@ -1,9 +1,4 @@
-use crate::config::{
-    CommunicationConfig, CpuCollectorConfig, GpuCollectorConfig, IceoryxConfig,
-    MemoryCollectorConfig, NetworkCollectorConfig, ProcessCollectorConfig, StorageCollectorConfig,
-    SubscriptionConfig, SystemCollectorConfig,
-};
-use crate::{config::CollectionConfig, config::PlatformConfig};
+use crate::config::{CollectionConfig, PlatformConfig, CommunicationConfig};
 
 #[derive(Debug, Clone, Default)]
 pub struct ServiceConfig {

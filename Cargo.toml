@@ -3,5 +3,6 @@ resolver = "2"
 members = [
     "monitord-service",
     "monitord-protocols",
-    "monitord-client"
+    "monitord-client",
+    "monitord-transport"
 ]
