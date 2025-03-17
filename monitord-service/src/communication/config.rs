@@ -1,6 +1,6 @@
-use monitord_transport::config::TransportType;
+use monitord_transport::config::TransportConfig;
 
 #[derive(Debug, Clone, Default)]
 pub struct CommunicationConfig {
-    pub transport_config: TransportType,
+    pub transport_config: TransportConfig,
 }

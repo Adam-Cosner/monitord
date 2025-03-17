@@ -15,7 +15,6 @@ fn main() -> Result<()> {
     // List all proto files
     let proto_files = vec![
         "protos/monitord.proto",
-        "protos/subscription.proto",
         "protos/config.proto",
     ];
 
