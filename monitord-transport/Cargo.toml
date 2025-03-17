@@ -1,0 +1,26 @@
+[package]
+name = "monitord-transport"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Data Types
+monitord-protocols = { path = "../monitord-protocols" }
+
+# Transport
+iceoryx2 = "0.5"
+tonic = { version = "0.12.3" }
+
+# Serialization
+prost = "0.13.5"
+
+# Error handling
+thiserror = "2.0.12"
+
+# Logging
+tracing = "0.1.41"
+
+# Utilities
+futures = { version = "0.3.31", features = []}
+chrono = "0.4.40"
+uuid = { version = "1.16.0", features = ["v4"] }
