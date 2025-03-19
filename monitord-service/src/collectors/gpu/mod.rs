@@ -1,7 +1,7 @@
 use crate::error::CollectionError;
 use config::GpuCollectorConfig;
 use monitord_protocols::protocols::GpuInfo;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 pub mod config;
 
@@ -38,7 +38,7 @@ impl GpuCollector {
         if self.config.nvidia_enabled {
             match nvidia::NvidiaGpuCollector::new() {
                 Ok(collector) => {
-                    info!("Initialized NVIDIA GPU collector");
+                    debug!("Initialized NVIDIA GPU collector");
                     self.nvidia_collector = Some(collector);
                 }
                 Err(e) => {
@@ -51,7 +51,7 @@ impl GpuCollector {
         if self.config.amd_enabled {
             match amd::AmdGpuCollector::new() {
                 Ok(collector) => {
-                    info!("Initialized AMD GPU collector");
+                    debug!("Initialized AMD GPU collector");
                     self.amd_collector = Some(collector);
                 }
                 Err(e) => {
@@ -64,7 +64,7 @@ impl GpuCollector {
         if self.config.intel_enabled {
             match intel::IntelGpuCollector::new() {
                 Ok(collector) => {
-                    info!("Initialized Intel GPU collector");
+                    debug!("Initialized Intel GPU collector");
                     self.intel_collector = Some(collector);
                 }
                 Err(e) => {
