@@ -6,10 +6,6 @@ pub enum CollectionError {
     Generic(String),
     #[error("collector disabled")]
     Disabled,
-    #[error("channel error: {0}")]
-    Channel(String),
     #[error("process error: {0}")]
     Process(String),
-    #[error("read error: {0}")]
-    Read(String),
 }

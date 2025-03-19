@@ -36,7 +36,7 @@ impl CommunicationManager {
             let mut transport_clone = transport.clone();
             tasks.spawn(async move {
                 while let Ok(cpu_info) = cpu_rx.recv().await {
-                    transport_clone.publish("monitord/cpu", cpu_info).await?;
+                    transport_clone.publish("cpu", cpu_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -47,7 +47,7 @@ impl CommunicationManager {
             let mut transport_clone = transport.clone();
             tasks.spawn(async move {
                 while let Ok(memory_info) = memory_rx.recv().await {
-                    transport_clone.publish("monitord/memory", memory_info).await?;
+                    transport_clone.publish("memory", memory_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -59,7 +59,7 @@ impl CommunicationManager {
             tasks.spawn(async move {
                 while let Ok(gpu_info) = gpu_rx.recv().await {
                     let gpu_info = GpuList { gpus: prost::alloc::vec::Vec::from(gpu_info) };
-                    transport_clone.publish("monitord/gpu", gpu_info).await?;
+                    transport_clone.publish("gpu", gpu_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -71,7 +71,7 @@ impl CommunicationManager {
             tasks.spawn(async move {
                 while let Ok(net_info) = net_rx.recv().await {
                     let net_info = NetworkList { nets: prost::alloc::vec::Vec::from(net_info) };
-                    transport_clone.publish("monitord/network", net_info).await?;
+                    transport_clone.publish("network", net_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -83,7 +83,7 @@ impl CommunicationManager {
             tasks.spawn(async move {
                 while let Ok(proc_info) = proc_rx.recv().await {
                     let proc_info = ProcessList { processes: prost::alloc::vec::Vec::from(proc_info) };
-                    transport_clone.publish("monitord/process", proc_info).await?;
+                    transport_clone.publish("process", proc_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -95,7 +95,7 @@ impl CommunicationManager {
             tasks.spawn(async move {
                 while let Ok(storage_info) = storage_rx.recv().await {
                     let storage_info = StorageList { storages: prost::alloc::vec::Vec::from(storage_info) };
-                    transport_clone.publish("monitord/storage", storage_info).await?;
+                    transport_clone.publish("storage", storage_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -106,7 +106,7 @@ impl CommunicationManager {
             let mut transport_clone = transport.clone();
             tasks.spawn(async move {
                 while let Ok(system_info) = system_rx.recv().await {
-                    transport_clone.publish("monitord/system", system_info).await?;
+                    transport_clone.publish("system", system_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });

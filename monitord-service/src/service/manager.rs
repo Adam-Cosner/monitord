@@ -2,7 +2,6 @@ use crate::collectors::CollectorManager;
 use crate::communication::CommunicationManager;
 use crate::config::ServiceConfig;
 use crate::error::ServiceError;
-use std::sync::Arc;
 
 pub struct ServiceManager {
     communication_manager: CommunicationManager,

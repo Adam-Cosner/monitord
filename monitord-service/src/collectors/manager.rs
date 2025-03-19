@@ -11,6 +11,7 @@ use super::{
 };
 use monitord_protocols::monitord::*;
 use tokio::sync::broadcast::Sender;
+use tracing::debug;
 
 /// Create a collector task that can be run in a tokio::select! statement
 ///
@@ -62,34 +63,47 @@ pub struct CollectorManager {
     system_collector: SystemCollector,
     pub system_tx: Sender<SystemInfo>,
 }
-
 impl CollectorManager {
     /// Initialize a new collector manager with the provided configuration
     ///
     /// Creates all collector instances and their associated broadcast channels
     /// for distributing collected data to subscribers.
     pub fn init(config: CollectionConfig) -> Result<Self, CollectionError> {
+        let cpu_collector = CpuCollector::new(config.cpu_config)?;
+        debug!("Initialized collector: {}", cpu_collector.name());
         let (cpu_tx, _) = tokio::sync::broadcast::channel(1);
+        let memory_collector = MemoryCollector::new(config.memory_config)?;
+        debug!("Initialized collector: {}", memory_collector.name());
         let (memory_tx, _) = tokio::sync::broadcast::channel(1);
+        let gpu_collector = GpuCollector::new(config.gpu_config)?;
+        debug!("Initialized collector: {}", gpu_collector.name());
         let (gpu_tx, _) = tokio::sync::broadcast::channel(1);
+        let network_collector = NetworkCollector::new(config.net_config)?;
+        debug!("Initialized collector: {}", network_collector.name());
         let (network_tx, _) = tokio::sync::broadcast::channel(1);
+        let process_collector = ProcessCollector::new(config.proc_config)?;
+        debug!("Initialized collector: {}", process_collector.name());
         let (process_tx, _) = tokio::sync::broadcast::channel(1);
+        let storage_collector = StorageCollector::new(config.disk_config)?;
+        debug!("Initialized collector: {}", storage_collector.name());
         let (storage_tx, _) = tokio::sync::broadcast::channel(1);
+        let system_collector = SystemCollector::new(config.sys_config)?;
+        debug!("Initialized collector: {}", system_collector.name());
         let (system_tx, _) = tokio::sync::broadcast::channel(1);
         Ok(Self {
-            cpu_collector: CpuCollector::new(config.cpu_config)?,
+            cpu_collector,
             cpu_tx,
-            memory_collector: MemoryCollector::new(config.memory_config)?,
+            memory_collector,
             memory_tx,
-            gpu_collector: GpuCollector::new(config.gpu_config)?,
+            gpu_collector,
             gpu_tx,
-            network_collector: NetworkCollector::new(config.net_config)?,
+            network_collector,
             network_tx,
-            process_collector: ProcessCollector::new(config.proc_config)?,
+            process_collector,
             process_tx,
-            storage_collector: StorageCollector::new(config.disk_config)?,
+            storage_collector,
             storage_tx,
-            system_collector: SystemCollector::new(config.sys_config)?,
+            system_collector,
             system_tx,
         })
     }

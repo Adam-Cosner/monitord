@@ -9,7 +9,7 @@ pub struct NvidiaGpuCollector {
 
 impl NvidiaGpuCollector {
     pub fn new() -> Result<Self, CollectionError> {
-        let nvml = Nvml::init().map_err(|e| CollectionError::Disabled)?;
+        let nvml = Nvml::init().map_err(|_| CollectionError::Disabled)?;
         Ok(Self { nvml })
     }
 }

@@ -34,7 +34,6 @@ impl super::Collector for NetworkCollector {
         if !self.config.enabled {
             return Err(CollectionError::Disabled);
         }
-        debug!("Collecting network information");
         self.nets.refresh(true);
 
         let mut networks = Vec::new();

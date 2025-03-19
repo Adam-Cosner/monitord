@@ -1,6 +1,7 @@
 
 #[derive(Debug, Clone)]
 pub enum TransportType {
+    Nng(NngConfig),
     Iceoryx(IceoryxConfig),
     Grpc,
     Intra,
@@ -8,13 +9,36 @@ pub enum TransportType {
 
 impl Default for TransportType {
     fn default() -> Self {
-        Self::Iceoryx(IceoryxConfig::default())
+        Self::Nng(NngConfig::default())
     }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct TransportConfig {
     pub(crate) transport_config: TransportType,
+}
+
+#[derive(Debug, Clone)]
+pub struct NngConfig {
+    /// Transport method (ipc, tcp, ws)
+    pub transport: String,
+    /// URL portion
+    pub url: String,
+    /// Timeout for operations in milliseconds
+    pub timeout_ms: u32,
+}
+
+impl Default for NngConfig {
+    fn default() -> Self {
+        Self {
+            transport: "ipc".to_string(),
+            #[cfg(unix)]
+            url: "/tmp/monitord".to_string(),
+            #[cfg(windows)]
+            topic_format: "monitord".to_string(),
+            timeout_ms: 1000,
+        }
+    }
 }
 
 /// Configuration for Iceoryx transport

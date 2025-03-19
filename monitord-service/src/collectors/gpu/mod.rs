@@ -29,7 +29,6 @@ impl GpuCollector {
 
         // Initialize vendor-specific collectors based on configuration
         collector.init_collectors()?;
-        info!("Initialized GPU collector");
 
         Ok(collector)
     }

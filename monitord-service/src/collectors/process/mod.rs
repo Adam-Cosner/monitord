@@ -35,7 +35,6 @@ impl super::Collector for ProcessCollector {
         if !self.config.enabled {
             return Err(CollectionError::Disabled);
         }
-        debug!("Collecting processes");
 
         let mut processes = Vec::new();
         self.system.refresh_processes_specifics(

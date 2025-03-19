@@ -8,6 +8,7 @@ edition = "2021"
 monitord-protocols = { path = "../monitord-protocols" }
 
 # Transport
+nng = "1.0.1"
 iceoryx2 = "0.5"
 tonic = { version = "0.12.3" }
 

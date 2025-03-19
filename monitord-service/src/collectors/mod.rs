@@ -23,8 +23,6 @@ mod system;
 
 pub mod config;
 pub mod error;
-pub mod models;
 
 mod manager;
 pub use manager::CollectorManager;
-pub use models::*;
