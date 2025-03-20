@@ -2,6 +2,7 @@ use crate::config::NngConfig;
 use crate::core::traits::Transport;
 use crate::error::TransportError;
 use futures::lock::Mutex;
+use nng::options::Options;
 use std::collections::HashMap;
 use tracing::info;
 
@@ -90,6 +91,10 @@ impl NngTransport {
         })?;
 
         info!("Created subscriber with URL: {}", url);
+
+        socket
+            .set_opt::<nng::options::protocol::pubsub::Subscribe>(vec![])
+            .map_err(|e| TransportError::Initialize(e.to_string()))?;
 
         // Return configured socket
         Ok(socket)
