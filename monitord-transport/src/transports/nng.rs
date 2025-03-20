@@ -48,7 +48,10 @@ impl NngTransport {
 
         // Construct the URL - this will differ based on platform
         #[cfg(unix)]
-        let url = format!("{}://{}/{}.ipc", self.config.transport, self.config.url, topic);
+        let url = format!(
+            "{}://{}/{}.ipc",
+            self.config.transport, self.config.url, topic
+        );
         #[cfg(windows)]
         let url = format!("{}/{}", self.url_base, topic);
 
@@ -56,6 +59,8 @@ impl NngTransport {
         socket
             .listen(&url)
             .map_err(|e| TransportError::Initialize(format!("Failed to bind NNG socket: {}", e)))?;
+
+        info!("Created publisher with URL: {}", url);
 
         // Return the configured socket
         Ok(socket)
@@ -72,7 +77,10 @@ impl NngTransport {
 
         // Construct the URL - this will differ based on platform
         #[cfg(unix)]
-        let url = format!("{}{}/{}.ipc", self.config.transport, self.config.url, topic);
+        let url = format!(
+            "{}://{}/{}.ipc",
+            self.config.transport, self.config.url, topic
+        );
         #[cfg(windows)]
         let url = format!("{}/{}", self.url_base, topic);
 
@@ -80,6 +88,8 @@ impl NngTransport {
         socket.dial(&url).map_err(|e| {
             TransportError::Initialize(format!("Failed to connect to NNG socket: {}", e))
         })?;
+
+        info!("Created subscriber with URL: {}", url);
 
         // Return configured socket
         Ok(socket)
@@ -130,6 +140,8 @@ impl Transport for NngTransport {
                 "NNG transport is not active".to_owned(),
             ));
         }
+
+        info!("Preparing receive");
 
         // Get or create subscriber for this topic
         let socket = {
