@@ -10,13 +10,9 @@ monitord-protocols = { path = "../monitord-protocols" }
 sysinfo = "0.33.1"
 raw-cpuid = "11.5.0"
 nvml-wrapper = "0.10.0"
-amdgpu-sysfs = "0.18.0"
 
 # Async
 futures = "0.3.31"
-
-# Configuration
-config = "0.15.11"
 
 # Error helper
 thiserror = "2.0.12"

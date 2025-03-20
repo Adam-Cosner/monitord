@@ -26,16 +26,8 @@ impl ServiceManager {
                 Err(e) => return Err(ServiceError::Communication(e)),
             };
 
-        // Register with the platform-specific service manager
-        match crate::platform::native::register_service(config.platform_config.clone()) {
-            Ok(_) => {
-                info!("Service registered with platform");
-            }
-            Err(e) => {
-                warn!("Failed to register service with platform: {}", e);
-                return Err(ServiceError::Platform(e));
-            }
-        }
+        // We don't register with the platform automatically anymore
+        // This is now done via the --register-service command-line flag
 
         Ok(Self {
             communication_manager,

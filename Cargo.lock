@@ -33,15 +33,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "250f629c0161ad8107cf89319e990051fae62832fd343083bea452d93e2205fd"
 
 [[package]]
-name = "amdgpu-sysfs"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1782ebeee4fce08bfb079e56c92c322f6c13ab04eec3e7391583da96853638ed"
-dependencies = [
- "enum_dispatch",
-]
-
-[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -711,18 +702,6 @@ version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1ab991c1362ac86c61ab6f556cff143daa22e5a15e4e189df818b2fd19fe65b"
 dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "enum_dispatch"
-version = "0.3.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa18ce2bc66555b3218614519ac839ddb759a7d6720732f979ef8d13be147ecd"
-dependencies = [
- "once_cell",
  "proc-macro2",
  "quote",
  "syn",
@@ -1535,9 +1514,7 @@ dependencies = [
 name = "monitord-collectors"
 version = "0.1.0"
 dependencies = [
- "amdgpu-sysfs",
  "chrono",
- "config",
  "futures",
  "monitord-protocols",
  "nvml-wrapper",
@@ -1571,7 +1548,6 @@ dependencies = [
  "monitord-protocols",
  "monitord-transport",
  "nix",
- "prost",
  "thiserror 2.0.12",
  "tokio",
  "tracing",
