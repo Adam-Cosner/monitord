@@ -13,10 +13,7 @@ fn main() -> Result<()> {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     // List all proto files
-    let proto_files = vec![
-        "protos/monitord.proto",
-        "protos/config.proto",
-    ];
+    let proto_files = vec!["protos/monitord.proto", "protos/config.proto"];
 
     // Ensure the proto directory exists
     let proto_dir = Path::new("protos");
@@ -65,14 +62,6 @@ fn generate_mod_file(out_dir: &Path) -> Result<()> {
     writeln!(file, "}}")?;
     writeln!(file, "")?;
 
-    writeln!(file, "pub mod subscription {{")?;
-    writeln!(
-        file,
-        "    include!(concat!(env!(\"OUT_DIR\"), \"/monitord.subscription.rs\"));"
-    )?;
-    writeln!(file, "}}")?;
-    writeln!(file, "")?;
-
     writeln!(file, "pub mod config {{")?;
     writeln!(
         file,
@@ -106,14 +95,6 @@ fn generate_mod_file(out_dir: &Path) -> Result<()> {
     writeln!(
         file,
         "    pub use super::monitord::monitord_service_server::MonitordServiceServer;"
-    )?;
-    writeln!(
-        file,
-        "    pub use super::subscription::subscription_service_client::SubscriptionServiceClient;"
-    )?;
-    writeln!(
-        file,
-        "    pub use super::subscription::subscription_service_server::SubscriptionServiceServer;"
     )?;
     writeln!(
         file,

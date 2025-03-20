@@ -1,6 +1,3 @@
-//! Common data models for the transport layer
-use monitord_protocols::subscription::TransportType as ProtoTransportType;
-
 /// Represents a connection
 #[derive(Debug, Clone)]
 pub struct ServiceConnection {
@@ -21,14 +18,4 @@ pub enum TransportType {
     Grpc,
     /// Intra-process transport, for testing purposes only
     Intra,
-}
-
-impl From<ProtoTransportType> for TransportType {
-    fn from(transport: ProtoTransportType) -> Self {
-        match transport {
-            ProtoTransportType::Iceoryx => Self::Iceoryx,
-            ProtoTransportType::Grpc => Self::Grpc,
-            ProtoTransportType::Intra => Self::Intra,
-        }
-    }
 }

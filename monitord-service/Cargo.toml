@@ -7,16 +7,11 @@ edition = "2021"
 # monitord crates
 monitord-protocols = { path = "../monitord-protocols" }
 monitord-transport = { path = "../monitord-transport" }
-
-# System information gathering
-sysinfo = "0.33.1"
-raw-cpuid = "11.4.0"
-nvml-wrapper = "0.10.0"
+monitord-collectors = { path = "../monitord-collectors" }
 
 # Async runtime
 tokio = { version = "1.43.0", features = ["full"] }
-async-trait = "0.1.87"
-futures = "0.3.30"
+futures = "0.3.31"
 
 # Command-line interface
 config = "0.15.8"

@@ -5,4 +5,4 @@ members = [
     "monitord-protocols",
     "monitord-client",
     "monitord-transport"
-]
+, "monitord-collectors"]

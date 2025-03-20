@@ -1,8 +1,14 @@
 use crate::config::CommunicationConfig;
 use crate::error::CommunicationError;
+use futures::channel::mpsc::Receiver;
+use futures::StreamExt;
 use monitord_protocols::monitord::*;
+use monitord_protocols::protocols::prost_types;
 use monitord_transport::TransportManager;
-use tokio::sync::broadcast::Receiver;
+use prost_types::Timestamp;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::task::JoinSet;
+use tracing::{error, info, warn};
 
 pub struct CommunicationManager {
     transport: TransportManager,
@@ -12,7 +18,7 @@ impl CommunicationManager {
     pub fn new(config: CommunicationConfig) -> Result<Self, CommunicationError> {
         let transport = TransportManager::new(config.transport_config)
             .map_err(CommunicationError::Transport)?;
-        
+
         Ok(Self { transport })
     }
 
@@ -26,98 +32,129 @@ impl CommunicationManager {
         mut storage_rx: Receiver<Vec<StorageInfo>>,
         mut system_rx: Receiver<SystemInfo>,
     ) -> Result<(), CommunicationError> {
-        let mut tasks = tokio::task::JoinSet::new();
+        let mut tasks = JoinSet::new();
 
+        info!("Initializing transport manager");
         let mut transport = self.transport.clone();
         transport.initialize().await?;
+        info!("Transport manager initialized");
 
         // CPU task
         {
             let mut transport_clone = transport.clone();
             tasks.spawn(async move {
-                while let Ok(cpu_info) = cpu_rx.recv().await {
+                info!("Starting CPU data publisher");
+                while let Some(cpu_info) = cpu_rx.next().await {
                     transport_clone.publish("cpu", cpu_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });
         }
-        
+
         // Memory task
         {
             let mut transport_clone = transport.clone();
             tasks.spawn(async move {
-                while let Ok(memory_info) = memory_rx.recv().await {
+                info!("Starting Memory data publisher");
+                while let Some(memory_info) = memory_rx.next().await {
                     transport_clone.publish("memory", memory_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });
         }
-        
+
         // GPU task
         {
             let mut transport_clone = transport.clone();
             tasks.spawn(async move {
-                while let Ok(gpu_info) = gpu_rx.recv().await {
-                    let gpu_info = GpuList { gpus: prost::alloc::vec::Vec::from(gpu_info) };
+                info!("Starting GPU data publisher");
+                while let Some(gpu_info) = gpu_rx.next().await {
+                    let gpu_info = GpuList { gpus: gpu_info };
                     transport_clone.publish("gpu", gpu_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });
         }
-        
+
         // Network task
         {
             let mut transport_clone = transport.clone();
             tasks.spawn(async move {
-                while let Ok(net_info) = net_rx.recv().await {
-                    let net_info = NetworkList { nets: prost::alloc::vec::Vec::from(net_info) };
+                info!("Starting Network data publisher");
+                while let Some(net_info) = net_rx.next().await {
+                    let net_info = NetworkList { nets: net_info };
                     transport_clone.publish("network", net_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });
         }
-        
+
         // Process task
         {
             let mut transport_clone = transport.clone();
             tasks.spawn(async move {
-                while let Ok(proc_info) = proc_rx.recv().await {
-                    let proc_info = ProcessList { processes: prost::alloc::vec::Vec::from(proc_info) };
+                info!("Starting Process data publisher");
+                while let Some(proc_info) = proc_rx.next().await {
+                    let proc_info = ProcessList {
+                        processes: proc_info,
+                    };
                     transport_clone.publish("process", proc_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });
         }
-        
+
         // Storage task
         {
             let mut transport_clone = transport.clone();
             tasks.spawn(async move {
-                while let Ok(storage_info) = storage_rx.recv().await {
-                    let storage_info = StorageList { storages: prost::alloc::vec::Vec::from(storage_info) };
+                info!("Starting Storage data publisher");
+                while let Some(storage_info) = storage_rx.next().await {
+                    let storage_info = StorageList {
+                        storages: storage_info,
+                    };
                     transport_clone.publish("storage", storage_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });
         }
-        
+
         // System task
         {
             let mut transport_clone = transport.clone();
             tasks.spawn(async move {
-                while let Ok(system_info) = system_rx.recv().await {
+                info!("Starting System data publisher");
+                while let Some(system_info) = system_rx.next().await {
                     transport_clone.publish("system", system_info).await?;
                 }
                 Ok::<(), CommunicationError>(())
             });
         }
-        
+
+        // Snapshot task - combines data from all collectors into a single snapshot
+        // This would be more efficiently implemented with shared state, but for simplicity
+        // we'll leave this for a future enhancement
+
         // Wait for any task to complete and return its result
         if let Some(result) = tasks.join_next().await {
             // If any task completes, it's because of an error
-            result.unwrap_or_else(|join_err| Err(CommunicationError::TaskJoin(join_err.to_string())))
+            match result {
+                Ok(Ok(())) => {
+                    warn!("A publisher task completed unexpectedly but without error");
+                    Ok(())
+                }
+                Ok(Err(e)) => {
+                    error!("A publisher task failed: {}", e);
+                    Err(e)
+                }
+                Err(e) => {
+                    error!("Failed to join publisher task: {}", e);
+                    Err(CommunicationError::TaskJoin(e.to_string()))
+                }
+            }
         } else {
             // All tasks completed successfully
+            info!("All publisher tasks completed successfully");
             Ok(())
         }
     }

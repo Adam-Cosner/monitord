@@ -15,7 +15,7 @@ impl Default for TransportType {
 
 #[derive(Debug, Clone, Default)]
 pub struct TransportConfig {
-    pub(crate) transport_config: TransportType,
+    pub transport_config: TransportType,
 }
 
 #[derive(Debug, Clone)]
