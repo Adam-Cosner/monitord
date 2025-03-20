@@ -11,8 +11,7 @@ build:
 # Install monitord service to system
 install: build
     @echo "Installing monitord service..."
-    sudo cp target/release/monitord /usr/local/bin/
-    sudo chmod +x /usr/local/bin/monitord
+    sudo install -Dm0755 target/release/monitord /usr/local/bin/
     @echo "Installation complete. Run 'just register-service' to register as a system service."
 
 # Uninstall monitord service from system
