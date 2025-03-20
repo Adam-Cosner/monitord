@@ -69,21 +69,21 @@ fn register_systemd_service(config: &PlatformConfig) -> Result<(), PlatformError
 
     service_content.push_str("[Service]\n");
     service_content.push_str(&format!("ExecStart={}\n", config.executable_path));
-    
+
     if let Some(user) = &config.user {
         service_content.push_str(&format!("User={}\n", user));
     }
-    
+
     if let Some(group) = &config.group {
         service_content.push_str(&format!("Group={}\n", group));
     }
-    
+
     if let Some(working_dir) = &config.working_directory {
         service_content.push_str(&format!("WorkingDirectory={}\n", working_dir));
     }
-    
+
     service_content.push_str("Restart=on-failure\n\n");
-    
+
     service_content.push_str("[Install]\n");
     service_content.push_str("WantedBy=multi-user.target\n");
 
@@ -122,7 +122,7 @@ fn register_sysvinit_service(config: &PlatformConfig) -> Result<(), PlatformErro
 
     script_content.push_str(&format!("NAME=\"{}\"\n", config.service_name));
     script_content.push_str(&format!("DAEMON=\"{}\"\n", config.executable_path));
-    
+
     if let Some(user) = &config.user {
         script_content.push_str(&format!("DAEMON_USER=\"{}\"\n", user));
     } else {
@@ -219,7 +219,7 @@ fn register_openrc_service(config: &PlatformConfig) -> Result<(), PlatformError>
     script_content.push_str(&format!("name=\"{}\"\n", config.description));
     script_content.push_str(&format!("description=\"{}\"\n", config.description));
     script_content.push_str(&format!("command=\"{}\"\n", config.executable_path));
-    
+
     if let Some(user) = &config.user {
         script_content.push_str(&format!("command_user=\"{}\"\n", user));
     }
@@ -291,7 +291,7 @@ fn register_runit_service(config: &PlatformConfig) -> Result<(), PlatformError> 
     if Path::new("/etc/service").exists() {
         let target_link = PathBuf::from("/etc/service")
             .join(&config.service_name);
-        
+
         if let Err(e) = std::os::unix::fs::symlink(&service_dir, &target_link) {
             if e.kind() != std::io::ErrorKind::AlreadyExists {
                 return Err(PlatformError::Io(e));
@@ -302,7 +302,7 @@ fn register_runit_service(config: &PlatformConfig) -> Result<(), PlatformError> 
     println!("Registered Runit service at: {}", service_dir.display());
     println!("To enable and start the service, run:");
     println!("sudo ln -s /etc/sv/{0} /var/service/{0}", config.service_name);
-    
+
     Ok(())
 }
 
@@ -318,7 +318,7 @@ fn ensure_user_exists(user: &str, group: Option<&str>) -> Result<(), PlatformErr
 
     if !user_exists {
         println!("Creating user '{}'...", user);
-        
+
         // If group is specified and different from user, create it first if needed
         if let Some(group_name) = group {
             if group_name != user {
@@ -328,7 +328,7 @@ fn ensure_user_exists(user: &str, group: Option<&str>) -> Result<(), PlatformErr
                     .status()
                     .map_err(PlatformError::Io)?
                     .success();
-                
+
                 if !group_exists {
                     Command::new("groupadd")
                         .arg(group_name)
@@ -336,7 +336,7 @@ fn ensure_user_exists(user: &str, group: Option<&str>) -> Result<(), PlatformErr
                         .map_err(PlatformError::Io)?;
                 }
             }
-            
+
             // Create user with specified group
             Command::new("useradd")
                 .args([
@@ -358,34 +358,34 @@ fn ensure_user_exists(user: &str, group: Option<&str>) -> Result<(), PlatformErr
                 .status()
                 .map_err(PlatformError::Io)?;
         }
-        
+
         println!("User '{}' created successfully", user);
     }
-    
+
     Ok(())
 }
 
 // Helper function to create directory and set permissions
 fn ensure_directory_exists(dir: &str, user: Option<&str>, group: Option<&str>) -> Result<(), PlatformError> {
     let path = Path::new(dir);
-    
+
     if !path.exists() {
         println!("Creating directory '{}'...", dir);
         fs::create_dir_all(path).map_err(PlatformError::Io)?;
-        
+
         // Set directory ownership if user/group is specified
         if user.is_some() || group.is_some() {
             let user_arg = user.unwrap_or("root");
             let group_arg = group.unwrap_or("root");
-            
+
             Command::new("chown")
                 .args([&format!("{}:{}", user_arg, group_arg), dir])
                 .status()
                 .map_err(PlatformError::Io)?;
         }
-        
+
         println!("Directory '{}' created successfully", dir);
     }
-    
+
     Ok(())
 }
