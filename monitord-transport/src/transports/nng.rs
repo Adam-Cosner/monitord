@@ -146,8 +146,6 @@ impl Transport for NngTransport {
             ));
         }
 
-        info!("Preparing receive");
-
         // Get or create subscriber for this topic
         let socket = {
             let mut subscribers = self.subscribers.lock().await;

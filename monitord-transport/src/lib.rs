@@ -5,6 +5,7 @@ use crate::error::TransportError;
 use crate::transports::{IceoryxTransport, NngTransport, TransportVariant};
 use std::sync::{Arc};
 use futures::lock::{Mutex};
+use futures_locks::RwLock;
 
 pub mod core;
 pub mod error;
@@ -12,7 +13,7 @@ pub mod transports;
 pub mod config;
 
 pub struct TransportManager {
-    variant: Arc<Mutex<TransportVariant>>,
+    variant: Arc<RwLock<TransportVariant>>,
     config: TransportConfig,
 }
 
@@ -27,13 +28,13 @@ impl TransportManager {
 
 
         Ok(Self {
-            variant: Arc::new(Mutex::new(variant)),
+            variant: Arc::new(RwLock::new(variant)),
             config
         })
     }
 
     pub async fn initialize(&mut self) -> Result<(), TransportError> {
-        let mut variant = self.variant.lock().await;
+        let mut variant = self.variant.write().await;
         match &mut *variant {
             TransportVariant::Nng(transport) => transport.initialize().await,
             TransportVariant::Iceoryx(transport) => transport.initialize().await,
@@ -44,9 +45,8 @@ impl TransportManager {
     }
 
     pub async fn publish<T: Message + Default>(&mut self, destination: &str, message: T) -> Result<(), TransportError> {
+        let variant = self.variant.read().await;
         let message = message.encode_to_vec();
-        let variant = self.variant.lock().await;
-
         match &*variant {
             TransportVariant::Iceoryx(transport) => transport.publish(destination, message.as_slice()).await,
             TransportVariant::Nng(transport) => transport.publish(destination, message.as_slice()).await,
@@ -56,9 +56,8 @@ impl TransportManager {
     }
 
     pub async fn receive<T: Message + Default>(&mut self, destination: &str) -> Result<Option<T>, TransportError> {
-        let variant = self.variant.lock().await;
-
-        let message = match &*variant {
+        let variant = self.variant.read().await;
+       let message = match &*variant {
             TransportVariant::Nng(transport) => transport.receive(destination).await?,
             TransportVariant::Iceoryx(transport) => transport.receive(destination).await?,
             TransportVariant::Grpc() => return Err(TransportError::Receive("gRPC unavailable".to_owned())),

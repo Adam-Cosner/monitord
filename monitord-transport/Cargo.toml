@@ -24,6 +24,7 @@ tracing = "0.1.41"
 
 # Utilities
 futures = { version = "0.3.31", features = [] }
+futures-locks = "0.7.1"
 chrono = "0.4.40"
 uuid = { version = "1.16.0", features = ["v4"] }
 
