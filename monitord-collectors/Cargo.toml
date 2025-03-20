@@ -1,0 +1,48 @@
+[package]
+name = "monitord-collectors"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+monitord-protocols = { path = "../monitord-protocols" }
+
+# System info gathering
+sysinfo = "0.33.1"
+raw-cpuid = "11.5.0"
+nvml-wrapper = "0.10.0"
+amdgpu-sysfs = "0.18.0"
+
+# Async
+futures = "0.3.31"
+
+# Configuration
+config = "0.15.11"
+
+# Error helper
+thiserror = "2.0.12"
+
+# Logging
+tracing = "0.1.41"
+tracing-subscriber = "0.3.18"
+
+# Utilities
+chrono = "0.4.40"
+
+[dev-dependencies]
+tokio = { version = "1.36.0", features = ["full"] }
+
+[[example]]
+name = "cpu_collector"
+path = "examples/cpu_collector.rs"
+
+[[example]]
+name = "system_monitor"
+path = "examples/system_monitor.rs"
+
+[[example]]
+name = "full_snapshot"
+path = "examples/full_snapshot.rs"
+
+[[example]]
+name = "gpu_collector"
+path = "examples/gpu_collector.rs"
