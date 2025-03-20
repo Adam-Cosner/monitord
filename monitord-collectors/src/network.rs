@@ -3,9 +3,8 @@ use crate::error::{CollectorError, Result};
 use crate::traits::Collector;
 use monitord_protocols::monitord::{NetworkInfo, NetworkList};
 use std::collections::HashMap;
-use std::time::Duration;
-use sysinfo::{Networks, System};
-use tracing::{debug, info, warn};
+use sysinfo::Networks;
+use tracing::{debug, info};
 
 pub struct NetworkCollector {
     config: NetworkCollectorConfig,

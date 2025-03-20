@@ -1226,11 +1226,14 @@ dependencies = [
 name = "monitord-collectors"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "futures",
  "monitord-protocols",
  "nvml-wrapper",
  "raw-cpuid",
+ "rocm_smi_lib",
+ "rocm_smi_lib_sys",
  "sysinfo",
  "thiserror 2.0.12",
  "tokio",
@@ -1762,6 +1765,27 @@ name = "regex-syntax"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
+
+[[package]]
+name = "rocm_smi_lib"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e90c379853ea4b2dd3fbe8cf35abc3e1a47f606fc83696af1d970a105f8b0a13"
+dependencies = [
+ "lazy_static",
+ "libc",
+ "rocm_smi_lib_sys",
+]
+
+[[package]]
+name = "rocm_smi_lib_sys"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0b3fa4a7732c9acf005c25f679e03a8d2e7ce4589175002de1affe0d50976f7"
+dependencies = [
+ "libc",
+ "libloading",
+]
 
 [[package]]
 name = "ron"

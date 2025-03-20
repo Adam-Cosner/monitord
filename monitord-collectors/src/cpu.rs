@@ -3,8 +3,6 @@ use crate::error::{CollectorError, Result};
 use crate::traits::Collector;
 use monitord_protocols::monitord::{CoreInfo, CpuCache, CpuInfo};
 use raw_cpuid::{CpuId, CpuIdReaderNative};
-use std::any::Any;
-use std::time::Duration;
 use sysinfo::{CpuRefreshKind, System};
 use tracing::{debug, info, warn};
 

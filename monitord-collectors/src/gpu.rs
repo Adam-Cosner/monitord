@@ -8,7 +8,6 @@ use nvml_wrapper::enum_wrappers::device::{Clock, TemperatureSensor};
 use nvml_wrapper::enums::device::UsedGpuMemory;
 use nvml_wrapper::Nvml;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 use tracing::{debug, info, warn};
@@ -27,9 +26,9 @@ impl Collector for GpuCollector {
 
         if !config.enabled {
             info!("GPU collector is disabled");
-            return Err(CollectorError::ConfigurationError(
-                "GPU collector is disabled".into(),
-            ));
+            return Err(
+                CollectorError::ConfigurationError("GPU collector is disabled".into()).into(),
+            );
         }
 
         // Initialize NVIDIA NVML if requested
@@ -40,7 +39,7 @@ impl Collector for GpuCollector {
                     Some(Arc::new(nvml))
                 }
                 Err(err) => {
-                    warn!("Failed to initialize NVIDIA NVML: {:?}", err);
+                    warn!("Failed to initialize NVIDIA NVML: {}", err.to_string());
                     None
                 }
             }
@@ -120,7 +119,8 @@ impl GpuCollector {
                 return Err(CollectorError::GpuError(format!(
                     "Failed to get NVIDIA device count: {:?}",
                     e
-                )));
+                ))
+                .into());
             }
         };
 
@@ -270,6 +270,8 @@ impl GpuCollector {
     }
 }
 
+/// Linux AMD GPU
+#[cfg(target_os = "linux")]
 impl GpuCollector {
     /// Collect information from AMD GPUs using sysfs interface
     fn collect_amd_gpus(&mut self) -> Result<Vec<GpuInfo>> {
@@ -317,9 +319,7 @@ impl GpuCollector {
         }
 
         if gpus.is_empty() {
-            return Err(CollectorError::GpuError(
-                "No AMD GPUs found in system".into(),
-            ));
+            return Err(CollectorError::GpuError("No AMD GPUs found in system".into()).into());
         }
 
         Ok(gpus)
@@ -402,7 +402,7 @@ impl GpuCollector {
                 return Ok(bytes);
             }
         }
-        Err(CollectorError::GpuError("Failed to read VRAM size".into()))
+        Err(CollectorError::GpuError("Failed to read VRAM size".to_string()).into())
     }
 
     /// Get AMD GPU VRAM used from sysfs
@@ -413,7 +413,7 @@ impl GpuCollector {
                 return Ok(bytes);
             }
         }
-        Err(CollectorError::GpuError("Failed to read VRAM usage".into()))
+        Err(CollectorError::GpuError("Failed to read VRAM usage".to_string()).into())
     }
 
     /// Get AMD GPU utilization percentage from sysfs
@@ -424,9 +424,7 @@ impl GpuCollector {
                 return Ok(percent);
             }
         }
-        Err(CollectorError::GpuError(
-            "Failed to read GPU utilization".into(),
-        ))
+        Err(CollectorError::GpuError("Failed to read GPU utilization".to_string()).into())
     }
 
     /// Get AMD GPU temperature from sysfs hwmon
@@ -448,9 +446,7 @@ impl GpuCollector {
                 }
             }
         }
-        Err(CollectorError::GpuError(
-            "Failed to read temperature".into(),
-        ))
+        Err(CollectorError::GpuError("Failed to read temperature".to_string()).into())
     }
 
     /// Get AMD GPU power usage from sysfs hwmon
@@ -612,9 +608,7 @@ impl GpuCollector {
 
                 // Track GPU usage per device
                 let mut accumulated_per_device_usages: HashMap<String, u128> = HashMap::new();
-
-                // Estimate VRAM usage (this is approximate for AMD GPUs)
-                let mut vram_bytes = 0u64;
+                let mut accumulated_per_device_vram: HashMap<String, u128> = HashMap::new();
 
                 // Parse fdinfo for DRM usage
                 if let Ok(fdinfo_dir) = path.join("fdinfo").read_dir() {
@@ -638,9 +632,17 @@ impl GpuCollector {
                                             *accumulated_per_device_usages
                                                 .entry(drm_pdev.to_string())
                                                 .or_insert(0) += usage;
-
-                                            // Increment VRAM usage (very approximate)
-                                            vram_bytes += 1024 * 1024; // Incremental guess
+                                        }
+                                        if let Some(vram) = content
+                                            .lines()
+                                            .find(|l| l.starts_with("drm-memory-vram"))
+                                            .and_then(|line| line.split_whitespace().nth(1))
+                                            .and_then(|usage| usage.parse::<u128>().ok())
+                                        {
+                                            // Add to accumulated vram for this device
+                                            *accumulated_per_device_vram
+                                                .entry(drm_pdev.to_string())
+                                                .or_insert(0) += vram;
                                         }
                                     }
                                 }
@@ -654,6 +656,7 @@ impl GpuCollector {
                     process_usages.insert(pid, (timestamp, accumulated_per_device_usages.clone()))
                 {
                     for (drm_pdev, accumulated_usage) in accumulated_per_device_usages.iter() {
+                        let vram_bytes = *accumulated_per_device_vram.get(drm_pdev).unwrap() as u64;
                         if let Some(previous_usage) = old_usages.get(drm_pdev) {
                             let delta_time = (timestamp - old_timestamp).as_nanos();
                             if delta_time > 0 {

@@ -3,7 +3,7 @@ use crate::error::{CollectorError, Result};
 use crate::traits::Collector;
 use monitord_protocols::monitord::{DramInfo, MemoryInfo};
 use sysinfo::System;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 pub struct MemoryCollector {
     config: MemoryCollectorConfig,
