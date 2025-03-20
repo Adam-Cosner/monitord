@@ -23,7 +23,7 @@ impl Default for PlatformConfig {
         Self {
             service_name: "monitord".to_string(),
             description: "System monitoring daemon".to_string(),
-            executable_path: "/usr/bin/monitord".to_string(),
+            executable_path: "/usr/local/bin/monitord".to_string(),
             user: None,
             group: None,
             working_directory: None,
