@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cpu_interval = Duration::from_secs(2);
     let memory_interval = Duration::from_secs(3);
     
-    let mut cpu_stream = cpu_collector.stream(cpu_interval)
+    let cpu_stream = cpu_collector.stream(cpu_interval)
         .map(|result| {
             match result {
                 Ok(info) => format!(
@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
     
-    let mut memory_stream = memory_collector.stream(memory_interval)
+    let memory_stream = memory_collector.stream(memory_interval)
         .map(|result| {
             match result {
                 Ok(info) => {

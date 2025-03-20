@@ -299,6 +299,7 @@ impl CollectorConfig for SystemCollectorConfig {
 
 /// A container for all collector configurations
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct CollectorsConfig {
     pub cpu: CpuCollectorConfig,
     pub memory: MemoryCollectorConfig,
@@ -309,16 +310,3 @@ pub struct CollectorsConfig {
     pub system: SystemCollectorConfig,
 }
 
-impl Default for CollectorsConfig {
-    fn default() -> Self {
-        Self {
-            cpu: CpuCollectorConfig::default(),
-            memory: MemoryCollectorConfig::default(),
-            gpu: GpuCollectorConfig::default(),
-            network: NetworkCollectorConfig::default(),
-            storage: StorageCollectorConfig::default(),
-            process: ProcessCollectorConfig::default(),
-            system: SystemCollectorConfig::default(),
-        }
-    }
-}

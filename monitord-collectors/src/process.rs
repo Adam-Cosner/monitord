@@ -4,9 +4,8 @@ use crate::traits::Collector;
 use crate::CollectorConfig;
 use monitord_protocols::monitord::{KeyValuePair, ProcessInfo, ProcessList};
 use std::collections::HashMap;
-use std::time::Duration;
 use sysinfo::{ProcessesToUpdate, System};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 pub struct ProcessCollector {
     config: ProcessCollectorConfig,
@@ -74,8 +73,7 @@ impl Collector for ProcessCollector {
 
             // Get process owner
             let username = process
-                .user_id()
-                .and_then(|uid| Some(uid.to_string()))
+                .user_id().map(|uid| uid.to_string())
                 .unwrap_or_else(|| "unknown".to_string());
 
             // Get process state

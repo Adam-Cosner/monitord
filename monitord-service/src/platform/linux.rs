@@ -89,13 +89,13 @@ fn register_systemd_service(config: &PlatformConfig) -> Result<(), PlatformError
 
     // Write file
     fs::write(&service_path, service_content)
-        .map_err(|e| PlatformError::Io(e))?;
+        .map_err(PlatformError::Io)?;
 
     // Reload systemd daemon
     Command::new("systemctl")
         .args(["daemon-reload"])
         .output()
-        .map_err(|e| PlatformError::Io(e))?;
+        .map_err(PlatformError::Io)?;
 
     println!("Registered systemd service at: {}", service_path.display());
     println!("To enable and start the service, run:");
@@ -195,11 +195,11 @@ exit 0
 
     // Write file
     fs::write(&service_path, script_content)
-        .map_err(|e| PlatformError::Io(e))?;
+        .map_err(PlatformError::Io)?;
 
     // Make script executable
     fs::set_permissions(&service_path, fs::Permissions::from_mode(0o755))
-        .map_err(|e| PlatformError::Io(e))?;
+        .map_err(PlatformError::Io)?;
 
     println!("Registered SysVinit service at: {}", service_path.display());
     println!("To enable and start the service, run:");
@@ -236,11 +236,11 @@ fn register_openrc_service(config: &PlatformConfig) -> Result<(), PlatformError>
 
     // Write file
     fs::write(&service_path, script_content)
-        .map_err(|e| PlatformError::Io(e))?;
+        .map_err(PlatformError::Io)?;
 
     // Make script executable
     fs::set_permissions(&service_path, fs::Permissions::from_mode(0o755))
-        .map_err(|e| PlatformError::Io(e))?;
+        .map_err(PlatformError::Io)?;
 
     println!("Registered OpenRC service at: {}", service_path.display());
     println!("To enable and start the service, run:");
@@ -256,7 +256,7 @@ fn register_runit_service(config: &PlatformConfig) -> Result<(), PlatformError> 
 
     // Create service directory
     fs::create_dir_all(&service_dir)
-        .map_err(|e| PlatformError::Io(e))?;
+        .map_err(PlatformError::Io)?;
 
     let run_script_path = service_dir.join("run");
 
@@ -281,11 +281,11 @@ fn register_runit_service(config: &PlatformConfig) -> Result<(), PlatformError> 
 
     // Write run script
     fs::write(&run_script_path, run_script)
-        .map_err(|e| PlatformError::Io(e))?;
+        .map_err(PlatformError::Io)?;
 
     // Make script executable
     fs::set_permissions(&run_script_path, fs::Permissions::from_mode(0o755))
-        .map_err(|e| PlatformError::Io(e))?;
+        .map_err(PlatformError::Io)?;
 
     // Create symbolic link in /etc/service if it exists
     if Path::new("/etc/service").exists() {

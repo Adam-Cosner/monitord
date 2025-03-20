@@ -57,7 +57,7 @@ impl IceoryxTransport {
         let mut publishers = HashMap::new();
         let mut subscribers = HashMap::new();
 
-        while let Some(cmd) = command_rx.recv().ok() {
+        while let Ok(cmd) = command_rx.recv() {
             match cmd {
                 IceoryxCommand::Publish { topic, payload, response_tx } => {
                     let publisher = if let Some(publisher) = publishers.get(&topic) {

@@ -10,8 +10,6 @@ monitord-protocols = { path = "../monitord-protocols" }
 sysinfo = "0.33.1"
 raw-cpuid = "11.5.0"
 nvml-wrapper = "0.10.0"
-rocm_smi_lib = "0.2.5"
-rocm_smi_lib_sys = "0.2.5"
 
 # Async
 futures = "0.3.31"

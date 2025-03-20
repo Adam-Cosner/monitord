@@ -4,7 +4,7 @@ use crate::traits::Collector;
 use crate::CollectorConfig;
 use monitord_protocols::monitord::SystemInfo;
 use sysinfo::{ProcessesToUpdate, System};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 pub struct SystemCollector {
     config: SystemCollectorConfig,
@@ -46,7 +46,7 @@ impl Collector for SystemCollector {
                 .system
                 .processes()
                 .iter()
-                .filter(|(_, proc)| proc.thread_kind() == None)
+                .filter(|(_, proc)| proc.thread_kind().is_none())
                 .count() as u32;
             let threads = self.system.processes().len() as u32;
             (processes, threads)
@@ -56,7 +56,7 @@ impl Collector for SystemCollector {
                 .system
                 .processes()
                 .iter()
-                .filter(|(_, proc)| proc.thread_kind() == None)
+                .filter(|(_, proc)| proc.thread_kind().is_none())
                 .count() as u32;
             (processes, 0)
         };

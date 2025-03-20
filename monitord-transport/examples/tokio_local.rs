@@ -150,7 +150,7 @@ async fn storage(mut transport: TransportManager) -> Result<(), anyhow::Error> {
             }
         }
         
-        output.push_str("\n");
+        output.push('\n');
     }
 
     println!("{}", output);
@@ -189,7 +189,7 @@ async fn network(mut transport: TransportManager) -> Result<(), anyhow::Error> {
             output.push_str(format!("    Link Speed: {} Mbps\n", speed).as_str());
         }
         
-        output.push_str("\n");
+        output.push('\n');
     }
 
     println!("{}", output);

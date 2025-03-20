@@ -3,10 +3,7 @@ use crate::error::CommunicationError;
 use futures::channel::mpsc::Receiver;
 use futures::StreamExt;
 use monitord_protocols::monitord::*;
-use monitord_protocols::protocols::prost_types;
 use monitord_transport::TransportManager;
-use prost_types::Timestamp;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::task::JoinSet;
 use tracing::{error, info, warn};
 

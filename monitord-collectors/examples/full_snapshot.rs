@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use monitord_collectors::{
     config::{
-        CollectorsConfig, CpuCollectorConfig, GpuCollectorConfig, MemoryCollectorConfig,
+        CpuCollectorConfig, GpuCollectorConfig, MemoryCollectorConfig,
         NetworkCollectorConfig, ProcessCollectorConfig, StorageCollectorConfig,
         SystemCollectorConfig,
     },
@@ -15,8 +15,6 @@ use monitord_collectors::{
     traits::Collector,
 };
 use monitord_protocols::monitord::SystemSnapshot;
-use monitord_protocols::protocols::prost_types::Timestamp;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

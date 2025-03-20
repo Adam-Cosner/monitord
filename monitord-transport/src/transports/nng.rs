@@ -133,7 +133,7 @@ impl Transport for NngTransport {
 
         // Send the data through the socket
         socket.send(&data).map_err(|e| {
-            TransportError::Publish(format!("Failed to publish message: {}", e.1.to_string()))
+            TransportError::Publish(format!("Failed to publish message: {}", e.1))
         })?;
 
         Ok(())

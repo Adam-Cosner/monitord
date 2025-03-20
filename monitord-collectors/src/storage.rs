@@ -4,9 +4,8 @@ use crate::traits::Collector;
 use crate::CollectorConfig;
 use monitord_protocols::monitord::{SmartData, StorageInfo, StorageList};
 use std::collections::HashMap;
-use std::time::Duration;
-use sysinfo::{Disks, System};
-use tracing::{debug, info, warn};
+use sysinfo::Disks;
+use tracing::{debug, info};
 
 pub struct StorageCollector {
     config: StorageCollectorConfig,

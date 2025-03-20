@@ -2,7 +2,7 @@ use monitord_collectors::config::GpuCollectorConfig;
 use monitord_collectors::gpu::GpuCollector;
 use monitord_collectors::traits::Collector;
 use std::error::Error;
-use tracing::{info, Level};
+use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]

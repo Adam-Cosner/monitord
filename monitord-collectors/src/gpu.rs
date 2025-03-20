@@ -27,7 +27,7 @@ impl Collector for GpuCollector {
         if !config.enabled {
             info!("GPU collector is disabled");
             return Err(
-                CollectorError::ConfigurationError("GPU collector is disabled".into()).into(),
+                CollectorError::ConfigurationError("GPU collector is disabled".into()),
             );
         }
 
@@ -119,8 +119,7 @@ impl GpuCollector {
                 return Err(CollectorError::GpuError(format!(
                     "Failed to get NVIDIA device count: {:?}",
                     e
-                ))
-                .into());
+                )));
             }
         };
 
@@ -224,7 +223,7 @@ impl GpuCollector {
                                     // We would need additional libraries to get process names
                                     // For now, just include the PID and memory usage
                                     process_info.push(GpuProcessInfo {
-                                        pid: proc.pid as u32,
+                                        pid: proc.pid,
                                         process_name: format!("PID {}", proc.pid), // Would need additional lookup
                                         gpu_utilization_percent: 0.0, // Not available from NVML this way
                                         vram_bytes: match proc.used_gpu_memory {
@@ -319,7 +318,7 @@ impl GpuCollector {
         }
 
         if gpus.is_empty() {
-            return Err(CollectorError::GpuError("No AMD GPUs found in system".into()).into());
+            return Err(CollectorError::GpuError("No AMD GPUs found in system".into()));
         }
 
         Ok(gpus)
@@ -402,7 +401,7 @@ impl GpuCollector {
                 return Ok(bytes);
             }
         }
-        Err(CollectorError::GpuError("Failed to read VRAM size".to_string()).into())
+        Err(CollectorError::GpuError("Failed to read VRAM size".to_string()))
     }
 
     /// Get AMD GPU VRAM used from sysfs
@@ -413,7 +412,7 @@ impl GpuCollector {
                 return Ok(bytes);
             }
         }
-        Err(CollectorError::GpuError("Failed to read VRAM usage".to_string()).into())
+        Err(CollectorError::GpuError("Failed to read VRAM usage".to_string()))
     }
 
     /// Get AMD GPU utilization percentage from sysfs
@@ -424,7 +423,7 @@ impl GpuCollector {
                 return Ok(percent);
             }
         }
-        Err(CollectorError::GpuError("Failed to read GPU utilization".to_string()).into())
+        Err(CollectorError::GpuError("Failed to read GPU utilization".to_string()))
     }
 
     /// Get AMD GPU temperature from sysfs hwmon
@@ -446,7 +445,7 @@ impl GpuCollector {
                 }
             }
         }
-        Err(CollectorError::GpuError("Failed to read temperature".to_string()).into())
+        Err(CollectorError::GpuError("Failed to read temperature".to_string()))
     }
 
     /// Get AMD GPU power usage from sysfs hwmon
