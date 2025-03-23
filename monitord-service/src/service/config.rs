@@ -18,7 +18,7 @@ impl ServiceConfig {
             .set_default("service.enable_logging", true)?
             .set_default("service.log_level", "INFO")?
             // Collection config defaults
-            .set_default("grpc.server_address", "127.0.0.1:50051")?
+            .set_default("grpc.server_address", "localhost:50051")?
             .set_default("grpc.timeout_ms", 3000)?;
 
         // Add configuration from a file if specified via environment variable
@@ -145,7 +145,7 @@ impl ServiceConfig {
         let grpc_config = crate::communication::config::GrpcConfig {
             server_address: config
                 .get_string("grpc.server_address")
-                .unwrap_or_else(|_| "127.0.0.1:50051".to_string()),
+                .unwrap_or_else(|_| "localhost:50051".to_string()),
         };
 
         let communication_config = CommunicationConfig { grpc_config };

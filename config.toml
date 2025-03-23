@@ -1,5 +1,5 @@
 [grpc]
-server_address = "127.0.0.1:50052"
+server_address = "127.0.0.1:50051"
 
 [service]
 update_interval_ms = 1000
