@@ -21,8 +21,8 @@ Monitord consists of several components:
 
 - **monitord-service**: The main daemon that runs as a system service
 - **monitord-collectors**: Data collection modules for system metrics
-- **monitord-transport**: Communication transport layer
 - **monitord-protocols**: Protocol definitions and data structures
+- **monitord-client**: Client library for interacting with the monitord service
 
 ## Installation
 
@@ -98,46 +98,47 @@ just uninstall
 
 ## Client Interface
 
-### Connecting to Monitord
+### Using the Client Library
 
-Monitord uses a transport layer that abstracts the communication details. Here's how to connect to the service:
+Monitord comes with a dedicated client library for easy integration:
 
 ```rust
-use monitord_protocols::monitord::*;
-use monitord_transport::config::TransportConfig;
-use monitord_transport::TransportManager;
+use monitord_client::MonitordClient;
+use futures::StreamExt;
 
+#[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize the transport with default configuration
-    let mut transport = TransportManager::new(TransportConfig::default())?;
+    // Connect to the monitord service
+    let client = MonitordClient::connect("http://localhost:50051").await?;
     
-    // Initialize the connection
-    transport.initialize().await?;
+    // Get a complete system snapshot
+    let snapshot = client.get_system_snapshot().await?;
     
-    // Now you can receive data from various collectors
-    if let Some(cpu_info) = transport.receive::<CpuInfo>("cpu").await? {
-        println!("CPU Model: {}", cpu_info.model_name);
-        println!("CPU Usage: {}%", cpu_info.global_utilization_percent);
-        println!("Logical Cores: {}", cpu_info.logical_cores);
-        // ... and much more
-    }
-    
-    // Get memory information
-    if let Some(memory_info) = transport.receive::<MemoryInfo>("memory").await? {
-        let total_gb = memory_info.total_memory_bytes as f64 / 1_073_741_824.0;
-        let used_gb = memory_info.used_memory_bytes as f64 / 1_073_741_824.0;
-        
-        println!("Memory Usage: {:.2}% ({:.2} GB / {:.2} GB)", 
-                 memory_info.memory_load_percent,
-                 used_gb,
-                 total_gb);
-    }
-    
-    // Get system information
-    if let Some(system_info) = transport.receive::<SystemInfo>("system").await? {
+    // Access system information
+    if let Some(system_info) = &snapshot.system_info {
         println!("Hostname: {}", system_info.hostname);
         println!("OS: {} {}", system_info.os_name, system_info.os_version);
         println!("Uptime: {} seconds", system_info.uptime_seconds);
+    }
+    
+    // Access CPU information
+    if let Some(cpu_info) = &snapshot.cpu_info {
+        println!("CPU Model: {}", cpu_info.model_name);
+        println!("CPU Usage: {:.1}%", cpu_info.global_utilization_percent);
+        println!("Logical Cores: {}", cpu_info.logical_cores);
+    }
+    
+    // Stream CPU information with updates every 1000ms
+    let mut cpu_stream = client.stream_cpu_info(1000).await?;
+    
+    while let Some(result) = cpu_stream.next().await {
+        match result {
+            Ok(info) => {
+                println!("CPU Usage: {:.1}%", info.global_utilization_percent);
+                // Process real-time CPU information
+            },
+            Err(e) => eprintln!("Error: {}", e),
+        }
     }
     
     Ok(())

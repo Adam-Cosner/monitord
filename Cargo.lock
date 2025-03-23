@@ -915,6 +915,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "monitord-client"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "futures",
+ "monitord-protocols",
+ "thiserror 1.0.69",
+ "tokio",
+ "tonic",
+ "tracing",
+]
+
+[[package]]
 name = "monitord-collectors"
 version = "0.1.0"
 dependencies = [

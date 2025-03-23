@@ -1,0 +1,39 @@
+[grpc]
+server_address = "127.0.0.1:50052"
+
+[service]
+update_interval_ms = 1000
+max_clients = 10
+enable_logging = true
+log_level = "INFO"
+
+[collectors]
+# Define collector configurations
+[collectors.system]
+enabled = true
+interval_ms = 1000
+
+[collectors.cpu]
+enabled = true
+interval_ms = 1000
+collect_per_core = true
+
+[collectors.memory]
+enabled = true
+interval_ms = 1000
+
+[collectors.gpu]
+enabled = true
+interval_ms = 1000
+
+[collectors.network]
+enabled = true
+interval_ms = 1000
+
+[collectors.process]
+enabled = true
+interval_ms = 1000
+
+[collectors.storage]
+enabled = true
+interval_ms = 1000

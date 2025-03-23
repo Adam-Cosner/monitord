@@ -13,8 +13,8 @@ message SystemSnapshot {
   MemoryInfo memory_info = 4;
   GpuList gpu_info = 5;
   NetworkList network_info = 6;
-  repeated ProcessInfo processes = 7;
-  repeated StorageInfo storage_devices = 8;
+  ProcessList processes = 7;
+  StorageList storage_devices = 8;
 }
 
 // System-wide information
@@ -246,13 +246,16 @@ service MonitordService {
   rpc StreamMemoryInfo(SnapshotRequest) returns (stream MemoryInfo);
 
   // Stream just GPU information
-  rpc StreamGpuInfo(SnapshotRequest) returns (stream GpuInfo);
+  rpc StreamGpuInfo(SnapshotRequest) returns (stream GpuList);
 
   // Stream just network information
-  rpc StreamNetworkInfo(SnapshotRequest) returns (stream NetworkInfo);
+  rpc StreamNetworkInfo(SnapshotRequest) returns (stream NetworkList);
 
   // Stream process information with optional filtering
-  rpc StreamProcessInfo(ProcessInfoRequest) returns (stream ProcessInfo);
+  rpc StreamProcessInfo(ProcessInfoRequest) returns (stream ProcessList);
+
+  // Stream storage information
+  rpc StreamStorageInfo(SnapshotRequest) returns (stream StorageList);
 }
 
 // Request message for snapshots
