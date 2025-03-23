@@ -30,18 +30,7 @@ impl Collector for CpuCollector {
         system.refresh_cpu_specifics(CpuRefreshKind::everything());
 
         // Initialize cpuid if possible
-        let cpuid = match CpuId::new() {
-            cpuid => Some(cpuid),
-            #[allow(clippy::needless_return)]
-            _ => {
-                warn!("Unable to initialize CPUID, some CPU information will be unavailable");
-                return Ok(Self {
-                    config,
-                    system,
-                    cpuid: None,
-                });
-            }
-        };
+        let cpuid = Some(CpuId::new());
 
         info!("CPU collector initialized");
         Ok(Self {

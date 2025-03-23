@@ -1,22 +1,352 @@
 use crate::config::CommunicationConfig;
 use crate::error::CommunicationError;
 use futures::channel::mpsc::Receiver;
-use futures::StreamExt;
+use monitord_protocols::monitord::monitord_service_server::{
+    MonitordService, MonitordServiceServer,
+};
 use monitord_protocols::monitord::*;
-use monitord_transport::TransportManager;
+use std::pin::Pin;
+use std::sync::Arc;
+use tokio::sync::mpsc::{self as tokio_mpsc};
+use tokio::sync::RwLock;
 use tokio::task::JoinSet;
+use tokio_stream::Stream;
+use tonic::{transport::Server, Response};
 use tracing::{error, info, warn};
 
+// Shared state for the gRPC service
+#[derive(Debug, Default)]
+struct SharedState {
+    cpu_data: Option<CpuInfo>,
+    memory_data: Option<MemoryInfo>,
+    gpu_data: Option<Vec<GpuInfo>>,
+    network_data: Option<Vec<NetworkInfo>>,
+    process_data: Option<Vec<ProcessInfo>>,
+    storage_data: Option<Vec<StorageInfo>>,
+    system_data: Option<SystemInfo>,
+}
+
+// Our gRPC service implementation
+#[derive(Debug)]
+pub struct MonitordServiceImpl {
+    state: Arc<RwLock<SharedState>>,
+}
+
+#[tonic::async_trait]
+impl MonitordService for MonitordServiceImpl {
+    async fn get_system_snapshot(
+        &self,
+        _request: tonic::Request<SnapshotRequest>,
+    ) -> Result<tonic::Response<SystemSnapshot>, tonic::Status> {
+        let state = self.state.read().await;
+
+        // Create a snapshot from our current state
+        let snapshot = SystemSnapshot {
+            timestamp: Some(prost_types::Timestamp::from(std::time::SystemTime::now())),
+            system_info: state.system_data.clone(),
+            cpu_info: state.cpu_data.clone(),
+            memory_info: state.memory_data.clone(),
+            gpu_info: Some(GpuList {
+                gpus: state.gpu_data.clone().unwrap_or_default(),
+            }),
+            network_info: Some(NetworkList {
+                nets: state.network_data.clone().unwrap_or_default(),
+            }),
+            processes: state.process_data.clone().unwrap_or_default(),
+            storage_devices: state.storage_data.clone().unwrap_or_default(),
+        };
+
+        Ok(Response::new(snapshot))
+    }
+
+    type StreamSystemSnapshotsStream =
+        Pin<Box<dyn Stream<Item = Result<SystemSnapshot, tonic::Status>> + Send + 'static>>;
+
+    async fn stream_system_snapshots(
+        &self,
+        request: tonic::Request<SnapshotRequest>,
+    ) -> Result<tonic::Response<Self::StreamSystemSnapshotsStream>, tonic::Status> {
+        let interval_ms = request.into_inner().interval_ms;
+        let state_clone = self.state.clone();
+
+        // Create a channel for our stream
+        let (tx, rx) = tokio_mpsc::channel(128);
+
+        // Spawn a task to send snapshots at the requested interval
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_millis(interval_ms as u64));
+
+            loop {
+                interval.tick().await;
+                let state = state_clone.read().await;
+
+                // Create a snapshot from our current state
+                let snapshot = SystemSnapshot {
+                    timestamp: Some(prost_types::Timestamp::from(std::time::SystemTime::now())),
+                    system_info: state.system_data.clone(),
+                    cpu_info: state.cpu_data.clone(),
+                    memory_info: state.memory_data.clone(),
+                    gpu_info: Some(GpuList {
+                        gpus: state.gpu_data.clone().unwrap_or_default(),
+                    }),
+                    network_info: Some(NetworkList {
+                        nets: state.network_data.clone().unwrap_or_default(),
+                    }),
+                    processes: state.process_data.clone().unwrap_or_default(),
+                    storage_devices: state.storage_data.clone().unwrap_or_default(),
+                };
+
+                if tx.send(Ok(snapshot)).await.is_err() {
+                    // Client disconnected
+                    break;
+                }
+            }
+        });
+
+        // Convert our channel into a stream
+        let output_stream =
+            futures::StreamExt::boxed(tokio_stream::wrappers::ReceiverStream::new(rx));
+
+        Ok(Response::new(output_stream))
+    }
+
+    type StreamCpuInfoStream =
+        Pin<Box<dyn Stream<Item = Result<CpuInfo, tonic::Status>> + Send + 'static>>;
+
+    async fn stream_cpu_info(
+        &self,
+        request: tonic::Request<SnapshotRequest>,
+    ) -> Result<tonic::Response<Self::StreamCpuInfoStream>, tonic::Status> {
+        let interval_ms = request.into_inner().interval_ms;
+        let state_clone = self.state.clone();
+
+        let (tx, rx) = tokio_mpsc::channel(128);
+
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_millis(interval_ms as u64));
+
+            loop {
+                interval.tick().await;
+                let state = state_clone.read().await;
+
+                if let Some(cpu_info) = &state.cpu_data {
+                    if tx.send(Ok(cpu_info.clone())).await.is_err() {
+                        break;
+                    }
+                }
+            }
+        });
+
+        let output_stream =
+            futures::StreamExt::boxed(tokio_stream::wrappers::ReceiverStream::new(rx));
+
+        Ok(Response::new(output_stream))
+    }
+
+    type StreamMemoryInfoStream =
+        Pin<Box<dyn Stream<Item = Result<MemoryInfo, tonic::Status>> + Send + 'static>>;
+
+    async fn stream_memory_info(
+        &self,
+        request: tonic::Request<SnapshotRequest>,
+    ) -> Result<tonic::Response<Self::StreamMemoryInfoStream>, tonic::Status> {
+        let interval_ms = request.into_inner().interval_ms;
+        let state_clone = self.state.clone();
+
+        let (tx, rx) = tokio_mpsc::channel(128);
+
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_millis(interval_ms as u64));
+
+            loop {
+                interval.tick().await;
+                let state = state_clone.read().await;
+
+                if let Some(memory_info) = &state.memory_data {
+                    if tx.send(Ok(memory_info.clone())).await.is_err() {
+                        break;
+                    }
+                }
+            }
+        });
+
+        let output_stream =
+            futures::StreamExt::boxed(tokio_stream::wrappers::ReceiverStream::new(rx));
+
+        Ok(Response::new(output_stream))
+    }
+
+    type StreamGpuInfoStream =
+        Pin<Box<dyn Stream<Item = Result<GpuInfo, tonic::Status>> + Send + 'static>>;
+
+    async fn stream_gpu_info(
+        &self,
+        request: tonic::Request<SnapshotRequest>,
+    ) -> Result<tonic::Response<Self::StreamGpuInfoStream>, tonic::Status> {
+        let interval_ms = request.into_inner().interval_ms;
+        let state_clone = self.state.clone();
+
+        let (tx, rx) = tokio_mpsc::channel(128);
+
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_millis(interval_ms as u64));
+
+            loop {
+                interval.tick().await;
+                let state = state_clone.read().await;
+
+                if let Some(gpu_list) = &state.gpu_data {
+                    for gpu in gpu_list {
+                        if tx.send(Ok(gpu.clone())).await.is_err() {
+                            return;
+                        }
+                    }
+                }
+            }
+        });
+
+        let output_stream =
+            futures::StreamExt::boxed(tokio_stream::wrappers::ReceiverStream::new(rx));
+
+        Ok(Response::new(output_stream))
+    }
+
+    type StreamNetworkInfoStream =
+        Pin<Box<dyn Stream<Item = Result<NetworkInfo, tonic::Status>> + Send + 'static>>;
+
+    async fn stream_network_info(
+        &self,
+        request: tonic::Request<SnapshotRequest>,
+    ) -> Result<tonic::Response<Self::StreamNetworkInfoStream>, tonic::Status> {
+        let interval_ms = request.into_inner().interval_ms;
+        let state_clone = self.state.clone();
+
+        let (tx, rx) = tokio_mpsc::channel(128);
+
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_millis(interval_ms as u64));
+
+            loop {
+                interval.tick().await;
+                let state = state_clone.read().await;
+
+                if let Some(network_list) = &state.network_data {
+                    for network in network_list {
+                        if tx.send(Ok(network.clone())).await.is_err() {
+                            return;
+                        }
+                    }
+                }
+            }
+        });
+
+        let output_stream =
+            futures::StreamExt::boxed(tokio_stream::wrappers::ReceiverStream::new(rx));
+
+        Ok(Response::new(output_stream))
+    }
+
+    type StreamProcessInfoStream =
+        Pin<Box<dyn Stream<Item = Result<ProcessInfo, tonic::Status>> + Send + 'static>>;
+
+    async fn stream_process_info(
+        &self,
+        request: tonic::Request<ProcessInfoRequest>,
+    ) -> Result<tonic::Response<Self::StreamProcessInfoStream>, tonic::Status> {
+        let req = request.into_inner();
+        let interval_ms = req.interval_ms;
+        let username_filter = req.username_filter;
+        let pid_filter = req.pid_filter;
+        let name_filter = req.name_filter;
+        let sort_by_cpu = req.sort_by_cpu;
+        let sort_by_memory = req.sort_by_memory;
+        let limit = req.limit;
+
+        let state_clone = self.state.clone();
+
+        let (tx, rx) = tokio_mpsc::channel(128);
+
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_millis(interval_ms as u64));
+
+            loop {
+                interval.tick().await;
+                let state = state_clone.read().await;
+
+                if let Some(process_list) = &state.process_data {
+                    // Apply filters
+                    let mut filtered: Vec<ProcessInfo> = process_list
+                        .iter()
+                        .filter(|p| {
+                            let username_match = username_filter
+                                .as_ref()
+                                .map(|u| p.username.contains(u))
+                                .unwrap_or(true);
+
+                            let pid_match = pid_filter.map(|pid| p.pid == pid).unwrap_or(true);
+
+                            let name_match = name_filter
+                                .as_ref()
+                                .map(|n| p.name.contains(n))
+                                .unwrap_or(true);
+
+                            username_match && pid_match && name_match
+                        })
+                        .cloned()
+                        .collect();
+
+                    // Apply sorting
+                    if sort_by_cpu {
+                        filtered.sort_by(|a, b| {
+                            b.cpu_usage_percent
+                                .partial_cmp(&a.cpu_usage_percent)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        });
+                    } else if sort_by_memory {
+                        filtered
+                            .sort_by(|a, b| b.physical_memory_bytes.cmp(&a.physical_memory_bytes));
+                    }
+
+                    // Apply limit
+                    if limit > 0 && filtered.len() > limit as usize {
+                        filtered.truncate(limit as usize);
+                    }
+
+                    // Send filtered processes
+                    for process in filtered {
+                        if tx.send(Ok(process)).await.is_err() {
+                            return;
+                        }
+                    }
+                }
+            }
+        });
+
+        let output_stream =
+            futures::StreamExt::boxed(tokio_stream::wrappers::ReceiverStream::new(rx));
+
+        Ok(Response::new(output_stream))
+    }
+}
+
+// Our communication manager that will run the gRPC server and update the shared state
 pub struct CommunicationManager {
-    transport: TransportManager,
+    config: CommunicationConfig,
+    state: Arc<RwLock<SharedState>>,
 }
 
 impl CommunicationManager {
     pub fn new(config: CommunicationConfig) -> Result<Self, CommunicationError> {
-        let transport = TransportManager::new(config.transport_config)
-            .map_err(CommunicationError::Transport)?;
-
-        Ok(Self { transport })
+        Ok(Self {
+            config,
+            state: Arc::new(RwLock::new(SharedState::default())),
+        })
     }
 
     pub async fn run(
@@ -30,19 +360,44 @@ impl CommunicationManager {
         mut system_rx: Receiver<SystemInfo>,
     ) -> Result<(), CommunicationError> {
         let mut tasks = JoinSet::new();
+        let state = self.state.clone();
 
-        info!("Initializing transport manager");
-        let mut transport = self.transport.clone();
-        transport.initialize().await?;
-        info!("Transport manager initialized");
+        // Start the gRPC server
+        let server_addr = self
+            .config
+            .grpc_config
+            .server_address
+            .parse()
+            .map_err(|e| CommunicationError::ServerStartup(format!("Invalid address: {}", e)))?;
+
+        let service = MonitordServiceImpl {
+            state: state.clone(),
+        };
+
+        // Spawn the gRPC server task
+        let server_future = Server::builder()
+            .add_service(MonitordServiceServer::new(service))
+            .serve(server_addr);
+
+        tasks.spawn(async move {
+            info!("Starting gRPC server on {}", server_addr);
+            if let Err(e) = server_future.await {
+                error!("gRPC server error: {}", e);
+                return Err(CommunicationError::ServerStartup(e.to_string()));
+            }
+            Ok(())
+        });
+
+        // Spawn tasks to update the shared state from collector channels
 
         // CPU task
         {
-            let mut transport_clone = transport.clone();
+            let state_clone = state.clone();
             tasks.spawn(async move {
-                info!("Starting CPU data publisher");
-                while let Some(cpu_info) = cpu_rx.next().await {
-                    transport_clone.publish("cpu", cpu_info).await?;
+                info!("Starting CPU data collector");
+                while let Some(cpu_info) = futures::StreamExt::next(&mut cpu_rx).await {
+                    let mut state = state_clone.write().await;
+                    state.cpu_data = Some(cpu_info);
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -50,11 +405,12 @@ impl CommunicationManager {
 
         // Memory task
         {
-            let mut transport_clone = transport.clone();
+            let state_clone = state.clone();
             tasks.spawn(async move {
-                info!("Starting Memory data publisher");
-                while let Some(memory_info) = memory_rx.next().await {
-                    transport_clone.publish("memory", memory_info).await?;
+                info!("Starting Memory data collector");
+                while let Some(memory_info) = futures::StreamExt::next(&mut memory_rx).await {
+                    let mut state = state_clone.write().await;
+                    state.memory_data = Some(memory_info);
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -62,12 +418,12 @@ impl CommunicationManager {
 
         // GPU task
         {
-            let mut transport_clone = transport.clone();
+            let state_clone = state.clone();
             tasks.spawn(async move {
-                info!("Starting GPU data publisher");
-                while let Some(gpu_info) = gpu_rx.next().await {
-                    let gpu_info = GpuList { gpus: gpu_info };
-                    transport_clone.publish("gpu", gpu_info).await?;
+                info!("Starting GPU data collector");
+                while let Some(gpu_info) = futures::StreamExt::next(&mut gpu_rx).await {
+                    let mut state = state_clone.write().await;
+                    state.gpu_data = Some(gpu_info);
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -75,12 +431,12 @@ impl CommunicationManager {
 
         // Network task
         {
-            let mut transport_clone = transport.clone();
+            let state_clone = state.clone();
             tasks.spawn(async move {
-                info!("Starting Network data publisher");
-                while let Some(net_info) = net_rx.next().await {
-                    let net_info = NetworkList { nets: net_info };
-                    transport_clone.publish("network", net_info).await?;
+                info!("Starting Network data collector");
+                while let Some(net_info) = futures::StreamExt::next(&mut net_rx).await {
+                    let mut state = state_clone.write().await;
+                    state.network_data = Some(net_info);
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -88,14 +444,12 @@ impl CommunicationManager {
 
         // Process task
         {
-            let mut transport_clone = transport.clone();
+            let state_clone = state.clone();
             tasks.spawn(async move {
-                info!("Starting Process data publisher");
-                while let Some(proc_info) = proc_rx.next().await {
-                    let proc_info = ProcessList {
-                        processes: proc_info,
-                    };
-                    transport_clone.publish("process", proc_info).await?;
+                info!("Starting Process data collector");
+                while let Some(proc_info) = futures::StreamExt::next(&mut proc_rx).await {
+                    let mut state = state_clone.write().await;
+                    state.process_data = Some(proc_info);
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -103,14 +457,12 @@ impl CommunicationManager {
 
         // Storage task
         {
-            let mut transport_clone = transport.clone();
+            let state_clone = state.clone();
             tasks.spawn(async move {
-                info!("Starting Storage data publisher");
-                while let Some(storage_info) = storage_rx.next().await {
-                    let storage_info = StorageList {
-                        storages: storage_info,
-                    };
-                    transport_clone.publish("storage", storage_info).await?;
+                info!("Starting Storage data collector");
+                while let Some(storage_info) = futures::StreamExt::next(&mut storage_rx).await {
+                    let mut state = state_clone.write().await;
+                    state.storage_data = Some(storage_info);
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -118,40 +470,37 @@ impl CommunicationManager {
 
         // System task
         {
-            let mut transport_clone = transport.clone();
+            let state_clone = state.clone();
             tasks.spawn(async move {
-                info!("Starting System data publisher");
-                while let Some(system_info) = system_rx.next().await {
-                    transport_clone.publish("system", system_info).await?;
+                info!("Starting System data collector");
+                while let Some(system_info) = futures::StreamExt::next(&mut system_rx).await {
+                    let mut state = state_clone.write().await;
+                    state.system_data = Some(system_info);
                 }
                 Ok::<(), CommunicationError>(())
             });
         }
-
-        // Snapshot task - combines data from all collectors into a single snapshot
-        // This would be more efficiently implemented with shared state, but for simplicity
-        // we'll leave this for a future enhancement
 
         // Wait for any task to complete and return its result
         if let Some(result) = tasks.join_next().await {
             // If any task completes, it's because of an error
             match result {
                 Ok(Ok(())) => {
-                    warn!("A publisher task completed unexpectedly but without error");
+                    warn!("A task completed unexpectedly but without error");
                     Ok(())
                 }
                 Ok(Err(e)) => {
-                    error!("A publisher task failed: {}", e);
+                    error!("A task failed: {}", e);
                     Err(e)
                 }
                 Err(e) => {
-                    error!("Failed to join publisher task: {}", e);
+                    error!("Failed to join task: {}", e);
                     Err(CommunicationError::TaskJoin(e.to_string()))
                 }
             }
         } else {
             // All tasks completed successfully
-            info!("All publisher tasks completed successfully");
+            info!("All tasks completed successfully");
             Ok(())
         }
     }

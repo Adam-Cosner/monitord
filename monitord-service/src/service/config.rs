@@ -1,4 +1,4 @@
-use crate::config::{CommunicationConfig, PlatformConfig};
+use crate::config::CommunicationConfig;
 use crate::error::ServiceError;
 use monitord_collectors::config::CollectorsConfig;
 use tracing::error;
@@ -7,7 +7,6 @@ use tracing::error;
 pub struct ServiceConfig {
     pub collection_config: CollectorsConfig,
     pub communication_config: CommunicationConfig,
-    pub platform_config: PlatformConfig,
 }
 
 impl ServiceConfig {
@@ -19,8 +18,8 @@ impl ServiceConfig {
             .set_default("service.enable_logging", true)?
             .set_default("service.log_level", "INFO")?
             // Collection config defaults
-            // Communication config defaults
-            .set_default("transport.type", "nng")?;
+            .set_default("grpc.server_address", "127.0.0.1:50051")?
+            .set_default("grpc.timeout_ms", 3000)?;
 
         // Add configuration from a file if specified via environment variable
         if let Ok(config_path) = std::env::var("MONITORD_CONFIG") {
@@ -50,42 +49,28 @@ impl ServiceConfig {
         };
 
         // Convert durations from milliseconds to chrono::Duration
-        let system_interval = chrono::Duration::milliseconds(
-            config
-                .get_int("collectors.system.interval_ms")
-                .unwrap_or(1000),
-        );
-        let cpu_interval = chrono::Duration::milliseconds(
-            config.get_int("collectors.cpu.interval_ms").unwrap_or(1000),
-        );
-        let memory_interval = chrono::Duration::milliseconds(
-            config
-                .get_int("collectors.memory.interval_ms")
-                .unwrap_or(1000),
-        );
-        let gpu_interval = chrono::Duration::milliseconds(
-            config.get_int("collectors.gpu.interval_ms").unwrap_or(1000),
-        );
-        let network_interval = chrono::Duration::milliseconds(
-            config
-                .get_int("collectors.network.interval_ms")
-                .unwrap_or(1000),
-        );
-        let process_interval = chrono::Duration::milliseconds(
-            config
-                .get_int("collectors.process.interval_ms")
-                .unwrap_or(1000),
-        );
-        let storage_interval = chrono::Duration::milliseconds(
-            config
-                .get_int("collectors.storage.interval_ms")
-                .unwrap_or(1000),
-        );
+        let system_interval = config
+            .get_int("collectors.system.interval_ms")
+            .unwrap_or(1000) as u64;
+        let cpu_interval = config.get_int("collectors.cpu.interval_ms").unwrap_or(1000) as u64;
+        let memory_interval = config
+            .get_int("collectors.memory.interval_ms")
+            .unwrap_or(1000) as u64;
+        let gpu_interval = config.get_int("collectors.gpu.interval_ms").unwrap_or(1000) as u64;
+        let network_interval = config
+            .get_int("collectors.network.interval_ms")
+            .unwrap_or(1000) as u64;
+        let process_interval = config
+            .get_int("collectors.process.interval_ms")
+            .unwrap_or(1000) as u64;
+        let storage_interval = config
+            .get_int("collectors.storage.interval_ms")
+            .unwrap_or(1000) as u64;
 
         // Build collector configs
         let system_config = monitord_collectors::config::SystemCollectorConfig {
             enabled: config.get_bool("collectors.system.enabled").unwrap_or(true),
-            interval_ms: 1000,
+            interval_ms: system_interval,
             collect_load_avg: true,
             collect_open_files: true,
             collect_thread_count: true,
@@ -93,7 +78,7 @@ impl ServiceConfig {
 
         let cpu_config = monitord_collectors::config::CpuCollectorConfig {
             enabled: config.get_bool("collectors.cpu.enabled").unwrap_or(true),
-            interval_ms: 1000,
+            interval_ms: cpu_interval,
             collect_per_core: true,
             collect_cache_info: false,
             collect_temperature: false,
@@ -102,14 +87,14 @@ impl ServiceConfig {
 
         let memory_config = monitord_collectors::config::MemoryCollectorConfig {
             enabled: config.get_bool("collectors.memory.enabled").unwrap_or(true),
-            interval_ms: 1000,
+            interval_ms: memory_interval,
             collect_dram_info: true,
             collect_swap_info: true,
         };
 
         let gpu_config = monitord_collectors::config::GpuCollectorConfig {
             enabled: config.get_bool("collectors.gpu.enabled").unwrap_or(true),
-            interval_ms: 1000,
+            interval_ms: gpu_interval,
             collect_nvidia: true,
             collect_amd: true,
             collect_intel: true,
@@ -120,7 +105,7 @@ impl ServiceConfig {
             enabled: config
                 .get_bool("collectors.network.enabled")
                 .unwrap_or(true),
-            interval_ms: 1000,
+            interval_ms: network_interval,
             collect_packets: true,
             collect_errors: true,
         };
@@ -129,7 +114,7 @@ impl ServiceConfig {
             enabled: config
                 .get_bool("collectors.process.enabled")
                 .unwrap_or(true),
-            interval_ms: 1000,
+            interval_ms: process_interval,
             max_processes: 1000000,
             collect_command_line: false,
             collect_environment: false,
@@ -140,7 +125,7 @@ impl ServiceConfig {
             enabled: config
                 .get_bool("collectors.storage.enabled")
                 .unwrap_or(true),
-            interval_ms: 1000,
+            interval_ms: storage_interval,
             collect_smart: false,
             collect_io_stats: true,
         };
@@ -156,50 +141,18 @@ impl ServiceConfig {
             process: process_config,
         };
 
-        // Build transport config based on type
-        let transport_type = config
-            .get_string("transport.type")
-            .unwrap_or_else(|_| "intra".to_string());
-        let transport_config = match transport_type.as_str() {
-            "nng" => {
-                let nng_config = monitord_transport::config::NngConfig {
-                    transport: config
-                        .get_string("transport.nng.transport")
-                        .unwrap_or_else(|_| "ipc".to_string()),
-                    url: config
-                        .get_string("transport.nng.url")
-                        .unwrap_or_else(|_| "/tmp/monitord".to_string()),
-                    timeout_ms: config.get_int("transport.nng.timeout_ms").unwrap_or(1000) as u32,
-                };
-                monitord_transport::config::TransportType::Nng(nng_config)
-            }
-            "iceoryx" => {
-                let iceoryx_config = monitord_transport::config::IceoryxConfig {
-                    service_name: config
-                        .get_string("transport.iceoryx.service_name")
-                        .unwrap_or_else(|_| uuid::Uuid::new_v4().to_string()),
-                    buffer_size: config
-                        .get_int("transport.iceoryx.buffer_size")
-                        .unwrap_or(1024 * 1024) as usize,
-                };
-                monitord_transport::config::TransportType::Iceoryx(iceoryx_config)
-            }
-            "grpc" => monitord_transport::config::TransportType::Grpc,
-            _ => monitord_transport::config::TransportType::Intra,
+        // Configure gRPC
+        let grpc_config = crate::communication::config::GrpcConfig {
+            server_address: config
+                .get_string("grpc.server_address")
+                .unwrap_or_else(|_| "127.0.0.1:50051".to_string()),
         };
 
-        let communication_config = CommunicationConfig {
-            transport_config: monitord_transport::config::TransportConfig { transport_config },
-        };
-
-        // Build platform config
-        // Currently empty, but can be extended later
-        let platform_config = crate::platform::config::PlatformConfig::default();
+        let communication_config = CommunicationConfig { grpc_config };
 
         Ok(Self {
             collection_config,
             communication_config,
-            platform_config,
         })
     }
 }

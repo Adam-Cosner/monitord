@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 # monitord crates
 monitord-protocols = { path = "../monitord-protocols" }
-monitord-transport = { path = "../monitord-transport" }
 monitord-collectors = { path = "../monitord-collectors" }
 
 # Async runtime
@@ -26,6 +25,12 @@ tracing-subscriber = "0.3.19"
 # Utilities
 chrono = "0.4.40"
 uuid = { version = "1.15.1", features = ["v4"] }
+
+# gRPC
+tonic = { version = "0.12.3", features = ["transport", "tls"] }
+prost = "0.13.5"
+prost-types = "0.13.5" 
+tokio-stream = "0.1.15"
 
 # Unix systems
 [target.'cfg(unix)'.dependencies]

@@ -13,9 +13,6 @@ pub enum ServiceError {
     #[error("collection error: {0}")]
     Collection(#[from] CollectorError),
 
-    #[error("task error: {0}")]
-    TaskError(String),
-
     #[error("configuration error: {0}")]
     ConfigError(String),
 }
