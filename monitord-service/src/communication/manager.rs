@@ -19,10 +19,10 @@ use tracing::{error, info, warn};
 struct SharedState {
     cpu_data: Option<CpuInfo>,
     memory_data: Option<MemoryInfo>,
-    gpu_data: Option<Vec<GpuInfo>>,
-    network_data: Option<Vec<NetworkInfo>>,
-    process_data: Option<Vec<ProcessInfo>>,
-    storage_data: Option<Vec<StorageInfo>>,
+    gpu_data: Option<GpuList>,
+    network_data: Option<NetworkList>,
+    process_data: Option<ProcessList>,
+    storage_data: Option<StorageList>,
     system_data: Option<SystemInfo>,
 }
 
@@ -46,14 +46,10 @@ impl MonitordService for MonitordServiceImpl {
             system_info: state.system_data.clone(),
             cpu_info: state.cpu_data.clone(),
             memory_info: state.memory_data.clone(),
-            gpu_info: Some(GpuList {
-                gpus: state.gpu_data.clone().unwrap_or_default(),
-            }),
-            network_info: Some(NetworkList {
-                nets: state.network_data.clone().unwrap_or_default(),
-            }),
-            processes: state.process_data.clone().unwrap_or_default(),
-            storage_devices: state.storage_data.clone().unwrap_or_default(),
+            gpu_info: state.gpu_data.clone(),
+            network_info: state.network_data.clone(),
+            processes: state.process_data.clone(),
+            storage_devices: state.storage_data.clone(),
         };
 
         Ok(Response::new(snapshot))
@@ -87,14 +83,10 @@ impl MonitordService for MonitordServiceImpl {
                     system_info: state.system_data.clone(),
                     cpu_info: state.cpu_data.clone(),
                     memory_info: state.memory_data.clone(),
-                    gpu_info: Some(GpuList {
-                        gpus: state.gpu_data.clone().unwrap_or_default(),
-                    }),
-                    network_info: Some(NetworkList {
-                        nets: state.network_data.clone().unwrap_or_default(),
-                    }),
-                    processes: state.process_data.clone().unwrap_or_default(),
-                    storage_devices: state.storage_data.clone().unwrap_or_default(),
+                    gpu_info: state.gpu_data.clone(),
+                    network_info: state.network_data.clone(),
+                    processes: state.process_data.clone(),
+                    storage_devices: state.storage_data.clone(),
                 };
 
                 if tx.send(Ok(snapshot)).await.is_err() {
@@ -180,7 +172,7 @@ impl MonitordService for MonitordServiceImpl {
     }
 
     type StreamGpuInfoStream =
-        Pin<Box<dyn Stream<Item = Result<GpuInfo, tonic::Status>> + Send + 'static>>;
+        Pin<Box<dyn Stream<Item = Result<GpuList, tonic::Status>> + Send + 'static>>;
 
     async fn stream_gpu_info(
         &self,
@@ -200,10 +192,8 @@ impl MonitordService for MonitordServiceImpl {
                 let state = state_clone.read().await;
 
                 if let Some(gpu_list) = &state.gpu_data {
-                    for gpu in gpu_list {
-                        if tx.send(Ok(gpu.clone())).await.is_err() {
-                            return;
-                        }
+                    if tx.send(Ok(gpu_list.clone())).await.is_err() {
+                        return;
                     }
                 }
             }
@@ -216,7 +206,7 @@ impl MonitordService for MonitordServiceImpl {
     }
 
     type StreamNetworkInfoStream =
-        Pin<Box<dyn Stream<Item = Result<NetworkInfo, tonic::Status>> + Send + 'static>>;
+        Pin<Box<dyn Stream<Item = Result<NetworkList, tonic::Status>> + Send + 'static>>;
 
     async fn stream_network_info(
         &self,
@@ -236,10 +226,42 @@ impl MonitordService for MonitordServiceImpl {
                 let state = state_clone.read().await;
 
                 if let Some(network_list) = &state.network_data {
-                    for network in network_list {
-                        if tx.send(Ok(network.clone())).await.is_err() {
-                            return;
-                        }
+                    if tx.send(Ok(network_list.clone())).await.is_err() {
+                        return;
+                    }
+                }
+            }
+        });
+
+        let output_stream =
+            futures::StreamExt::boxed(tokio_stream::wrappers::ReceiverStream::new(rx));
+
+        Ok(Response::new(output_stream))
+    }
+
+    type StreamStorageInfoStream =
+        Pin<Box<dyn Stream<Item = Result<StorageList, tonic::Status>> + Send + 'static>>;
+
+    async fn stream_storage_info(
+        &self,
+        request: tonic::Request<SnapshotRequest>,
+    ) -> Result<tonic::Response<Self::StreamStorageInfoStream>, tonic::Status> {
+        let interval_ms = request.into_inner().interval_ms;
+        let state_clone = self.state.clone();
+
+        let (tx, rx) = tokio_mpsc::channel(128);
+
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_millis(interval_ms as u64));
+
+            loop {
+                interval.tick().await;
+                let state = state_clone.read().await;
+
+                if let Some(storage_list) = &state.storage_data {
+                    if tx.send(Ok(storage_list.clone())).await.is_err() {
+                        return;
                     }
                 }
             }
@@ -252,7 +274,7 @@ impl MonitordService for MonitordServiceImpl {
     }
 
     type StreamProcessInfoStream =
-        Pin<Box<dyn Stream<Item = Result<ProcessInfo, tonic::Status>> + Send + 'static>>;
+        Pin<Box<dyn Stream<Item = Result<ProcessList, tonic::Status>> + Send + 'static>>;
 
     async fn stream_process_info(
         &self,
@@ -282,6 +304,7 @@ impl MonitordService for MonitordServiceImpl {
                 if let Some(process_list) = &state.process_data {
                     // Apply filters
                     let mut filtered: Vec<ProcessInfo> = process_list
+                        .processes
                         .iter()
                         .filter(|p| {
                             let username_match = username_filter
@@ -319,10 +342,14 @@ impl MonitordService for MonitordServiceImpl {
                     }
 
                     // Send filtered processes
-                    for process in filtered {
-                        if tx.send(Ok(process)).await.is_err() {
-                            return;
-                        }
+                    if tx
+                        .send(Ok(ProcessList {
+                            processes: filtered,
+                        }))
+                        .await
+                        .is_err()
+                    {
+                        return;
                     }
                 }
             }
@@ -423,7 +450,7 @@ impl CommunicationManager {
                 info!("Starting GPU data collector");
                 while let Some(gpu_info) = futures::StreamExt::next(&mut gpu_rx).await {
                     let mut state = state_clone.write().await;
-                    state.gpu_data = Some(gpu_info);
+                    state.gpu_data = Some(GpuList { gpus: gpu_info });
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -436,7 +463,7 @@ impl CommunicationManager {
                 info!("Starting Network data collector");
                 while let Some(net_info) = futures::StreamExt::next(&mut net_rx).await {
                     let mut state = state_clone.write().await;
-                    state.network_data = Some(net_info);
+                    state.network_data = Some(NetworkList { nets: net_info });
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -449,7 +476,9 @@ impl CommunicationManager {
                 info!("Starting Process data collector");
                 while let Some(proc_info) = futures::StreamExt::next(&mut proc_rx).await {
                     let mut state = state_clone.write().await;
-                    state.process_data = Some(proc_info);
+                    state.process_data = Some(ProcessList {
+                        processes: proc_info,
+                    });
                 }
                 Ok::<(), CommunicationError>(())
             });
@@ -462,7 +491,9 @@ impl CommunicationManager {
                 info!("Starting Storage data collector");
                 while let Some(storage_info) = futures::StreamExt::next(&mut storage_rx).await {
                     let mut state = state_clone.write().await;
-                    state.storage_data = Some(storage_info);
+                    state.storage_data = Some(StorageList {
+                        storages: storage_info,
+                    });
                 }
                 Ok::<(), CommunicationError>(())
             });
