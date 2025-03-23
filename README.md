@@ -11,7 +11,7 @@ Monitord is a high-performance system monitoring daemon that provides real-time 
 Key features:
 - Cross-platform support (Linux, macOS, Windows)
 - Low overhead monitoring
-- Multiple transport mechanisms (IPC, gRPC, etc.)
+- gRPC for reliable transport
 - Configurable collection intervals
 - System service integration
 
