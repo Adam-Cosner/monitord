@@ -103,6 +103,40 @@ impl MonitordService for MonitordServiceImpl {
         Ok(Response::new(output_stream))
     }
 
+    type StreamSystemInfoStream =
+        Pin<Box<dyn Stream<Item = Result<SystemInfo, tonic::Status>> + Send + 'static>>;
+
+    async fn stream_system_info(
+        &self,
+        request: tonic::Request<SnapshotRequest>,
+    ) -> Result<tonic::Response<Self::StreamSystemInfoStream>, tonic::Status> {
+        let interval_ms = request.into_inner().interval_ms;
+        let state_clone = self.state.clone();
+
+        let (tx, rx) = tokio_mpsc::channel(128);
+
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_millis(interval_ms as u64));
+
+            loop {
+                interval.tick().await;
+                let state = state_clone.read().await;
+
+                if let Some(system_info) = &state.system_data {
+                    if tx.send(Ok(system_info.clone())).await.is_err() {
+                        break;
+                    }
+                }
+            }
+        });
+
+        let output_stream =
+            futures::StreamExt::boxed(tokio_stream::wrappers::ReceiverStream::new(rx));
+
+        Ok(Response::new(output_stream))
+    }
+
     type StreamCpuInfoStream =
         Pin<Box<dyn Stream<Item = Result<CpuInfo, tonic::Status>> + Send + 'static>>;
 

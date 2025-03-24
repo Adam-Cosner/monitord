@@ -239,6 +239,9 @@ service MonitordService {
   // Get a single snapshot
   rpc GetSystemSnapshot(SnapshotRequest) returns (SystemSnapshot);
 
+  // Stream just system information
+  rpc StreamSystemInfo(SnapshotRequest) returns (stream SystemInfo);
+
   // Stream just CPU information
   rpc StreamCpuInfo(SnapshotRequest) returns (stream CpuInfo);
 
