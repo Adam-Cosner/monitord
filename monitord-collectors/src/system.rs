@@ -9,6 +9,12 @@ use tracing::{debug, info};
 pub struct SystemCollector {
     config: SystemCollectorConfig,
     system: System,
+
+    // Cached stuff
+    hostname: String,
+    os_name: String,
+    os_version: String,
+    kernel_version: String,
 }
 
 impl Collector for SystemCollector {
@@ -30,7 +36,14 @@ impl Collector for SystemCollector {
         system.refresh_all();
 
         info!("System collector initialized");
-        Ok(Self { config, system })
+        Ok(Self {
+            config,
+            system,
+            hostname: System::host_name().unwrap_or_else(|| "unknown".to_string()),
+            os_name: System::distribution_id(),
+            os_version: System::os_version().unwrap_or_else(|| "unknown".to_string()),
+            kernel_version: System::kernel_version().unwrap_or_else(|| "unknown".to_string()),
+        })
     }
 
     fn collect(&mut self) -> Result<Self::Data> {
@@ -86,10 +99,10 @@ impl Collector for SystemCollector {
 
         // Build the system info message
         let system_info = SystemInfo {
-            hostname: System::host_name().unwrap_or_else(|| "unknown".to_string()),
-            os_name: System::distribution_id(),
-            os_version: System::os_version().unwrap_or_else(|| "unknown".to_string()),
-            kernel_version: System::kernel_version().unwrap_or_else(|| "unknown".to_string()),
+            hostname: self.hostname.clone(),
+            os_name: self.os_name.clone(),
+            os_version: self.os_version.clone(),
+            kernel_version: self.kernel_version.clone(),
             process_count,
             thread_count,
             open_file_count,
@@ -99,9 +112,9 @@ impl Collector for SystemCollector {
             load_average_15m: load_15m,
             architecture: std::env::consts::ARCH.to_string(),
             boot_time,
-            vendor: None,                  // Not easily available through sysinfo
-            virtualization: None,          // Not easily available through sysinfo
-            security_features: Vec::new(), // Would need platform-specific detection
+            vendor: None,                  // todo
+            virtualization: None,          // todo
+            security_features: Vec::new(), // todo
         };
 
         debug!("System information collected");

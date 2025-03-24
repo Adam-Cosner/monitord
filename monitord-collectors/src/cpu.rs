@@ -93,7 +93,7 @@ impl Collector for CpuCollector {
             global_utilization_percent: global_usage,
             core_info,
             cache_info: Some(cache_info),
-            scaling_governor: None, // Not available through sysinfo
+            scaling_governor: None, // TODO
             architecture: std::env::consts::ARCH.to_string(),
             cpu_flags,
         };
