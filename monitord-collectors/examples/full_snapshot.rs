@@ -1,9 +1,7 @@
-use futures::StreamExt;
 use monitord_collectors::{
     config::{
-        CpuCollectorConfig, GpuCollectorConfig, MemoryCollectorConfig,
-        NetworkCollectorConfig, ProcessCollectorConfig, StorageCollectorConfig,
-        SystemCollectorConfig,
+        CpuCollectorConfig, GpuCollectorConfig, MemoryCollectorConfig, NetworkCollectorConfig,
+        ProcessCollectorConfig, StorageCollectorConfig, SystemCollectorConfig,
     },
     cpu::CpuCollector,
     gpu::GpuCollector,
@@ -77,8 +75,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         memory_info: Some(snapshot.2),
         gpu_info: Some(snapshot.3),
         network_info: Some(snapshot.4),
-        storage_devices: snapshot.5.storages,
-        processes: snapshot.6.processes,
+        storage_devices: Some(snapshot.5),
+        processes: Some(snapshot.6),
     };
 
     // Print a summary of the collected data
@@ -153,42 +151,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!(
-        "\nStorage Devices: {}",
-        system_snapshot.storage_devices.len()
-    );
-    for disk in &system_snapshot.storage_devices {
-        let total_gb = disk.total_space_bytes as f64 / 1_073_741_824.0;
-        let used_gb = disk.used_space_bytes as f64 / 1_073_741_824.0;
-        let used_pct = if disk.total_space_bytes > 0 {
-            (disk.used_space_bytes as f64 / disk.total_space_bytes as f64) * 100.0
-        } else {
-            0.0
-        };
-        println!(
-            "  {} ({}): {:.2} GB / {:.2} GB ({:.1}%)",
-            disk.device_name, disk.mount_point, used_gb, total_gb, used_pct
-        );
+    if let Some(storage) = &system_snapshot.storage_devices {
+        println!("\nStorage Devices: {}", storage.storages.len());
+        for disk in &storage.storages {
+            let total_gb = disk.total_space_bytes as f64 / 1_073_741_824.0;
+            let used_gb = disk.used_space_bytes as f64 / 1_073_741_824.0;
+            let used_pct = if disk.total_space_bytes > 0 {
+                (disk.used_space_bytes as f64 / disk.total_space_bytes as f64) * 100.0
+            } else {
+                0.0
+            };
+            println!(
+                "  {} ({}): {:.2} GB / {:.2} GB ({:.1}%)",
+                disk.device_name, disk.mount_point, used_gb, total_gb, used_pct
+            );
+        }
     }
 
-    println!("\nProcesses: {}", system_snapshot.processes.len());
-    // Show the top 5 CPU-consuming processes
-    let mut processes = system_snapshot.processes.clone();
-    processes.sort_by(|a, b| {
-        b.cpu_usage_percent
-            .partial_cmp(&a.cpu_usage_percent)
-            .unwrap()
-    });
-    println!("Top processes by CPU usage:");
-    for (i, proc) in processes.iter().take(5).enumerate() {
-        println!(
-            "  {}. {} (PID {}): {:.2}% CPU, {:.2} MB RAM",
-            i + 1,
-            proc.name,
-            proc.pid,
-            proc.cpu_usage_percent,
-            proc.physical_memory_bytes as f64 / 1_048_576.0
-        );
+    if let Some(processes) = &system_snapshot.processes {
+        println!("\nProcesses: {}", processes.processes.len());
+        // Show the top 5 CPU-consuming processes
+        let mut processes = processes.processes.clone();
+        processes.sort_by(|a, b| {
+            b.cpu_usage_percent
+                .partial_cmp(&a.cpu_usage_percent)
+                .unwrap()
+        });
+        println!("Top processes by CPU usage:");
+        for (i, proc) in processes.iter().take(5).enumerate() {
+            println!(
+                "  {}. {} (PID {}): {:.2}% CPU, {:.2} MB RAM",
+                i + 1,
+                proc.name,
+                proc.pid,
+                proc.cpu_usage_percent,
+                proc.physical_memory_bytes as f64 / 1_048_576.0
+            );
+        }
     }
 
     println!("\nSnapshot complete!");
