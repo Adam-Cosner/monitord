@@ -190,7 +190,6 @@ impl MonitordService for MonitordServiceImpl {
             loop {
                 interval.tick().await;
                 let state = state_clone.read().await;
-
                 if let Some(gpu_list) = &state.gpu_data {
                     if tx.send(Ok(gpu_list.clone())).await.is_err() {
                         return;
@@ -450,7 +449,24 @@ impl CommunicationManager {
                 info!("Starting GPU data collector");
                 while let Some(gpu_info) = futures::StreamExt::next(&mut gpu_rx).await {
                     let mut state = state_clone.write().await;
-                    state.gpu_data = Some(GpuList { gpus: gpu_info });
+                    state.gpu_data = Some(GpuList {
+                        gpus: gpu_info.clone(),
+                    });
+
+                    // Iterate over gpu processes
+                    for gpu in gpu_info.iter() {
+                        for gpu_process in gpu.process_info.iter() {
+                            if let Some(ref mut process_data) = state.process_data {
+                                if let Some(process) = process_data
+                                    .processes
+                                    .iter_mut()
+                                    .find(|proc| proc.pid == gpu_process.pid)
+                                {
+                                    process.gpu_usage = Some(gpu_process.clone())
+                                }
+                            }
+                        }
+                    }
                 }
                 Ok::<(), CommunicationError>(())
             });

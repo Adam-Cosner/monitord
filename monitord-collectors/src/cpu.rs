@@ -10,6 +10,9 @@ pub struct CpuCollector {
     config: CpuCollectorConfig,
     system: System,
     cpuid: Option<CpuId<CpuIdReaderNative>>,
+
+    // Cached information
+    cache_info: Option<CpuCache>,
 }
 
 impl Collector for CpuCollector {
@@ -37,6 +40,7 @@ impl Collector for CpuCollector {
             config,
             system,
             cpuid,
+            cache_info: None,
         })
     }
 
@@ -123,40 +127,48 @@ impl CpuCollector {
     }
 
     /// Get CPU cache information
-    fn get_cache_info(&self) -> Result<CpuCache> {
-        if let Some(ref cpuid) = self.cpuid {
-            if let Some(cache_info) = cpuid.get_cache_parameters() {
-                // For simplicity, we assume all cores have the same cache configuration
-                let mut l1d = 0;
-                let mut l1i = 0;
-                let mut l2 = 0;
-                let mut l3 = 0;
+    fn get_cache_info(&mut self) -> Result<CpuCache> {
+        if let Some(cache) = self.cache_info {
+            return Ok(cache);
+        } else {
+            if let Some(ref cpuid) = self.cpuid {
+                if let Some(cache_info) = cpuid.get_cache_parameters() {
+                    // For simplicity, we assume all cores have the same cache configuration
+                    let mut l1d = 0;
+                    let mut l1i = 0;
+                    let mut l2 = 0;
+                    let mut l3 = 0;
 
-                for cache in cache_info {
-                    let size = cache.associativity()
-                        * cache.physical_line_partitions()
-                        * cache.coherency_line_size()
-                        * cache.sets();
-                    match cache.level() {
-                        1 => {
-                            if cache.cache_type() == raw_cpuid::CacheType::Data {
-                                l1d = size as u32 / 1024; // Convert bytes to KB
-                            } else if cache.cache_type() == raw_cpuid::CacheType::Instruction {
-                                l1i = size as u32 / 1024;
+                    for cache in cache_info {
+                        let size = cache.associativity()
+                            * cache.physical_line_partitions()
+                            * cache.coherency_line_size()
+                            * cache.sets();
+                        match cache.level() {
+                            1 => {
+                                if cache.cache_type() == raw_cpuid::CacheType::Data {
+                                    l1d = size as u32 / 1024; // Convert bytes to KB
+                                } else if cache.cache_type() == raw_cpuid::CacheType::Instruction {
+                                    l1i = size as u32 / 1024;
+                                }
                             }
+                            2 => l2 = size as u32 / 1024,
+                            3 => l3 = size as u32 / 1024,
+                            _ => (),
                         }
-                        2 => l2 = size as u32 / 1024,
-                        3 => l3 = size as u32 / 1024,
-                        _ => (),
                     }
-                }
 
-                return Ok(CpuCache {
-                    l1_data_kb: l1d,
-                    l1_instruction_kb: l1i,
-                    l2_kb: l2,
-                    l3_kb: l3,
-                });
+                    let cache = CpuCache {
+                        l1_data_kb: l1d,
+                        l1_instruction_kb: l1i,
+                        l2_kb: l2,
+                        l3_kb: l3,
+                    };
+
+                    self.cache_info = Some(cache.clone());
+
+                    return Ok(cache);
+                }
             }
         }
 

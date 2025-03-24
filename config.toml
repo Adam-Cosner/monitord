@@ -11,7 +11,7 @@ log_level = "INFO"
 # Define collector configurations
 [collectors.system]
 enabled = true
-interval_ms = 1000
+interval_ms = 60000
 
 [collectors.cpu]
 enabled = true

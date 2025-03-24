@@ -62,9 +62,11 @@ where
 
         let now = std::time::Instant::now();
         if now < this.next_poll {
-            // Not time to poll yet, schedule a wakeup
+            // Not time to poll yet, schedule a wakeup at the right time
+            // We use parking_lot or std::thread::park with a timer would be better,
+            // but for now just use a less aggressive approach than before
+            std::thread::sleep(std::time::Duration::from_millis(10));
             cx.waker().wake_by_ref();
-            futures::task::noop_waker_ref();
             return Poll::Pending;
         }
 
