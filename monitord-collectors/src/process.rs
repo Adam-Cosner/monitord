@@ -10,10 +10,6 @@ use tracing::{debug, info};
 pub struct ProcessCollector {
     config: ProcessCollectorConfig,
     system: System,
-    // Store previous values to calculate rates
-    previous_disk_read: HashMap<u32, u64>,
-    previous_disk_write: HashMap<u32, u64>,
-    previous_time: std::time::Instant,
 }
 
 impl Collector for ProcessCollector {
@@ -34,18 +30,8 @@ impl Collector for ProcessCollector {
         // Refresh process list to initialize
         system.refresh_processes(ProcessesToUpdate::All, true);
 
-        // Initialize previous values
-        let previous_disk_read = HashMap::new();
-        let previous_disk_write = HashMap::new();
-
         info!("Process collector initialized");
-        Ok(Self {
-            config,
-            system,
-            previous_disk_read,
-            previous_disk_write,
-            previous_time: std::time::Instant::now(),
-        })
+        Ok(Self { config, system })
     }
 
     fn collect(&mut self) -> Result<Self::Data> {
@@ -53,11 +39,6 @@ impl Collector for ProcessCollector {
 
         // Refresh process information
         self.system.refresh_processes(ProcessesToUpdate::All, true);
-
-        // Calculate time elapsed since last collection
-        let now = std::time::Instant::now();
-        let elapsed_secs = now.duration_since(self.previous_time).as_secs_f64();
-        self.previous_time = now;
 
         let mut process_infos = Vec::new();
 
@@ -73,7 +54,8 @@ impl Collector for ProcessCollector {
 
             // Get process owner
             let username = process
-                .user_id().map(|uid| uid.to_string())
+                .user_id()
+                .map(|uid| uid.to_string())
                 .unwrap_or_else(|| "unknown".to_string());
 
             // Get process state
@@ -96,34 +78,12 @@ impl Collector for ProcessCollector {
 
             // Calculate disk IO rates if enabled
             let (disk_read_rate, disk_write_rate) = if self.config.collect_io_stats {
-                let read_bytes = process.disk_usage().read_bytes;
-                let write_bytes = process.disk_usage().written_bytes;
-
-                let read_rate = if let Some(&prev_read) = self.previous_disk_read.get(&pid_u32) {
-                    if elapsed_secs > 0.0 {
-                        ((read_bytes - prev_read) as f64 / elapsed_secs) as u64
-                    } else {
-                        0
-                    }
-                } else {
-                    0
-                };
-
-                let write_rate = if let Some(&prev_write) = self.previous_disk_write.get(&pid_u32) {
-                    if elapsed_secs > 0.0 {
-                        ((write_bytes - prev_write) as f64 / elapsed_secs) as u64
-                    } else {
-                        0
-                    }
-                } else {
-                    0
-                };
-
-                // Update previous values
-                self.previous_disk_read.insert(pid_u32, read_bytes);
-                self.previous_disk_write.insert(pid_u32, write_bytes);
-
-                (read_rate, write_rate)
+                (
+                    (process.disk_usage().read_bytes as f64
+                        / (self.config.interval_ms as f64 / 1000.0)) as u64,
+                    (process.disk_usage().written_bytes as f64
+                        / (self.config.interval_ms as f64 / 1000.0)) as u64,
+                )
             } else {
                 (0, 0)
             };

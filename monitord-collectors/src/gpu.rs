@@ -15,6 +15,7 @@ use tracing::{debug, info, warn};
 pub struct GpuCollector {
     config: GpuCollectorConfig,
     nvml: Option<Arc<Nvml>>, // Wrapped in Arc to allow cloning for stream creation
+    process_usages: HashMap<u32, (Instant, HashMap<String, u128>)>,
 }
 
 impl Collector for GpuCollector {
@@ -26,9 +27,9 @@ impl Collector for GpuCollector {
 
         if !config.enabled {
             info!("GPU collector is disabled");
-            return Err(
-                CollectorError::ConfigurationError("GPU collector is disabled".into()),
-            );
+            return Err(CollectorError::ConfigurationError(
+                "GPU collector is disabled".into(),
+            ));
         }
 
         // Initialize NVIDIA NVML if requested
@@ -48,7 +49,11 @@ impl Collector for GpuCollector {
         };
 
         info!("GPU collector initialized");
-        Ok(Self { config, nvml })
+        Ok(Self {
+            config,
+            nvml,
+            process_usages: HashMap::new(),
+        })
     }
 
     fn collect(&mut self) -> Result<Self::Data> {
@@ -275,8 +280,6 @@ impl GpuCollector {
     /// Collect information from AMD GPUs using sysfs interface
     fn collect_amd_gpus(&mut self) -> Result<Vec<GpuInfo>> {
         let mut gpus = Vec::new();
-        let mut process_usages: HashMap<u32, (std::time::Instant, HashMap<String, u128>)> =
-            HashMap::new();
 
         debug!("Collecting AMD GPU information from sysfs");
 
@@ -304,7 +307,7 @@ impl GpuCollector {
                 if let Ok(vendor) = std::fs::read_to_string(path.join("device/vendor")) {
                     if vendor.trim() == "0x1002" {
                         debug!("Found AMD GPU at {}", path.display());
-                        match self.collect_amd_gpu_info(&path, &mut process_usages) {
+                        match self.collect_amd_gpu_info(&path) {
                             Ok(gpu_info) => gpus.push(gpu_info),
                             Err(e) => warn!(
                                 "Failed to collect info for AMD GPU at {}: {}",
@@ -318,18 +321,16 @@ impl GpuCollector {
         }
 
         if gpus.is_empty() {
-            return Err(CollectorError::GpuError("No AMD GPUs found in system".into()));
+            return Err(CollectorError::GpuError(
+                "No AMD GPUs found in system".into(),
+            ));
         }
 
         Ok(gpus)
     }
 
     /// Collect info for a single AMD GPU
-    fn collect_amd_gpu_info(
-        &self,
-        device_path: &std::path::Path,
-        process_usages: &mut HashMap<u32, (std::time::Instant, HashMap<String, u128>)>,
-    ) -> Result<GpuInfo> {
+    fn collect_amd_gpu_info(&mut self, device_path: &std::path::Path) -> Result<GpuInfo> {
         // Get device name
         let name = self
             .get_amd_device_name(device_path)
@@ -352,7 +353,7 @@ impl GpuCollector {
 
         // Get process information if enabled
         let process_info = if self.config.collect_processes {
-            self.collect_amd_processes(device_path, process_usages)?
+            self.collect_amd_processes(device_path)?
         } else {
             Vec::new()
         };
@@ -401,7 +402,9 @@ impl GpuCollector {
                 return Ok(bytes);
             }
         }
-        Err(CollectorError::GpuError("Failed to read VRAM size".to_string()))
+        Err(CollectorError::GpuError(
+            "Failed to read VRAM size".to_string(),
+        ))
     }
 
     /// Get AMD GPU VRAM used from sysfs
@@ -412,7 +415,9 @@ impl GpuCollector {
                 return Ok(bytes);
             }
         }
-        Err(CollectorError::GpuError("Failed to read VRAM usage".to_string()))
+        Err(CollectorError::GpuError(
+            "Failed to read VRAM usage".to_string(),
+        ))
     }
 
     /// Get AMD GPU utilization percentage from sysfs
@@ -423,7 +428,9 @@ impl GpuCollector {
                 return Ok(percent);
             }
         }
-        Err(CollectorError::GpuError("Failed to read GPU utilization".to_string()))
+        Err(CollectorError::GpuError(
+            "Failed to read GPU utilization".to_string(),
+        ))
     }
 
     /// Get AMD GPU temperature from sysfs hwmon
@@ -445,7 +452,9 @@ impl GpuCollector {
                 }
             }
         }
-        Err(CollectorError::GpuError("Failed to read temperature".to_string()))
+        Err(CollectorError::GpuError(
+            "Failed to read temperature".to_string(),
+        ))
     }
 
     /// Get AMD GPU power usage from sysfs hwmon
@@ -577,15 +586,19 @@ impl GpuCollector {
 
     /// Collect process information for AMD GPUs
     fn collect_amd_processes(
-        &self,
+        &mut self,
         device_path: &std::path::Path,
-        process_usages: &mut HashMap<u32, (Instant, HashMap<String, u128>)>,
     ) -> Result<Vec<GpuProcessInfo>> {
         let mut processes = Vec::new();
         let device_id = device_path
+            .join("device")
+            .read_link()
+            .expect("Failed to read symlink for AMD GPU")
             .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("unknown");
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or("unknown".to_string());
+
+        info!("Checking if any processes are using GPU {:?}", device_id);
 
         // Parse /proc for processes using this GPU
         if let Ok(proc_entries) = std::fs::read_dir("/proc") {
@@ -603,7 +616,7 @@ impl GpuCollector {
                     .map(|s| s.trim().to_owned())
                     .unwrap_or_else(|_| format!("PID {}", pid));
 
-                let timestamp = std::time::Instant::now();
+                let timestamp = Instant::now();
 
                 // Track GPU usage per device
                 let mut accumulated_per_device_usages: HashMap<String, u128> = HashMap::new();
@@ -619,7 +632,7 @@ impl GpuCollector {
                             {
                                 // Check if this is for our GPU
                                 if let Some(drm_pdev) = drm_pdev_line.split_whitespace().nth(1) {
-                                    if drm_pdev.contains(device_id) {
+                                    if drm_pdev.contains(device_id.as_str()) {
                                         // Extract GPU engine usage
                                         if let Some(usage) = content
                                             .lines()
@@ -650,32 +663,47 @@ impl GpuCollector {
                     }
                 }
 
-                // Calculate utilization based on previous usage data
-                if let Some((old_timestamp, old_usages)) =
-                    process_usages.insert(pid, (timestamp, accumulated_per_device_usages.clone()))
-                {
-                    for (drm_pdev, accumulated_usage) in accumulated_per_device_usages.iter() {
-                        let vram_bytes = *accumulated_per_device_vram.get(drm_pdev).unwrap() as u64;
-                        if let Some(previous_usage) = old_usages.get(drm_pdev) {
-                            let delta_time = (timestamp - old_timestamp).as_nanos();
-                            if delta_time > 0 {
-                                let delta_usages = *accumulated_usage - *previous_usage;
-                                let usage = delta_usages as f64 / delta_time as f64 * 100.0;
+                if !accumulated_per_device_usages.is_empty() {
+                    info!(
+                        "Accumulated GPU usage for PID {}: {:?}",
+                        pid, accumulated_per_device_usages
+                    );
+                    info!("Process usages: {:?}", self.process_usages);
+                    info!("Process usages: {:?}", self.process_usages.get(&pid));
+                    // Calculate utilization based on previous usage data
+                    if let Some((old_timestamp, old_usages)) = self
+                        .process_usages
+                        .insert(pid, (timestamp, accumulated_per_device_usages.clone()))
+                    {
+                        info!("Previous GPU Usage for PID {}: {:?}", pid, old_usages);
+                        for (drm_pdev, accumulated_usage) in accumulated_per_device_usages.iter() {
+                            let vram_bytes =
+                                *accumulated_per_device_vram.get(drm_pdev).unwrap_or(&0u128) as u64;
+                            if let Some(previous_usage) = old_usages.get(drm_pdev) {
+                                let delta_time = (timestamp - old_timestamp).as_nanos();
+                                if delta_time > 0 {
+                                    let delta_usages = *accumulated_usage - *previous_usage;
+                                    let usage = delta_usages as f64 / delta_time as f64 * 100.0;
 
-                                // Add to process list
-                                processes.push(GpuProcessInfo {
-                                    pid,
-                                    process_name: process_name.clone(),
-                                    gpu_utilization_percent: usage,
-                                    vram_bytes,
-                                    gpu_device_id: Some(drm_pdev.clone()),
-                                });
+                                    info!("Read a GPU Process: {}", process_name);
+
+                                    // Add to process list
+                                    processes.push(GpuProcessInfo {
+                                        pid,
+                                        process_name: process_name.clone(),
+                                        gpu_utilization_percent: usage,
+                                        vram_bytes,
+                                        gpu_device_id: Some(drm_pdev.clone()),
+                                    });
+                                }
                             }
                         }
                     }
                 }
             }
         }
+
+        info!("Processes list: {:?}", processes);
 
         Ok(processes)
     }
