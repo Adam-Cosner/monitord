@@ -7,272 +7,291 @@ import "google/protobuf/timestamp.proto";
 
 // Top-level message containing all system information
 message SystemSnapshot {
-  google.protobuf.Timestamp timestamp = 1;
-  SystemInfo system_info = 2;
-  CpuInfo cpu_info = 3;
-  MemoryInfo memory_info = 4;
-  GpuList gpu_info = 5;
-  NetworkList network_info = 6;
-  ProcessList processes = 7;
-  StorageList storage_devices = 8;
+    google.protobuf.Timestamp timestamp = 1;
+    SystemInfo system_info = 2;
+    CpuInfo cpu_info = 3;
+    MemoryInfo memory_info = 4;
+    GpuList gpu_info = 5;
+    NetworkList network_info = 6;
+    ProcessList processes = 7;
+    StorageList storage_devices = 8;
 }
 
 // System-wide information
 message SystemInfo {
-  string hostname = 1;
-  string os_name = 2;
-  string os_version = 3;
-  string kernel_version = 4;
-  uint32 process_count = 5;
-  uint32 thread_count = 6;
-  uint32 open_file_count = 7;
-  uint64 uptime_seconds = 8;
-  double load_average_1m = 9;
-  double load_average_5m = 10;
-  double load_average_15m = 11;
-  string architecture = 12;
-  uint64 boot_time = 13;
-  optional string vendor = 14;
-  optional string virtualization = 15;
-  repeated string security_features = 16;
+    string hostname = 1;
+    string os_name = 2;
+    string os_version = 3;
+    string kernel_version = 4;
+    uint32 process_count = 5;
+    uint32 thread_count = 6;
+    uint32 open_file_count = 7;
+    uint64 uptime_seconds = 8;
+    double load_average_1m = 9;
+    double load_average_5m = 10;
+    double load_average_15m = 11;
+    string architecture = 12;
+    uint64 boot_time = 13;
+    optional string vendor = 14;
+    optional string virtualization = 15;
+    repeated string security_features = 16;
 }
 
 // CPU information
 message CpuInfo {
-  string model_name = 1;
-  uint32 physical_cores = 2;
-  uint32 logical_cores = 3;
-  double global_utilization_percent = 4;
-  repeated CoreInfo core_info = 5;
-  CpuCache cache_info = 6;
-  optional string scaling_governor = 7;
-  string architecture = 8;
-  repeated string cpu_flags = 9;
+    string model_name = 1;
+    uint32 physical_cores = 2;
+    uint32 logical_cores = 3;
+    double global_utilization_percent = 4;
+    repeated CoreInfo core_info = 5;
+    CpuCache cache_info = 6;
+    optional string scaling_governor = 7;
+    string architecture = 8;
+    repeated string cpu_flags = 9;
 }
 
 // Information about each CPU core
 message CoreInfo {
-  uint32 core_id = 1;
-  double frequency_mhz = 2;
-  double utilization_percent = 3;
-  double temperature_celsius = 4;
-  optional double min_frequency_mhz = 5;
-  optional double max_frequency_mhz = 6;
+    uint32 core_id = 1;
+    double frequency_mhz = 2;
+    double utilization_percent = 3;
+    double temperature_celsius = 4;
+    optional double min_frequency_mhz = 5;
+    optional double max_frequency_mhz = 6;
 }
 
 // CPU cache information
 message CpuCache {
-  uint32 l1_data_kb = 1;
-  uint32 l1_instruction_kb = 2;
-  uint32 l2_kb = 3;
-  uint32 l3_kb = 4;
+    uint32 l1_data_kb = 1;
+    uint32 l1_instruction_kb = 2;
+    uint32 l2_kb = 3;
+    uint32 l3_kb = 4;
 }
 
 // Memory information
 message MemoryInfo {
-  uint64 total_memory_bytes = 1;
-  uint64 used_memory_bytes = 2;
-  uint64 free_memory_bytes = 3;
-  uint64 available_memory_bytes = 4;
-  uint64 swap_total_bytes = 5;
-  uint64 swap_used_bytes = 6;
-  uint64 swap_free_bytes = 7;
-  optional DramInfo dram_info = 8;
-  uint64 cached_memory_bytes = 9;
-  uint64 shared_memory_bytes = 10;
-  double memory_load_percent = 11;
+    uint64 total_memory_bytes = 1;
+    uint64 used_memory_bytes = 2;
+    uint64 free_memory_bytes = 3;
+    uint64 available_memory_bytes = 4;
+    uint64 swap_total_bytes = 5;
+    uint64 swap_used_bytes = 6;
+    uint64 swap_free_bytes = 7;
+    optional DramInfo dram_info = 8;
+    uint64 cached_memory_bytes = 9;
+    uint64 shared_memory_bytes = 10;
+    double memory_load_percent = 11;
 }
 
 // DRAM specific information
 message DramInfo {
-  double frequency_mhz = 1;
-  string memory_type = 2;  // DDR4, DDR5, etc.
-  uint32 slots_total = 3;
-  uint32 slots_used = 4;
-  optional string manufacturer = 5;
-  optional string part_number = 6;
+    double frequency_mhz = 1;
+    string memory_type = 2;  // DDR4, DDR5, etc.
+    uint32 slots_total = 3;
+    uint32 slots_used = 4;
+    optional string manufacturer = 5;
+    optional string part_number = 6;
 }
 
 // Information on all GPUs
 message GpuList {
-  repeated GpuInfo gpus = 1;
+    repeated GpuInfo gpus = 1;
 }
 
 // GPU information
 message GpuInfo {
-  string name = 1;
-  string vendor = 2;  // NVIDIA, AMD, Intel, Other
-  uint64 vram_total_bytes = 3;
-  uint64 vram_used_bytes = 4;
-  double core_utilization_percent = 5;
-  double memory_utilization_percent = 6;
-  double temperature_celsius = 7;
-  optional double power_usage_watts = 8;
-  optional double core_frequency_mhz = 9;
-  optional double memory_frequency_mhz = 10;
-  optional GpuDriverInfo driver_info = 11;
-  optional GpuEncoderInfo encoder_info = 12;
-  repeated GpuProcessInfo process_info = 13;
+    string name = 1;
+    string vendor = 2;  // NVIDIA, AMD, Intel, Other
+    uint64 vram_total_bytes = 3;
+    uint64 vram_used_bytes = 4;
+    double core_utilization_percent = 5;
+    double memory_utilization_percent = 6;
+    double temperature_celsius = 7;
+    optional double power_usage_watts = 8;
+    optional double core_frequency_mhz = 9;
+    optional double memory_frequency_mhz = 10;
+    optional GpuDriverInfo driver_info = 11;
+    optional GpuEncoderInfo encoder_info = 12;
+    repeated GpuProcessInfo process_info = 13;
 }
 
 // GPU driver information
 message GpuDriverInfo {
-  string kernel_driver = 1;
-  string userspace_driver = 2;
-  string driver_version = 3;
+    string kernel_driver = 1;
+    string userspace_driver = 2;
+    string driver_version = 3;
 }
 
 // GPU encoder/decoder engine usage
 message GpuEncoderInfo {
-  double video_encode_utilization_percent = 1;
-  double video_decode_utilization_percent = 2;
+    double video_encode_utilization_percent = 1;
+    double video_decode_utilization_percent = 2;
 }
 
 // Information about processes using the GPU
 message GpuProcessInfo {
-  uint32 pid = 1;
-  string process_name = 2;
-  double gpu_utilization_percent = 3;
-  uint64 vram_bytes = 4;
-  optional string gpu_device_id = 5;
+    uint32 pid = 1;
+    string process_name = 2;
+    double gpu_utilization_percent = 3;
+    uint64 vram_bytes = 4;
+    optional string gpu_device_id = 5;
 }
 
 // Information on all networks
 message NetworkList {
-  repeated NetworkInfo nets = 1;
+    repeated NetworkInfo nets = 1;
 }
 
 // Network interface information
 message NetworkInfo {
-  string interface_name = 1;
-  string driver = 2;
-  string mac_address = 3;
-  repeated string ip_addresses = 4;
-  uint64 max_bandwidth_bytes_per_sec = 5;
-  uint64 rx_bytes_per_sec = 6;
-  uint64 tx_bytes_per_sec = 7;
-  uint64 rx_packets_per_sec = 8;
-  uint64 tx_packets_per_sec = 9;
-  uint64 rx_errors = 10;
-  uint64 tx_errors = 11;
-  uint64 rx_bytes_total = 12;
-  uint64 tx_bytes_total = 13;
-  bool is_up = 14;
-  uint32 mtu = 15;
-  repeated string dns_servers = 16;
-  optional uint32 link_speed_mbps = 17;
+    string interface_name = 1;
+    string driver = 2;
+    string mac_address = 3;
+    repeated string ip_addresses = 4;
+    uint64 max_bandwidth_bytes_per_sec = 5;
+    uint64 rx_bytes_per_sec = 6;
+    uint64 tx_bytes_per_sec = 7;
+    uint64 rx_packets_per_sec = 8;
+    uint64 tx_packets_per_sec = 9;
+    uint64 rx_errors = 10;
+    uint64 tx_errors = 11;
+    uint64 rx_bytes_total = 12;
+    uint64 tx_bytes_total = 13;
+    bool is_up = 14;
+    uint32 mtu = 15;
+    repeated string dns_servers = 16;
+    optional uint32 link_speed_mbps = 17;
 }
 
 // Information on all storage devices
 message StorageList {
-  repeated StorageInfo storages = 1;
+    repeated StorageInfo storages = 1;
 }
 
 // Storage device information
 message StorageInfo {
-  string device_name = 1;
-  string device_type = 2;  // SSD, HDD, NVMe, etc.
-  string model = 3;
-  string filesystem_type = 4;
-  string mount_point = 5;
-  uint64 total_space_bytes = 6;
-  uint64 available_space_bytes = 7;
-  uint64 read_bytes_per_sec = 8;
-  uint64 write_bytes_per_sec = 9;
-  uint64 io_time_ms = 10;
-  optional double temperature_celsius = 11;
-  optional uint64 lifetime_writes_bytes = 12;
-  optional string serial_number = 13;
-  optional string partition_label = 14;
-  uint64 used_space_bytes = 15;
-  optional SmartData smart_data = 16;
+    string device_name = 1;
+    string device_type = 2;  // SSD, HDD, NVMe, etc.
+    string model = 3;
+    string filesystem_type = 4;
+    string mount_point = 5;
+    uint64 total_space_bytes = 6;
+    uint64 available_space_bytes = 7;
+    uint64 read_bytes_per_sec = 8;
+    uint64 write_bytes_per_sec = 9;
+    uint64 io_time_ms = 10;
+    optional double temperature_celsius = 11;
+    optional uint64 lifetime_writes_bytes = 12;
+    optional string serial_number = 13;
+    optional string partition_label = 14;
+    uint64 used_space_bytes = 15;
+    optional SmartData smart_data = 16;
 }
 
 // S.M.A.R.T. data for storage devices
 message SmartData {
-  string health_status = 1;
-  optional uint64 power_on_hours = 2;
-  optional uint32 power_cycle_count = 3;
-  optional uint32 reallocated_sectors = 4;
-  optional uint32 remaining_life_percent = 5;
+    string health_status = 1;
+    optional uint64 power_on_hours = 2;
+    optional uint32 power_cycle_count = 3;
+    optional uint32 reallocated_sectors = 4;
+    optional uint32 remaining_life_percent = 5;
 }
 
 // Information on all processes
 message ProcessList {
-  repeated ProcessInfo processes = 1;
+    repeated ProcessInfo processes = 1;
 }
 
 // Process information
 message ProcessInfo {
-  uint32 pid = 1;
-  string name = 2;
-  string username = 3;
-  string state = 4;
-  double cpu_usage_percent = 5;
-  uint64 physical_memory_bytes = 6;
-  uint64 virtual_memory_bytes = 7;
-  uint64 disk_read_bytes_per_sec = 8;
-  uint64 disk_write_bytes_per_sec = 9;
-  uint64 threads = 10;
-  uint64 open_files = 11;
-  int64 start_time_epoch_seconds = 12;
-  optional GpuProcessInfo gpu_usage = 13;
-  optional uint32 parent_pid = 14;
-  optional string cmdline = 15;
-  optional string cwd = 16;
-  repeated KeyValuePair environment = 17;
-  optional uint32 io_priority = 18;
-  optional int32 nice_value = 19;
+    uint32 pid = 1;
+    string name = 2;
+    string username = 3;
+    string state = 4;
+    double cpu_usage_percent = 5;
+    uint64 physical_memory_bytes = 6;
+    uint64 virtual_memory_bytes = 7;
+    uint64 disk_read_bytes_per_sec = 8;
+    uint64 disk_write_bytes_per_sec = 9;
+    uint64 threads = 10;
+    uint64 open_files = 11;
+    int64 start_time_epoch_seconds = 12;
+    optional GpuProcessInfo gpu_usage = 13;
+    optional uint32 parent_pid = 14;
+    optional string cmdline = 15;
+    optional string cwd = 16;
+    repeated KeyValuePair environment = 17;
+    optional uint32 io_priority = 18;
+    optional int32 nice_value = 19;
 }
 
 // Key-value pair for environment variables
 message KeyValuePair {
-  string key = 1;
-  string value = 2;
+    string key = 1;
+    string value = 2;
 }
 
 // Service to provide system monitoring data
 service MonitordService {
-  // Stream full system snapshots
-  rpc StreamSystemSnapshots(SnapshotRequest) returns (stream SystemSnapshot);
+    // Stream full system snapshots
+    rpc StreamSystemSnapshots (SnapshotRequest) returns (stream SystemSnapshot);
 
-  // Get a single snapshot
-  rpc GetSystemSnapshot(SnapshotRequest) returns (SystemSnapshot);
+    // Get a single snapshot
+    rpc GetSystemSnapshot (SnapshotRequest) returns (SystemSnapshot);
 
-  // Stream just system information
-  rpc StreamSystemInfo(SnapshotRequest) returns (stream SystemInfo);
+    // Stream just system information
+    rpc StreamSystemInfo (SnapshotRequest) returns (stream SystemInfo);
 
-  // Stream just CPU information
-  rpc StreamCpuInfo(SnapshotRequest) returns (stream CpuInfo);
+    // Stream just CPU information
+    rpc StreamCpuInfo (SnapshotRequest) returns (stream CpuInfo);
 
-  // Stream just memory information
-  rpc StreamMemoryInfo(SnapshotRequest) returns (stream MemoryInfo);
+    // Stream just memory information
+    rpc StreamMemoryInfo (SnapshotRequest) returns (stream MemoryInfo);
 
-  // Stream just GPU information
-  rpc StreamGpuInfo(SnapshotRequest) returns (stream GpuList);
+    // Stream just GPU information
+    rpc StreamGpuInfo (SnapshotRequest) returns (stream GpuList);
 
-  // Stream just network information
-  rpc StreamNetworkInfo(SnapshotRequest) returns (stream NetworkList);
+    // Stream just network information
+    rpc StreamNetworkInfo (SnapshotRequest) returns (stream NetworkList);
 
-  // Stream process information with optional filtering
-  rpc StreamProcessInfo(ProcessInfoRequest) returns (stream ProcessList);
+    // Stream process information with optional filtering
+    rpc StreamProcessInfo (ProcessInfoRequest) returns (stream ProcessList);
 
-  // Stream storage information
-  rpc StreamStorageInfo(SnapshotRequest) returns (stream StorageList);
+    // Send sigterm to a process
+    rpc TermProcess (ProcessSigRequest) returns (ProcessSigResponse);
+
+    // Stream storage information
+    rpc StreamStorageInfo (SnapshotRequest) returns (stream StorageList);
 }
 
 // Request message for snapshots
 message SnapshotRequest {
-  uint32 interval_ms = 1;  // Requested interval between updates
+    uint32 interval_ms = 1;  // Requested interval between updates
 }
 
 // Request message for process information with filtering options
 message ProcessInfoRequest {
-  uint32 interval_ms = 1;
-  optional string username_filter = 2;
-  optional uint32 pid_filter = 3;
-  optional string name_filter = 4;
-  bool sort_by_cpu = 5;
-  bool sort_by_memory = 6;
-  uint32 limit = 7;  // Max number of processes to return
+    uint32 interval_ms = 1;
+    optional string username_filter = 2;
+    optional uint32 pid_filter = 3;
+    optional string name_filter = 4;
+    bool sort_by_cpu = 5;
+    bool sort_by_memory = 6;
+    uint32 limit = 7;  // Max number of processes to return
+}
+
+// Process signal request
+message ProcessSigRequest {
+    uint32 pid = 1;
+    ProcessSig sig = 2;
+}
+
+// Process signal response
+message ProcessSigResponse {
+    bool succeeded = 1;
+}
+
+enum ProcessSig {
+    SIGTERM = 0;
+    SIGKILL = 1;
 }

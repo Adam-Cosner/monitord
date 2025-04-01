@@ -3,7 +3,6 @@ use crate::error::{CollectorError, Result};
 use crate::traits::Collector;
 use crate::CollectorConfig;
 use monitord_protocols::monitord::{KeyValuePair, ProcessInfo, ProcessList};
-use std::collections::HashMap;
 use sysinfo::{ProcessesToUpdate, System};
 use tracing::{debug, info};
 

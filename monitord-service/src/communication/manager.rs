@@ -5,6 +5,8 @@ use monitord_protocols::monitord::monitord_service_server::{
     MonitordService, MonitordServiceServer,
 };
 use monitord_protocols::monitord::*;
+use nix::libc;
+use nix::libc::pid_t;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::mpsc::{self as tokio_mpsc};
@@ -34,27 +36,6 @@ pub struct MonitordServiceImpl {
 
 #[tonic::async_trait]
 impl MonitordService for MonitordServiceImpl {
-    async fn get_system_snapshot(
-        &self,
-        _request: tonic::Request<SnapshotRequest>,
-    ) -> Result<tonic::Response<SystemSnapshot>, tonic::Status> {
-        let state = self.state.read().await;
-
-        // Create a snapshot from our current state
-        let snapshot = SystemSnapshot {
-            timestamp: Some(prost_types::Timestamp::from(std::time::SystemTime::now())),
-            system_info: state.system_data.clone(),
-            cpu_info: state.cpu_data.clone(),
-            memory_info: state.memory_data.clone(),
-            gpu_info: state.gpu_data.clone(),
-            network_info: state.network_data.clone(),
-            processes: state.process_data.clone(),
-            storage_devices: state.storage_data.clone(),
-        };
-
-        Ok(Response::new(snapshot))
-    }
-
     type StreamSystemSnapshotsStream =
         Pin<Box<dyn Stream<Item = Result<SystemSnapshot, tonic::Status>> + Send + 'static>>;
 
@@ -101,6 +82,27 @@ impl MonitordService for MonitordServiceImpl {
             futures::StreamExt::boxed(tokio_stream::wrappers::ReceiverStream::new(rx));
 
         Ok(Response::new(output_stream))
+    }
+
+    async fn get_system_snapshot(
+        &self,
+        _request: tonic::Request<SnapshotRequest>,
+    ) -> Result<tonic::Response<SystemSnapshot>, tonic::Status> {
+        let state = self.state.read().await;
+
+        // Create a snapshot from our current state
+        let snapshot = SystemSnapshot {
+            timestamp: Some(prost_types::Timestamp::from(std::time::SystemTime::now())),
+            system_info: state.system_data.clone(),
+            cpu_info: state.cpu_data.clone(),
+            memory_info: state.memory_data.clone(),
+            gpu_info: state.gpu_data.clone(),
+            network_info: state.network_data.clone(),
+            processes: state.process_data.clone(),
+            storage_devices: state.storage_data.clone(),
+        };
+
+        Ok(Response::new(snapshot))
     }
 
     type StreamSystemInfoStream =
@@ -272,40 +274,6 @@ impl MonitordService for MonitordServiceImpl {
         Ok(Response::new(output_stream))
     }
 
-    type StreamStorageInfoStream =
-        Pin<Box<dyn Stream<Item = Result<StorageList, tonic::Status>> + Send + 'static>>;
-
-    async fn stream_storage_info(
-        &self,
-        request: tonic::Request<SnapshotRequest>,
-    ) -> Result<tonic::Response<Self::StreamStorageInfoStream>, tonic::Status> {
-        let interval_ms = request.into_inner().interval_ms;
-        let state_clone = self.state.clone();
-
-        let (tx, rx) = tokio_mpsc::channel(128);
-
-        tokio::spawn(async move {
-            let mut interval =
-                tokio::time::interval(tokio::time::Duration::from_millis(interval_ms as u64));
-
-            loop {
-                interval.tick().await;
-                let state = state_clone.read().await;
-
-                if let Some(storage_list) = &state.storage_data {
-                    if tx.send(Ok(storage_list.clone())).await.is_err() {
-                        return;
-                    }
-                }
-            }
-        });
-
-        let output_stream =
-            futures::StreamExt::boxed(tokio_stream::wrappers::ReceiverStream::new(rx));
-
-        Ok(Response::new(output_stream))
-    }
-
     type StreamProcessInfoStream =
         Pin<Box<dyn Stream<Item = Result<ProcessList, tonic::Status>> + Send + 'static>>;
 
@@ -382,6 +350,56 @@ impl MonitordService for MonitordServiceImpl {
                         .await
                         .is_err()
                     {
+                        return;
+                    }
+                }
+            }
+        });
+
+        let output_stream =
+            futures::StreamExt::boxed(tokio_stream::wrappers::ReceiverStream::new(rx));
+
+        Ok(Response::new(output_stream))
+    }
+
+    async fn term_process(
+        &self,
+        request: tonic::Request<ProcessSigRequest>,
+    ) -> Result<tonic::Response<ProcessSigResponse>, tonic::Status> {
+        let req = request.into_inner();
+        let pid = req.pid;
+        let sig = req.sig();
+        unsafe {
+            match sig {
+                ProcessSig::Sigkill => libc::kill(pid as pid_t, libc::SIGKILL),
+                ProcessSig::Sigterm => libc::kill(pid as pid_t, libc::SIGTERM),
+            };
+        }
+        Ok(Response::new(ProcessSigResponse { succeeded: true }))
+    }
+
+    type StreamStorageInfoStream =
+        Pin<Box<dyn Stream<Item = Result<StorageList, tonic::Status>> + Send + 'static>>;
+
+    async fn stream_storage_info(
+        &self,
+        request: tonic::Request<SnapshotRequest>,
+    ) -> Result<tonic::Response<Self::StreamStorageInfoStream>, tonic::Status> {
+        let interval_ms = request.into_inner().interval_ms;
+        let state_clone = self.state.clone();
+
+        let (tx, rx) = tokio_mpsc::channel(128);
+
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_millis(interval_ms as u64));
+
+            loop {
+                interval.tick().await;
+                let state = state_clone.read().await;
+
+                if let Some(storage_list) = &state.storage_data {
+                    if tx.send(Ok(storage_list.clone())).await.is_err() {
                         return;
                     }
                 }
