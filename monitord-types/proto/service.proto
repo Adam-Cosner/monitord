@@ -1,12 +1,8 @@
 syntax = "proto3";
-package service;
+package monitord;
 
 service Service {
     rpc GetMetrics(GetMetricsRequest) returns (GetMetricsResponse);
-
-
-    rpc GetSettings(GetSettingsRequest) returns (GetSettingsResponse);
-    rpc SetSettings(SetSettingsRequest) returns (SetSettingsResponse);
 }
 
 message GetMetricsRequest {
@@ -134,21 +130,4 @@ message ProcessResponse {
     double gpu = 6;
     double disk = 7;
     int32 priority = 8;
-}
-
-// === SETTINGS ===
-message GetSettingsRequest {
-    // nothing here yet
-}
-
-message GetSettingsResponse {
-    // nothing here yet
-}
-
-message SetSettingsRequest {
-    // nothing here yet
-}
-
-message SetSettingsResponse {
-    // nothing here yet
 }

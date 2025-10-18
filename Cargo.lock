@@ -483,6 +483,7 @@ dependencies = [
  "monitord-types",
  "sysinfo",
  "tokio",
+ "tonic",
  "tracing",
  "tracing-subscriber",
 ]
