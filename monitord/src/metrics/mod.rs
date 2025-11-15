@@ -1,16 +1,6 @@
-mod cpu;
-mod disk;
-mod gpu;
-mod mem;
-mod net;
-mod proc;
-
-pub struct MetricManager {
-    // instances of each metric collector
-}
-
-impl MetricManager {
-    pub fn new() -> Self {
-        MetricManager {}
-    }
-}
+pub mod cpu;
+pub mod disk;
+pub mod gpu;
+pub mod mem;
+pub mod net;
+pub mod proc;
