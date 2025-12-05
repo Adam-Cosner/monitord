@@ -44,7 +44,6 @@ impl CpuMetricCache {
                     let core = monitord_types::service::Core {
                         utilization: cpu.cpu_usage() as f64,
                         frequency_mhz: cpu.frequency() as u32,
-                        temperature: 0.0, // todo: get per-core temperature
                     };
                     cores.push(core);
                 }

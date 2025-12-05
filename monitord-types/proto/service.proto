@@ -41,7 +41,6 @@ message CpuResponse {
 message Core {
     double utilization = 1;
     uint32 frequency_mhz = 2;
-    double temperature = 3;
 }
 
 message MemoryRequest {
