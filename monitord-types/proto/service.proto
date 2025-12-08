@@ -90,13 +90,20 @@ message MemoryResponse {
     uint64 sw_use = 4;
 }
 
+message GpuProcess {
+    uint32 pid = 1;
+    double utilization = 2;
+    uint64 vram = 3;
+}
+
 message GpuResponse {
     string brand = 1;
     double utilization = 2;
-    double vram_utilization = 3;
-    double wattage = 4;
-    double fan_speed = 5;
+    uint64 vram_total = 3;
+    uint64 vram_utilization = 4;
+    double wattage = 5;
     double temperature = 6;
+    repeated GpuProcess processes = 7;
 }
 
 message DiskResponse {
