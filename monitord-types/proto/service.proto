@@ -128,6 +128,7 @@ message ProcessResponse {
     double cpu = 4;
     uint64 memory = 5;
     double gpu = 6;
-    double disk = 7;
-    int32 priority = 8;
+    uint64 disk_read = 7;
+    uint64 disk_write = 8;
+    int32 priority = 9;
 }
