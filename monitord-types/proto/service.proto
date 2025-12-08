@@ -32,9 +32,9 @@ message CpuRequest {
 
 message CpuResponse {
     string brand = 1; // CPU's brand name (i.e. AMD Ryzen 9 5950X etc.)
-    double overall_utilization = 2;
-    uint32 overall_frequency_mhz = 3;
-    double overall_temperature = 4;
+    double utilization = 2;
+    uint32 frequency_mhz = 3;
+    double temperature = 4;
     repeated Core cores = 5;
 }
 

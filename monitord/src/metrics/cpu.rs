@@ -1,14 +1,16 @@
 use crate::error::Result;
 use std::collections::HashMap;
 
-pub struct CpuMetricCache {
+pub struct CpuMetricCollector {
     sys: sysinfo::System,
 }
 
-impl CpuMetricCache {
+impl CpuMetricCollector {
     pub fn new() -> Result<Self> {
         Ok(Self {
-            sys: sysinfo::System::new(),
+            sys: sysinfo::System::new_with_specifics(
+                sysinfo::RefreshKind::nothing().with_cpu(sysinfo::CpuRefreshKind::everything()),
+            ),
         })
     }
 
@@ -17,48 +19,67 @@ impl CpuMetricCache {
         request: &monitord_types::service::CpuRequest,
     ) -> Result<Vec<monitord_types::service::CpuResponse>> {
         self.sys.refresh_cpu_all();
-        let mut brand_to_cpu = HashMap::new();
-        // Iterate over cpus and group cpus by brand name (temporary until it's able to differentiate logical CPUs among physical CPUs)
-        for cpu in self.sys.cpus() {
-            let brand = cpu.brand();
-
-            brand_to_cpu.entry(brand).or_insert_with(Vec::new).push(cpu);
-        }
-
+        let cpus = split_cpus(self.sys.cpus());
         let mut cpu_metrics = Vec::new();
 
         // Iterate over each branded CPU
-        for (brand, cpus) in brand_to_cpu {
-            let mut overall_frequency_mhz: u32 = 0;
+        for (brand, cores) in cpus {
+            // Utilization
+            let utilization = if request.utilization {
+                self.sys.global_cpu_usage() as f64
+            } else {
+                0.0
+            };
 
-            let overall_temperature = 0.0; // todo: get CPU temperature
-            tracing::debug!("CPU temperature not yet implemented");
+            // Frequency
+            let frequency_mhz = if request.frequency {
+                cores
+                    .iter()
+                    .max_by(|x, y| x.frequency().cmp(&y.frequency()))
+                    .map(|cpu| cpu.frequency())
+                    .unwrap_or_default() as u32
+            } else {
+                0
+            };
 
-            // Get core info
-            let mut cores = Vec::new();
-            for cpu in cpus.iter() {
-                if cpu.frequency() as u32 > overall_frequency_mhz {
-                    overall_frequency_mhz = cpu.frequency() as u32;
-                }
-                if request.per_core {
-                    let core = monitord_types::service::Core {
-                        utilization: cpu.cpu_usage() as f64,
-                        frequency_mhz: cpu.frequency() as u32,
-                    };
-                    cores.push(core);
-                }
-            }
+            // TODO: implement CPU temperature
+            let temperature = 0.0;
+            tracing::debug!("Cpu temperature not yet implemented");
+
+            // Per-core metrics
+            let cores = if request.per_core {
+                cores
+                    .iter()
+                    .map(|core| monitord_types::service::Core {
+                        utilization: core.cpu_usage() as f64,
+                        frequency_mhz: core.frequency() as u32,
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+
             cpu_metrics.push(monitord_types::service::CpuResponse {
                 brand: brand.to_string(),
-                overall_utilization: self.sys.global_cpu_usage() as f64,
-                overall_frequency_mhz,
-                overall_temperature,
+                utilization,
+                frequency_mhz,
+                temperature,
                 cores,
             });
         }
 
         Ok(cpu_metrics)
     }
+}
+
+fn split_cpus(cpus: &[sysinfo::Cpu]) -> HashMap<String, Vec<&sysinfo::Cpu>> {
+    let mut map = HashMap::new();
+    for cpu in cpus.iter() {
+        map.entry(cpu.brand().to_string())
+            .or_insert_with(Vec::new)
+            .push(cpu);
+    }
+    map
 }
 
 #[cfg(test)]
@@ -74,13 +95,25 @@ mod tests {
             temperature: false,
         };
 
-        let mut metric_cache = CpuMetricCache::new()?;
+        let mut metric_cache = CpuMetricCollector::new()?;
         let _ = metric_cache.collect(&request)?;
         // pause to allow second capture for accurate info
         std::thread::sleep(std::time::Duration::from_millis(1000));
         let cpu_metrics = metric_cache.collect(&request)?;
 
         println!("{:?}", cpu_metrics);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_temperature() -> Result<()> {
+        let components = sysinfo::Components::new_with_refreshed_list();
+        for component in components.iter() {
+            let temperature = component.temperature().unwrap_or_default();
+            let label = component.label().to_string();
+            println!("Component [{label}] Temperature: {temperature:.2}°C");
+        }
 
         Ok(())
     }
