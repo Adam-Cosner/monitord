@@ -8,10 +8,61 @@ service Service {
 message GetMetricsRequest {
     optional CpuRequest cpu = 1;
     optional MemoryRequest memory = 2;
-    optional DiskRequest disk = 3;
-    optional NetworkRequest network = 4;
+    bool disk = 3;
+    bool network = 4;
     optional GpuRequest gpu = 5;
-    optional ProcessRequest process = 6;
+    repeated ProcessFilter process = 6;
+}
+
+message CpuRequest {
+    bool per_core = 1; // whether to include per-core stats
+}
+message MemoryRequest {
+    bool swap = 1;
+}
+message GpuRequest {
+    bool process_data = 1;
+}
+
+// range of processes [lower, higher)
+message ProcessRange {
+    uint32 lower = 1;
+    uint32 higher = 2;
+}
+
+message ProcessStatus {
+    enum ProcessStatusKnown {
+        Idle = 0;
+        Run = 1;
+        Sleep = 2;
+        Stop = 3;
+        Zombie = 4;
+        Tracing = 5;
+        Dead = 6;
+        WakeKill = 7;
+        Waking = 8;
+        Parked = 9;
+        LockBlocked = 10;
+        UninterruptibleDiskSleep = 11;
+    }
+    oneof status {
+        ProcessStatusKnown known = 1;
+        uint32 unknown = 2;
+    }
+}
+
+message ProcessStatusFilterList {
+    repeated ProcessStatus list = 1;
+}
+
+message ProcessFilter {
+    oneof filter {
+        string user = 1;
+        ProcessRange range = 2;
+        string regex = 3;
+        ProcessStatusFilterList status_list = 4;
+    }
+
 }
 
 message GetMetricsResponse {
@@ -21,13 +72,6 @@ message GetMetricsResponse {
     repeated DiskResponse disk = 4;
     repeated NetworkResponse network = 5;
     map<uint32, ProcessResponse> process = 6;
-}
-
-message CpuRequest {
-    bool utilization = 1; // whether to include the overall utilization (0.0 - 100.0)
-    bool frequency = 2; // whether to include the highest core frequency (MHz)
-    bool temperature = 3; // whether to include the highest core temperature (Celsius)
-    bool per_core = 4; // whether to include per-core stats
 }
 
 message CpuResponse {
@@ -43,26 +87,11 @@ message Core {
     uint32 frequency_mhz = 2;
 }
 
-message MemoryRequest {
-    bool capacity = 1; // whether to include the physical memory capacity in bytes
-    bool in_use = 2; // whether to include the physical memory usage in bytes
-    bool sw_capacity = 3; // whether to include the swap capacity in bytes
-    bool sw_use = 4; // whether to include the swap usage in bytes
-}
-
 message MemoryResponse {
     uint64 capacity = 1;
     uint64 in_use = 2;
     uint64 sw_capacity = 3;
     uint64 sw_use = 4;
-}
-
-message GpuRequest {
-    bool utilization = 1; // whether to include the GPU utilization percentage (0.0 - 100.0)
-    bool vram_utilization = 2; // whether to include the VRAM utilization percentage (0.0 - 100.0)
-    bool wattage = 3; // whether to include the GPU wattage in watts
-    bool fan_speed = 4; // whether to include the GPU fan speed in RPM
-    bool temperature = 5; // whether to include the GPU temperature in Celsius
 }
 
 message GpuResponse {
@@ -74,14 +103,6 @@ message GpuResponse {
     double temperature = 6;
 }
 
-message DiskRequest {
-    bool capacity = 1; // whether to include the disk capacity in bytes
-    bool total_read = 2; // whether to include the total disk read in bytes
-    bool reading = 3; // whether to include the disk read speed in bytes per second
-    bool total_write = 4; // whether to include the total disk write in bytes
-    bool writing = 5; // whether to include the total disk write speed in bytes per second
-}
-
 message DiskResponse {
     string name = 1;
     uint64 capacity = 2;
@@ -89,15 +110,6 @@ message DiskResponse {
     uint64 reading = 4;
     uint64 total_write = 5;
     uint64 writing = 6;
-}
-
-message NetworkRequest {
-    bool received = 1; // whether to include the total network received bytes
-    bool receiving = 2; // whether to include the network receive speed in bytes per second
-    bool sent = 3; // whether to include the total network sent bytes
-    bool sending = 4; // whether to include the network send speed in bytes per second
-    bool ipv4_address = 5; // whether to include the IPv4 address
-    bool signal_strength = 6; // whether to include the signal strength in dBm
 }
 
 message NetworkResponse {
@@ -110,17 +122,6 @@ message NetworkResponse {
     double signal_strength = 7;
 }
 
-message ProcessRequest {
-    bool name = 1; // whether to include the process's name (the value in /proc/<pid>/comm)
-    bool user = 2; // the name of the user who owns the process
-    bool pid = 3; // the process ID
-    bool cpu = 4; // whether to include the process's CPU usage in percentage
-    bool memory = 5; // whether to include the process's memory usage in bytes
-    bool gpu = 6; // whether to include the process's GPU usage in percentage
-    bool disk = 7; // whether to include the process's disk usage in bytes
-    bool priority = 8; // whether to include the process's priority
-}
-
 message ProcessResponse {
     string name = 1;
     string user = 2;
@@ -131,4 +132,5 @@ message ProcessResponse {
     uint64 disk_read = 7;
     uint64 disk_write = 8;
     int32 priority = 9;
+    ProcessStatus status = 10;
 }

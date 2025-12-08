@@ -11,45 +11,17 @@ impl DiskMetricCollector {
         })
     }
 
-    pub fn collect(
-        &mut self,
-        request: &monitord_types::service::DiskRequest,
-    ) -> Result<Vec<monitord_types::service::DiskResponse>> {
+    pub fn collect(&mut self) -> Result<Vec<monitord_types::service::DiskResponse>> {
         self.disks.refresh(true);
         let mut disks = Vec::new();
 
         for disk in self.disks.list().iter() {
             let name = disk.name().to_string_lossy().to_string();
-
-            let capacity = if request.capacity {
-                disk.total_space()
-            } else {
-                0
-            };
-
-            let total_read = if request.total_read {
-                disk.usage().total_read_bytes
-            } else {
-                0
-            };
-
-            let reading = if request.reading {
-                disk.usage().read_bytes
-            } else {
-                0
-            };
-
-            let total_write = if request.total_write {
-                disk.usage().total_written_bytes
-            } else {
-                0
-            };
-
-            let writing = if request.writing {
-                disk.usage().written_bytes
-            } else {
-                0
-            };
+            let capacity = disk.total_space();
+            let total_read = disk.usage().total_read_bytes;
+            let reading = disk.usage().read_bytes;
+            let total_write = disk.usage().total_written_bytes;
+            let writing = disk.usage().written_bytes;
 
             disks.push(monitord_types::service::DiskResponse {
                 name,
@@ -71,19 +43,11 @@ mod tests {
 
     #[test]
     fn test_disk_metrics() -> Result<()> {
-        let request = monitord_types::service::DiskRequest {
-            capacity: true,
-            total_read: true,
-            reading: true,
-            total_write: true,
-            writing: true,
-        };
-
         let mut metric_cache = DiskMetricCollector::new()?;
-        let _ = metric_cache.collect(&request)?;
+        let _ = metric_cache.collect()?;
         // pause to allow second capture for usage info
         std::thread::sleep(std::time::Duration::from_secs(1));
-        let disk_metrics = metric_cache.collect(&request)?;
+        let disk_metrics = metric_cache.collect()?;
 
         println!("{:?}", disk_metrics);
         Ok(())

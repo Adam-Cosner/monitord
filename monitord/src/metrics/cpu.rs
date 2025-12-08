@@ -24,28 +24,14 @@ impl CpuMetricCollector {
 
         // Iterate over each branded CPU
         for (brand, cores) in cpus.iter() {
-            // Utilization
-            let utilization = if request.utilization {
-                self.sys.global_cpu_usage() as f64
-            } else {
-                0.0
-            };
-
-            // Frequency
-            let frequency_mhz = if request.frequency {
-                cores
-                    .iter()
-                    .max_by(|x, y| x.frequency().cmp(&y.frequency()))
-                    .map(|cpu| cpu.frequency())
-                    .unwrap_or_default() as u32
-            } else {
-                0
-            };
-
+            let utilization = self.sys.global_cpu_usage() as f64;
+            let frequency_mhz = cores
+                .iter()
+                .max_by(|x, y| x.frequency().cmp(&y.frequency()))
+                .map(|cpu| cpu.frequency())
+                .unwrap_or_default() as u32;
             // TODO: implement CPU temperature
             let temperature = 0.0;
-            tracing::debug!("Cpu temperature not yet implemented");
-
             // Per-core metrics
             let cores = if request.per_core {
                 cores
@@ -88,12 +74,7 @@ mod tests {
 
     #[test]
     fn test_cpu_metrics() -> Result<()> {
-        let request = monitord_types::service::CpuRequest {
-            utilization: true,
-            frequency: true,
-            per_core: true,
-            temperature: false,
-        };
+        let request = monitord_types::service::CpuRequest { per_core: true };
 
         let mut metric_cache = CpuMetricCollector::new()?;
         let _ = metric_cache.collect(&request)?;

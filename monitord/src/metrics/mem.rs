@@ -20,25 +20,15 @@ impl MemoryMetricCollector {
     ) -> Result<Option<monitord_types::service::MemoryResponse>> {
         self.sys.refresh_memory();
 
-        let capacity = if request.capacity {
-            self.sys.total_memory()
-        } else {
-            0
-        };
+        let capacity = self.sys.total_memory();
+        let in_use = self.sys.used_memory();
 
-        let in_use = if request.in_use {
-            self.sys.used_memory()
-        } else {
-            0
-        };
-
-        let sw_capacity = if request.sw_capacity {
+        let sw_capacity = if request.swap {
             self.sys.total_swap()
         } else {
             0
         };
-
-        let sw_use = if request.sw_use {
+        let sw_use = if request.swap {
             self.sys.used_swap()
         } else {
             0
@@ -59,12 +49,7 @@ mod tests {
 
     #[test]
     fn test_mem_metrics() -> Result<()> {
-        let request = monitord_types::service::MemoryRequest {
-            capacity: true,
-            in_use: true,
-            sw_capacity: true,
-            sw_use: true,
-        };
+        let request = monitord_types::service::MemoryRequest { swap: true };
 
         let mut metric_cache = MemoryMetricCollector::new()?;
         let mem_metrics = metric_cache.collect(&request)?;
