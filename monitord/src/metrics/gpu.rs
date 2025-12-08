@@ -39,10 +39,7 @@ impl GpuMetricCollector {
             // Check the vendor ID in the /sys/class/drm/<card>/device/vendor
             let vendor_id =
                 std::fs::read_to_string(format!("/sys/class/drm/{}/device/vendor", id))?;
-            let vendor_id = vendor_id
-                .trim()
-                .parse::<u32>()
-                .map_err(|e| crate::error::Error::Parse("Could not parse vendor ID".to_string()))?;
+            let vendor_id = vendor_id.trim();
 
             // Get the PCI bus ID in /sys/class/drm/<card>/device/uevent
             let bus_id = std::fs::read_to_string(format!("/sys/class/drm/{}/device/uevent", id))?;
@@ -61,17 +58,17 @@ impl GpuMetricCollector {
                 .to_string();
 
             match vendor_id {
-                0x1002 => {
+                "0x1002" => {
                     if let Some(amd_collector) = &mut self.amd_collector {
                         responses.push(amd_collector.collect(bus_id.clone(), request)?);
                     }
                 }
-                0x8086 => {
+                "0x8086" => {
                     if let Some(intel_collector) = &mut self.intel_collector {
                         responses.push(intel_collector.collect(bus_id.clone(), request)?);
                     }
                 }
-                0x10de => {
+                "0x10de" => {
                     if let Some(nvidia_collector) = &mut self.nvidia_collector {
                         responses.push(nvidia_collector.collect(bus_id.clone(), request)?);
                     }
