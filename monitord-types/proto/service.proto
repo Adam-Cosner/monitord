@@ -51,16 +51,12 @@ message ProcessStatus {
     }
 }
 
-message ProcessStatusFilterList {
-    repeated ProcessStatus list = 1;
-}
-
 message ProcessFilter {
     oneof filter {
         string user = 1;
         ProcessRange range = 2;
         string regex = 3;
-        ProcessStatusFilterList status_list = 4;
+        ProcessStatus status = 4;
     }
 
 }

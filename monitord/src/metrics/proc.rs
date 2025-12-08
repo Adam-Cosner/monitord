@@ -69,18 +69,9 @@ impl ProcessMetricCollector {
                             continue 'process_loop;
                         }
                     }
-                    Some(Filter::StatusList(status_list_filter)) => {
-                        let sysinfo_filters: Vec<sysinfo::ProcessStatus> = status_list_filter
-                            .list
-                            .iter()
-                            .cloned()
-                            .map(proto_to_sysinfo)
-                            .collect();
-                        if sysinfo_filters
-                            .into_iter()
-                            .find(|status| status.clone() == process.status())
-                            .is_none()
-                        {
+                    Some(Filter::Status(status_filter)) => {
+                        let sysinfo_filter = proto_to_sysinfo(status_filter.clone());
+                        if sysinfo_filter == process.status() {
                             continue 'process_loop;
                         }
                     }
