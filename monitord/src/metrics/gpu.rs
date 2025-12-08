@@ -63,6 +63,12 @@ impl GpuMetricCollector {
                         let collected = amd_collector.collect(bus_id.clone(), request);
                         if let Ok(collected) = collected {
                             responses.push(collected);
+                        } else {
+                            tracing::error!(
+                                "Failed to collect AMD GPU metrics for bus ID {}: {}",
+                                bus_id,
+                                collected.err().unwrap()
+                            );
                         }
                     }
                 }
@@ -71,6 +77,12 @@ impl GpuMetricCollector {
                         let collected = intel_collector.collect(bus_id.clone(), request);
                         if let Ok(collected) = collected {
                             responses.push(collected);
+                        } else {
+                            tracing::error!(
+                                "Failed to collect Intel GPU metrics for bus ID {}: {}",
+                                bus_id,
+                                collected.err().unwrap()
+                            );
                         }
                     }
                 }
@@ -79,6 +91,12 @@ impl GpuMetricCollector {
                         let collected = nvidia_collector.collect(bus_id.clone(), request);
                         if let Ok(collected) = collected {
                             responses.push(collected);
+                        } else {
+                            tracing::error!(
+                                "Failed to collect NVIDIA GPU metrics for bus ID {}: {}",
+                                bus_id,
+                                collected.err().unwrap()
+                            );
                         }
                     }
                 }
