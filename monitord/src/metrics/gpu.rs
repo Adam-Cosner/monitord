@@ -65,7 +65,8 @@ impl GpuMetricCollector {
                             responses.push(collected);
                         } else {
                             tracing::error!(
-                                "Failed to collect AMD GPU metrics for bus ID {}: {}",
+                                "Failed to collect AMD GPU metrics for card {} bus ID {}: {}",
+                                id,
                                 bus_id,
                                 collected.err().unwrap()
                             );
@@ -79,7 +80,8 @@ impl GpuMetricCollector {
                             responses.push(collected);
                         } else {
                             tracing::error!(
-                                "Failed to collect Intel GPU metrics for bus ID {}: {}",
+                                "Failed to collect Intel GPU metrics for card {} bus ID {}: {}",
+                                id,
                                 bus_id,
                                 collected.err().unwrap()
                             );
@@ -93,7 +95,8 @@ impl GpuMetricCollector {
                             responses.push(collected);
                         } else {
                             tracing::error!(
-                                "Failed to collect NVIDIA GPU metrics for bus ID {}: {}",
+                                "Failed to collect NVIDIA GPU metrics for card {} bus ID {}: {}",
+                                id,
                                 bus_id,
                                 collected.err().unwrap()
                             );
