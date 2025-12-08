@@ -16,6 +16,8 @@ impl AmdMetricCache {
         request: &monitord_types::service::GpuRequest,
     ) -> Result<monitord_types::service::GpuResponse> {
         // Implementation details
-        todo!()
+        Err(crate::error::Error::NotImplemented(
+            "AMD GPU metrics are not implemented".to_string(),
+        ))
     }
 }

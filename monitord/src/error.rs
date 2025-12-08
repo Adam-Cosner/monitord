@@ -11,6 +11,9 @@ pub enum Error {
 
     #[error("NVIDIA error: {0}")]
     Nvidia(#[from] nvml_wrapper::error::NvmlError),
+
+    #[error("Not implemented")]
+    NotImplemented(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
