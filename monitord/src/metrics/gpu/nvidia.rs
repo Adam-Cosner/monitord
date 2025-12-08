@@ -34,14 +34,17 @@ impl NvidiaMetricCache {
 
                 let mut processes = Vec::new();
                 if request.process_data {
-                    if let Ok(utilization) = device.process_utilization_stats(None) {
-                        for process in utilization {
-                            processes.push(monitord_types::service::GpuProcess {
-                                pid: process.pid,
-                                utilization: process.sm_util as f64,
-                                vram: process.mem_util as u64,
-                            });
+                    match device.process_utilization_stats(None) {
+                        Ok(utilization) => {
+                            for process in utilization {
+                                processes.push(monitord_types::service::GpuProcess {
+                                    pid: process.pid,
+                                    utilization: process.sm_util as f64,
+                                    vram: process.mem_util as u64,
+                                });
+                            }
                         }
+                        Err(e) => tracing::error!("Failed to get process utilization stats: {}", e),
                     }
                 }
 
