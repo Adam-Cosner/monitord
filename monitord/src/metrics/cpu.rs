@@ -23,7 +23,7 @@ impl CpuMetricCollector {
         let mut cpu_metrics = Vec::new();
 
         // Iterate over each branded CPU
-        for (brand, cores) in cpus {
+        for (brand, cores) in cpus.iter() {
             // Utilization
             let utilization = if request.utilization {
                 self.sys.global_cpu_usage() as f64
