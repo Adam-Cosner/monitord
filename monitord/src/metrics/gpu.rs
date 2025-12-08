@@ -89,23 +89,25 @@ impl GpuMetricCollector {
                     }
                 }
                 "0x10de" => {
-                    if let Some(nvidia_collector) = &mut self.nvidia_collector {
-                        let collected = nvidia_collector.collect(bus_id.clone(), request);
-                        if let Ok(collected) = collected {
-                            responses.push(collected);
-                        } else {
-                            tracing::error!(
-                                "Failed to collect NVIDIA GPU metrics for card {} bus ID {}: {}",
-                                id,
-                                bus_id,
-                                collected.err().unwrap()
-                            );
-                        }
-                    }
+                    tracing::error!("Nouveau not supported");
                 }
                 _ => continue,
             }
         }
+
+        // Get nvidia gpus and push to the vec
+        if let Some(nvidia_collector) = &mut self.nvidia_collector {
+            let collected = nvidia_collector.collect(request);
+            if let Ok(collected) = collected {
+                responses.extend(collected);
+            } else {
+                tracing::error!(
+                    "Failed to collect Nvidia GPU metrics: {}",
+                    collected.err().unwrap()
+                );
+            }
+        }
+
         Ok(responses)
     }
 }
