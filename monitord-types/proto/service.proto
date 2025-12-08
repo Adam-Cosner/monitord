@@ -101,12 +101,13 @@ message NetworkRequest {
 }
 
 message NetworkResponse {
-    uint64 received = 1;
-    uint64 receiving = 2;
-    uint64 sent = 3;
-    uint64 sending = 4;
-    string ipv4_address = 5;
-    double signal_strength = 6;
+    string name = 1;
+    uint64 received = 2;
+    uint64 receiving = 3;
+    uint64 sent = 4;
+    uint64 sending = 5;
+    string ipv4_address = 6;
+    double signal_strength = 7;
 }
 
 message ProcessRequest {
