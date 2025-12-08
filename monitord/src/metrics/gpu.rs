@@ -45,7 +45,7 @@ impl GpuMetricCollector {
             let bus_id = std::fs::read_to_string(format!("/sys/class/drm/{}/device/uevent", id))?;
             let bus_id = bus_id
                 .lines()
-                .find(|line| line.starts_with("PCI_BUS_ID="))
+                .find(|line| line.starts_with("PCI_SLOT_NAME="))
                 .ok_or_else(|| {
                     crate::error::Error::Parse("Could not parse PCI bus ID".to_string())
                 })?
