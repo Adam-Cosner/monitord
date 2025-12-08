@@ -60,17 +60,26 @@ impl GpuMetricCollector {
             match vendor_id {
                 "0x1002" => {
                     if let Some(amd_collector) = &mut self.amd_collector {
-                        responses.push(amd_collector.collect(bus_id.clone(), request)?);
+                        let collected = amd_collector.collect(bus_id.clone(), request);
+                        if let Ok(collected) = collected {
+                            responses.push(collected);
+                        }
                     }
                 }
                 "0x8086" => {
                     if let Some(intel_collector) = &mut self.intel_collector {
-                        responses.push(intel_collector.collect(bus_id.clone(), request)?);
+                        let collected = intel_collector.collect(bus_id.clone(), request);
+                        if let Ok(collected) = collected {
+                            responses.push(collected);
+                        }
                     }
                 }
                 "0x10de" => {
                     if let Some(nvidia_collector) = &mut self.nvidia_collector {
-                        responses.push(nvidia_collector.collect(bus_id.clone(), request)?);
+                        let collected = nvidia_collector.collect(bus_id.clone(), request);
+                        if let Ok(collected) = collected {
+                            responses.push(collected);
+                        }
                     }
                 }
                 _ => continue,
