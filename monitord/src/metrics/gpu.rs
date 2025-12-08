@@ -120,6 +120,7 @@ mod tests {
 
     #[test]
     fn test_collect() -> Result<()> {
+        tracing_subscriber::fmt::init();
         let mut collector = GpuMetricCollector::new()?;
         let request = monitord_types::service::GpuRequest { process_data: true };
 
