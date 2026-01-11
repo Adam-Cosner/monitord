@@ -1,0 +1,96 @@
+syntax = "proto3";
+package metrics;
+
+// === CPU ===
+message Cpu {
+  string brand_name = 1; // The CPU's branding name (i.e. AMD Ryzen 9 5950X)
+  double utilization = 2; // Out of 100.0
+  uint32 frequency_mhz = 3; // Peak core frequency
+  repeated Core cores = 4;
+}
+message Core {
+  double utilization = 1;
+  uint32 frequency_mhz = 2;
+}
+
+// === Memory ===
+message Memory {
+  uint64 capacity = 1;
+  uint64 in_use = 2;
+  uint64 swap_capacity = 3;
+  uint64 swap_use = 4;
+}
+
+// === GPU ===
+message Gpu {
+  string brand_name = 1; // The GPU's branding name (i.e. NVIDIA RTX 4090)
+  string kernel_driver = 2;
+  string opengl_driver = 3;
+  string vulkan_driver = 4;
+
+  // Graphics metrics
+  double graphics_utilization = 5;
+  uint32 graphics_clock = 6;
+
+  // Memory metrics
+  uint64 memory_capacity = 7;
+  uint64 memory_usage = 8;
+  uint32 memory_clock = 9;
+
+  // Video metrics
+  double video_utilization = 10;
+  uint32 video_clock = 11;
+
+  // Power and temperatures
+  uint32 power_milliwatt = 12;
+  uint32 temperature = 13;
+
+  // Process information
+  repeated GpuProcess processes = 14;
+}
+message GpuProcess {
+  uint32 pid = 1;
+  double graphics_utilization = 2;
+  uint64 memory_usage = 3;
+  double video_utilization = 4;
+}
+
+// === Storage ===
+message Storage {
+  string name = 1; // The storage device's name
+  string device_path = 2; // The storage device's /dev/* path
+  uint64 capacity = 3;
+  uint64 used = 4;
+  uint64 read_bytes = 5;
+  uint64 total_read = 6;
+  uint64 write_bytes = 7;
+  uint64 total_write = 8;
+}
+
+// === Network ===
+message Network {
+  string adapter_name = 1;
+  uint64 received_bytes = 2;
+  uint64 total_received = 3;
+  uint64 sent_bytes = 4;
+  uint64 total_sent = 5;
+  string ipv4_address = 6;
+  string ipv6_address = 7;
+  double signal_strength_db = 8;
+}
+
+// === Process ===
+message Process {
+  string name = 1; // The registered process name
+  string exe = 2; // The name of the executable
+  string cmd = 3; // The command-line of the process
+  string user = 4;
+  uint32 pid = 5;
+  double cpu_utilization = 6;
+  uint64 mem_utilization = 7;
+  double gpu_utilization = 8;
+  uint64 storage_read = 9;
+  uint64 storage_write = 10;
+  int32 priority = 11;
+  uint32 status = 12;
+}

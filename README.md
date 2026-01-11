@@ -11,6 +11,4 @@
 <h3><a href="./monitord-client/README.md">monitord-client</a>: Client Library</h3>
 <p>This component provides the client-facing interface for initiating a connection and receiving the metrics from the target daemon.</p>
 <h3><a href="./monitord-metrics/README.md">monitord-metrics</a>: Metric Collection Library</h3>
-<p>Contains the definition of the metric collection logic, for internal or external usage.</p>
-<h3><a href="./monitord-types/README.md">monitord-types</a>: Transport Protocol Types</h3>
-<p>This component contains protobuf type definitions used for interprocess communication. Users should not interact with this library unless strictly necessary.</p>
+<p>Contains the definition of the metric collection logic for others to use.</p>

@@ -2,6 +2,15 @@ mod config;
 mod error;
 mod metrics;
 mod server;
+mod transport {
+    mod control {
+        tonic::include_proto!("control");
+    }
+    mod client {
+        tonic::include_proto!("client");
+    }
+}
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
