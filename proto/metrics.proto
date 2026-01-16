@@ -6,7 +6,8 @@ message Cpu {
   string brand_name = 1; // The CPU's branding name (i.e. AMD Ryzen 9 5950X)
   double utilization = 2; // Out of 100.0
   uint32 frequency_mhz = 3; // Peak core frequency
-  repeated Core cores = 4;
+  uint32 temperature_c = 4;
+  repeated Core cores = 5;
 }
 message Core {
   double utilization = 1;
