@@ -1,6 +1,6 @@
-<h1 style="text-align: center">MonitorD</h1>
-<p style="text-align: center">An in-development system monitoring daemon for Linux that can locally or remotely fetch system statistics and deliver them to connected clients.</p>
-<h2 style="text-align:center">Components</h2>
+<h1 align="center">MonitorD</h1>
+<p align="center">An in-development system monitoring daemon for Linux that can locally or remotely fetch system statistics and deliver them to connected clients.</p>
+<h2 align="center">Components</h2>
 <h3><a href="./monitord/README.md">monitord</a>: The Main Binary</h3>
 <p>This component is the core binary of the daemon that is set up as a systemd service on the monitored system. Clients initiate a connection to the daemon and receive a stream of system snapshots. The daemon will keep an internal registry of connected clients and concurrently collect the metrics on the requested interval and push to clients.</p>
 <h3><a href="./monitordctl/README.md">monitordctl</a>: The Control Utility</h3>
