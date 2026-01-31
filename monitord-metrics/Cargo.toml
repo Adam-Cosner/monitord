@@ -4,5 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-procfs = "0.18.0"
-thiserror = "2.0.17"
+prost = "0.14"
+tonic = "0.14"
+procfs = "0.18"
+anyhow = "1.0"
+tracing = "0.1"
+dmidecode = "1.0"
+
+[build-dependencies]
+tonic-prost-build = "0.14"

@@ -37,7 +37,7 @@ message ClientAck {
 }
 
 message MetricReport {
-  metrics.Cpu cpu = 1;
+  repeated metrics.Cpu cpu = 1;
   metrics.Memory memory = 2;
   repeated metrics.Gpu gpus = 3;
   repeated metrics.Storage storages = 4;

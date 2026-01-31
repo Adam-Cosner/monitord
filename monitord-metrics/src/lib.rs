@@ -1,4 +1,6 @@
 pub mod cpu;
-pub mod error;
+pub mod memory;
 
-pub type Result<T> = std::result::Result<T, error::Error>;
+mod metrics {
+    tonic::include_proto!("metrics");
+}

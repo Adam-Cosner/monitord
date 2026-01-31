@@ -1,45 +1,77 @@
 syntax = "proto3";
 package metrics;
 
-// === CPU ===
+// Represents a single physical CPU
 message Cpu {
-  string brand_name = 1; // The CPU's branding name (i.e. AMD Ryzen 9 5950X)
-  double utilization = 2; // Out of 100.0
-  uint32 frequency_mhz = 3; // Peak core frequency
+  // The "branding name" of the CPU (i.e. AMD Ryzen 9 9800X3D 8-Core Processor)
+  string brand_name = 1;
+  // The percentage of CPU usage since the last snapshot (out of 100.0)
+  double utilization = 2;
+  // The peak per-core frequency in MHz
+  uint32 frequency_mhz = 3;
+  // The temperature in *millidegrees* Celsius (Maximum Tccd for AMD, maximum per-core temp for Intel)
   uint32 temperature_c = 4;
+  // The per-core statistics
   repeated Core cores = 5;
 }
+// Snapshot of a single core
 message Core {
+  // The core's utilization
   double utilization = 1;
+  // The frequency in MHz of the core
   uint32 frequency_mhz = 2;
 }
 
-// === Memory ===
+// Represents system memory and swap space
 message Memory {
+  // The total amount of physical memory in bytes
   uint64 capacity = 1;
+  // The amount of physical memory used
   uint64 in_use = 2;
-  uint64 swap_capacity = 3;
-  uint64 swap_use = 4;
+  // The total amount of completely empty space on RAM
+  uint64 free = 3;
+  // The total amount of cached files in memory
+  uint64 cached = 4;
+  // The amount of free memory plus the amount of cache that is freeable
+  uint64 available = 5;
+  // The total amount of swap space
+  uint64 swap_capacity = 6;
+  // The amount of swap space used
+  uint64 swap_in_use = 7;
+  // The transfer speed of the memory
+  uint64 speed = 8;
+  // The form factor of the RAM
+  string form_factor = 9;
+  // The type of the RAM
+  string ram_type = 10;
 }
 
-// === GPU ===
+// Represents a single physical GPU
 message Gpu {
-  string brand_name = 1; // The GPU's branding name (i.e. NVIDIA RTX 4090)
+  // The GPU's branding name (i.e. NVIDIA RTX 4090)
+  string brand_name = 1;
+  // The name and version of the kernel level driver
   string kernel_driver = 2;
+  // The name and version of the userspace OpenGL driver
   string opengl_driver = 3;
+  // The name and version of the userspace Vulkan driver
   string vulkan_driver = 4;
 
-  // Graphics metrics
+  // Utilization of the graphics engine
   double graphics_utilization = 5;
+  // The clock of the graphics engine
   uint32 graphics_clock = 6;
 
-  // Memory metrics
+  // The total amount of VRAM on the GPU
   uint64 memory_capacity = 7;
+  // The amount of VRAM currently in use
   uint64 memory_usage = 8;
+  // The clock of the VRAM
   uint32 memory_clock = 9;
 
-  // Video metrics
+  // Utilization of the video encode/decode engines (if supported)
   double video_utilization = 10;
+  // The clock of the video encode/decode engines (if supported)
   uint32 video_clock = 11;
 
   // Power and temperatures

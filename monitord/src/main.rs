@@ -7,10 +7,9 @@ mod transport {
         tonic::include_proto!("control");
     }
     mod client {
-        tonic::include_proto!("client");
+        tonic::include_proto!("monitord");
     }
 }
-
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
