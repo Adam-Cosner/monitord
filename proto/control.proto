@@ -9,13 +9,12 @@ package control;
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
-import "metrics.proto";
 
 // === Core Service ===
 service ControlService {
   rpc OpenNet(OpenNetRequest) returns (OpenNetResponse);
-  rpc FlushKeys(FlushKeyRequest) returns (FlushKeyResponse);
-  rpc DumpConnections(DumpConnectionRequest) returns (DumpConnectionResponse);
+  rpc FlushKeys(FlushKeysRequest) returns (FlushKeysResponse);
+  rpc DumpConnections(DumpConnectionsRequest) returns (DumpConnectionsResponse);
 }
 
 // === Open to network ===
@@ -29,17 +28,17 @@ message OpenNetResponse {
 }
 
 // === Flush Keys ===
-message FlushKeyRequest {
+message FlushKeysRequest {
   optional google.protobuf.Timestamp older_than = 1;
   optional google.protobuf.Timestamp newer_than = 2;
 }
-message FlushKeyResponse {
+message FlushKeysResponse {
   bool success = 1;
 }
 
 // === Connection Dumping ===
-message DumpConnectionRequest {}
-message DumpConnectionResponse {
+message DumpConnectionsRequest {}
+message DumpConnectionsResponse {
   repeated ConnectionDump connection_dumps = 1;
 }
 message ConnectionDump {
