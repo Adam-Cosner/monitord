@@ -1,4 +1,8 @@
-use std::process::Command;
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
 
 /// Memory metric collection
 ///
@@ -11,6 +15,7 @@ use std::process::Command;
 /// ```
 use procfs::Current;
 use anyhow::Context;
+use std::process::Command;
 
 #[doc(inline)]
 pub use crate::metrics::Memory as Snapshot;
