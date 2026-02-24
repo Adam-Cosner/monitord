@@ -29,6 +29,7 @@ pub struct Collector {
 impl Collector {
     /// Create a new instance of the collector
     pub fn new() -> Self {
+        tracing::info!("Creating memory collector");
         Self {
             sp_rt_ff: None,
             tried_udevadm: false,
@@ -37,8 +38,10 @@ impl Collector {
 
     /// Collects a `memory::Snapshot`
     pub fn collect(&mut self) -> anyhow::Result<Snapshot> {
+        tracing::debug!("Collecting memory metrics");
         let meminfo =
             procfs::Meminfo::current().with_context(|| format!("{} on {}", file!(), line!()))?;
+        tracing::trace!("Read /proc/meminfo");
         let capacity = meminfo.mem_total;
         let in_use = meminfo.mem_total - meminfo.mem_free;
         let free = meminfo.mem_free;
@@ -67,6 +70,8 @@ impl Collector {
     }
 
     fn collect_from_udevadm(&mut self) -> anyhow::Result<(u64, String, String)> {
+        tracing::debug!("Running udevadm to cache memory speed, form factor, and type");
+        let udevadm_bench = std::time::Instant::now();
         let mut cmd = Command::new("udevadm");
         cmd.arg("info")
             .arg("-q")
@@ -141,6 +146,10 @@ impl Collector {
         }
 
         self.sp_rt_ff = Some((speed.clone(), ram_type.clone(), form_factor.clone()));
+        tracing::debug!(
+            "udevadm command ran successfully, finished in {:?}",
+            udevadm_bench.elapsed()
+        );
 
         Ok((speed, ram_type, form_factor))
     }

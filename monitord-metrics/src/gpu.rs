@@ -48,8 +48,19 @@ enum GpuVendor {
     // TODO: Add support for smaller vendors at a later date
 }
 
+impl std::fmt::Display for GpuVendor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GpuVendor::Intel => write!(f, "Intel"),
+            GpuVendor::Nvidia => write!(f, "Nvidia"),
+            GpuVendor::Amd => write!(f, "AMD"),
+        }
+    }
+}
+
 impl Collector {
     pub fn new() -> Self {
+        tracing::info!("Creating GPU collector");
         Collector {
             gpus: Vec::new(),
             nvidia: nvidia::Collector::new(),
@@ -84,6 +95,8 @@ impl Collector {
 
     // Iterates over /sys/class/drm to find the GPU devices. This is the best way to get them in a consistent order.
     fn enumerate_devices() -> anyhow::Result<Vec<Gpu>> {
+        let enumerate_bench = std::time::Instant::now();
+        tracing::debug!("Enumerating GPU device paths");
         let mut paths = Vec::new();
         for entry in std::fs::read_dir("/sys/class/drm")
             .with_context(|| format!("{} at {}", file!(), line!()))?
@@ -106,6 +119,13 @@ impl Collector {
                 // Get OpenGL and Vulkan drivers
                 let (opengl_driver, vulkan_driver) = get_oglv_driver(&path, &vendor);
 
+                tracing::trace!(
+                    "Found a {} GPU at {}, OpenGL: {}, Vulkan: {}",
+                    vendor,
+                    path.display(),
+                    opengl_driver,
+                    vulkan_driver
+                );
                 paths.push(Gpu {
                     path,
                     vendor,
@@ -114,11 +134,17 @@ impl Collector {
                 });
             }
         }
+        tracing::debug!(
+            "Enumerated GPU device paths in {:?}",
+            enumerate_bench.elapsed()
+        );
         Ok(paths)
     }
 }
 
 fn get_oglv_driver(path: &PathBuf, vendor: &GpuVendor) -> (String, String) {
+    let driver_bench = std::time::Instant::now();
+    tracing::debug!("Getting OpenGL and Vulkan drivers for GPU {:?}", path);
     let device_path = path.join("device");
     let mut gl = String::from("none");
     let mut vk = String::from("none");
@@ -178,6 +204,11 @@ fn get_oglv_driver(path: &PathBuf, vendor: &GpuVendor) -> (String, String) {
             }
         }
     }
+    tracing::debug!(
+        "Got OpenGL and Vulkan drivers for GPU {:?} took {:?}",
+        path,
+        driver_bench.elapsed()
+    );
     (gl, vk)
 }
 
@@ -193,10 +224,10 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_secs(1));
         let second = collector.collect()?;
         for gpu in second.iter() {
-            tracing::info!("GPU {}", gpu.brand_name);
-            tracing::info!("  {}% Graphics", gpu.graphics_utilization);
+            println!("GPU {}", gpu.brand_name);
+            println!("  {}% Graphics", gpu.graphics_utilization);
             for proc in gpu.processes.iter() {
-                tracing::info!("    {} {}% Graphics", proc.pid, proc.graphics_utilization);
+                println!("    {} {}% Graphics", proc.pid, proc.graphics_utilization);
             }
         }
         Ok(())

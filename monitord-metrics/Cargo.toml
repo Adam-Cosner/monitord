@@ -30,7 +30,7 @@ amdgpu_top_json = "0.11.2"
 
 [dev-dependencies]
 # For tests only
-tracing-subscriber = "0.3.22"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 
 [build-dependencies]
 # For compiling the proto files needed

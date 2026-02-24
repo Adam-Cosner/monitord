@@ -13,12 +13,15 @@ pub(super) struct Collector {
 
 impl Collector {
     pub fn new() -> Self {
+        tracing::debug!("Initializing AMD GPU collector");
         Collector {
             app: std::collections::HashMap::new(),
         }
     }
 
     pub fn collect(&mut self, path: &PathBuf) -> anyhow::Result<super::Snapshot> {
+        let amd_bench = std::time::Instant::now();
+        tracing::trace!("Collecting metrics for amdgpu device {}", path.display());
         let (app, timestamp) = self.app.entry(path.clone()).or_insert_with(|| {
             let dev_path = path.join("device");
             let device_link = std::fs::read_link(dev_path)
@@ -168,6 +171,12 @@ impl Collector {
             .collect();
 
         *timestamp = std::time::Instant::now();
+
+        tracing::trace!(
+            "Collected metrics for amdgpu device {} in {:?}",
+            path.display(),
+            amd_bench.elapsed()
+        );
 
         Ok(super::Snapshot {
             brand_name,

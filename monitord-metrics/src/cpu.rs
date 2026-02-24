@@ -40,6 +40,7 @@ pub struct Collector {
 impl Collector {
     /// Create a new instance of the collector
     pub fn new() -> Self {
+        tracing::info!("Creating CPU collector");
         Self {
             last: None,
             temp_path: None,
@@ -50,13 +51,19 @@ impl Collector {
     /// Collects a Vec of `cpu::Snapshot`s that is separated by socket.
     /// Returns an empty Vec on first call, on subsequent calls it returns `cpu::Snapshot`s for each CPU socket
     pub fn collect(&mut self) -> anyhow::Result<Vec<Snapshot>> {
+        tracing::debug!("Collecting CPU metrics");
+
+        let stat_bench = std::time::Instant::now();
         let stat = procfs::KernelStats::current()
             .with_context(|| format!("{} at {}", file!(), line!()))?;
+        tracing::trace!("Read /proc/stat in {:?}", stat_bench.elapsed());
 
         match &mut self.last {
             Some(stat_last) => {
+                let cpuinfo_bench = std::time::Instant::now();
                 let cpu_info = procfs::CpuInfo::current()
                     .with_context(|| format!("{} at {}", file!(), line!()))?;
+                tracing::trace!("Read /proc/cpuinfo in {:?}", cpuinfo_bench.elapsed());
 
                 let mut cpus = vec![None, None];
                 for i in 0..cpu_info.num_cores() {
@@ -116,6 +123,7 @@ impl Collector {
                 Ok(cpus.into_iter().filter_map(|x| x).collect())
             }
             None => {
+                tracing::debug!("Previous metrics not available, returning empty");
                 self.last = Some(stat);
 
                 Ok(vec![])

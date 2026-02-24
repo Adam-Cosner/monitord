@@ -14,6 +14,7 @@ pub(super) struct Collector {
 
 impl Collector {
     pub fn new() -> Self {
+        tracing::debug!("Initializing NVIDIA GPU collector");
         Collector {
             nvml: std::cell::OnceCell::new(),
         }
@@ -36,6 +37,8 @@ impl Collector {
 
     // Returns an error if there's an actual NVML error so it can be logged, but if there's no NVML, just return an empty GPU snapshot
     fn collect_nvidia(&mut self, path: &PathBuf) -> anyhow::Result<super::Snapshot> {
+        let nvml_bench = std::time::Instant::now();
+        tracing::trace!("Collecting metrics for nvidia device {}", path.display());
         let nvml = self.nvml.get_or_init(|| {
             nvml_wrapper::Nvml::init()
                 .with_context(|| "Failed to initialize NVML")
@@ -110,6 +113,12 @@ impl Collector {
                     })
                 }
 
+                tracing::trace!(
+                    "Collected metrics for nvidia device {} in {:?}",
+                    path.display(),
+                    nvml_bench.elapsed()
+                );
+
                 Ok(Snapshot {
                     brand_name,
                     kernel_driver,
@@ -136,7 +145,8 @@ impl Collector {
         }
     }
 
-    fn collect_nouveau(&mut self, _path: &PathBuf) -> anyhow::Result<super::Snapshot> {
+    fn collect_nouveau(&mut self, path: &PathBuf) -> anyhow::Result<super::Snapshot> {
+        tracing::trace!("Collecting metrics for nouveau device {}", path.display());
         Err(anyhow::anyhow!("nouveau not yet implemented"))
     }
 }
