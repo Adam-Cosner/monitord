@@ -136,7 +136,7 @@ impl Collector {
         }
     }
 
-    fn collect_nouveau(&mut self, path: &PathBuf) -> anyhow::Result<super::Snapshot> {
+    fn collect_nouveau(&mut self, _path: &PathBuf) -> anyhow::Result<super::Snapshot> {
         Err(anyhow::anyhow!("nouveau not yet implemented"))
     }
 }

@@ -16,7 +16,7 @@ impl Collector {
         }
     }
 
-    pub fn collect(&mut self, path: &PathBuf) -> anyhow::Result<super::Snapshot> {
+    pub fn collect(&mut self, _path: &PathBuf) -> anyhow::Result<super::Snapshot> {
         // Implementation for collecting data
         Err(anyhow::anyhow!("intel not yet implemented"))
     }
