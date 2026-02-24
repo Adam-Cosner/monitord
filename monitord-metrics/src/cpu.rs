@@ -4,24 +4,24 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-/// CPU metric collection
-///
-/// First sample will be empty due to needing two samples to calculate usage values
-///
-/// # Example
-///
-/// ```
-/// let collector = monitord_metrics::cpu::Collector::new();
-/// // The first collect call will return nothing as collection requires a current and last sample to calculate usages
-/// let empty = collector.collect().unwrap();
-/// assert!(empty.is_empty());
-/// std::thread::sleep(std::time::Duration::from_secs(1));
-/// let result = collector.collect().unwrap();
-/// assert!(!empty.is_empty());
-/// ```
+//! CPU metric collection
+//!
+//! First sample will be empty due to needing two samples to calculate usage values
+//!
+//! # Example
+//!
+//! ```
+//! let collector = monitord_metrics::cpu::Collector::new();
+//! // The first collect call will return nothing as collection requires a current and last sample to calculate usages
+//! let empty = collector.collect().unwrap();
+//! assert!(empty.is_empty());
+//! std::thread::sleep(std::time::Duration::from_secs(1));
+//! let result = collector.collect().unwrap();
+//! assert!(!result.is_empty());
+//! ```
+use anyhow::Context;
 use procfs::{Current, CurrentSI};
 use std::path::PathBuf;
-use anyhow::Context;
 
 #[doc(inline)]
 pub use crate::metrics::Cpu as Snapshot;

@@ -4,17 +4,17 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-/// Memory metric collection
-///
-/// # Example
-///
-/// ```
-/// let collector = monitord_metrics::memory::Collector::new();
-/// let result = collector.collect().unwrap();
-/// assert!()
-/// ```
-use procfs::Current;
+//! Memory metric collection
+//!
+//! # Example
+//!
+//! ```
+//! let collector = monitord_metrics::memory::Collector::new();
+//! let result = collector.collect().unwrap();
+//! assert!()
+//! ```
 use anyhow::Context;
+use procfs::Current;
 use std::process::Command;
 
 #[doc(inline)]
@@ -49,9 +49,7 @@ impl Collector {
 
         let (speed, form_factor, ram_type) = match self.sp_rt_ff.clone() {
             Some((speed, form_factor, ram_type)) => (speed, form_factor, ram_type),
-            None => {
-                self.collect_from_udevadm().unwrap_or_default()
-            }
+            None => self.collect_from_udevadm().unwrap_or_default(),
         };
 
         Ok(Snapshot {
@@ -70,30 +68,52 @@ impl Collector {
 
     fn collect_from_udevadm(&mut self) -> anyhow::Result<(u64, String, String)> {
         let mut cmd = Command::new("udevadm");
-        cmd.arg("info").arg("-q").arg("property").arg("-p").arg("/sys/devices/virtual/dmi/id");
+        cmd.arg("info")
+            .arg("-q")
+            .arg("property")
+            .arg("-p")
+            .arg("/sys/devices/virtual/dmi/id");
         cmd.env_remove("LD_PRELOAD");
 
         self.tried_udevadm = true;
 
-        let output = cmd.output().with_context(|| format!("{} on {}", file!(), line!()))?;
-        let stdout = String::from_utf8(output.stdout).with_context(|| format!("{} on {}", file!(), line!()))?;
+        let output = cmd
+            .output()
+            .with_context(|| format!("{} on {}", file!(), line!()))?;
+        let stdout = String::from_utf8(output.stdout)
+            .with_context(|| format!("{} on {}", file!(), line!()))?;
 
         let mut speed = 0;
         let mut form_factor = String::new();
         let mut ram_type = String::new();
         let lines = stdout.lines().collect::<Vec<&str>>();
-        let slot_number = lines.iter().find(|line| line.starts_with("MEMORY_ARRAY_NUM_DEVICES")).map(|line| line.split('=').nth(1).unwrap().parse::<u32>().unwrap_or(0));
+        let slot_number = lines
+            .iter()
+            .find(|line| line.starts_with("MEMORY_ARRAY_NUM_DEVICES"))
+            .map(|line| line.split('=').nth(1).unwrap().parse::<u32>().unwrap_or(0));
 
         // Speed
         for slot_index in 0..slot_number.unwrap_or(0) {
-            if let Some(speed_mts) = lines.iter().find(|line| line.starts_with(format!("MEMORY_DEVICE_{}_SPEED_MTS=", slot_index).as_str())).map(|line| line.split('=').nth(1).unwrap().parse::<u64>().unwrap_or(0)) {
+            if let Some(speed_mts) = lines
+                .iter()
+                .find(|line| {
+                    line.starts_with(format!("MEMORY_DEVICE_{}_SPEED_MTS=", slot_index).as_str())
+                })
+                .map(|line| line.split('=').nth(1).unwrap().parse::<u64>().unwrap_or(0))
+            {
                 speed = core::cmp::max(speed, speed_mts);
             }
         }
 
         // RAM Type
         for slot_index in 0..slot_number.unwrap_or(0) {
-            if let Some(ram_type_value) = lines.iter().find(|line| line.starts_with(format!("MEMORY_DEVICE_{}_TYPE=", slot_index).as_str())).map(|line| line.split('=').nth(1).unwrap()) {
+            if let Some(ram_type_value) = lines
+                .iter()
+                .find(|line| {
+                    line.starts_with(format!("MEMORY_DEVICE_{}_TYPE=", slot_index).as_str())
+                })
+                .map(|line| line.split('=').nth(1).unwrap())
+            {
                 if ram_type_value == "Unknown" {
                     continue;
                 }
@@ -104,7 +124,13 @@ impl Collector {
 
         // Form Factor
         for slot_index in 0..slot_number.unwrap_or(0) {
-            if let Some(form_factor_value) = lines.iter().find(|line| line.starts_with(format!("MEMORY_DEVICE_{}_FORM_FACTOR=", slot_index).as_str())).map(|line| line.split('=').nth(1).unwrap()) {
+            if let Some(form_factor_value) = lines
+                .iter()
+                .find(|line| {
+                    line.starts_with(format!("MEMORY_DEVICE_{}_FORM_FACTOR=", slot_index).as_str())
+                })
+                .map(|line| line.split('=').nth(1).unwrap())
+            {
                 if form_factor_value == "Unknown" {
                     continue;
                 }
@@ -119,8 +145,6 @@ impl Collector {
         Ok((speed, ram_type, form_factor))
     }
 }
-
-
 
 mod tests {
     #[test]

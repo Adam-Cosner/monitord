@@ -76,23 +76,38 @@ message Gpu {
   // The clock of the VRAM
   uint32 memory_clock = 9;
 
-  // Utilization of the video encode/decode engines (if supported)
-  double video_utilization = 10;
-  // The clock of the video encode/decode engines (if supported)
-  uint32 video_clock = 11;
+  // NOTE ABOUT VIDEO ENCODE/DECODE:
+  // AMD reports clock of encode and decode engines separately and utilization is merged
+  // NVIDIA reports utilization of encode and decode engines separately and clock is merged
+
+  // Utilization of the video encode engine (if supported)
+  double encoder_utilization = 10;
+  // Utilization of the video decode engine (if supported)
+  double decoder_utilization = 11;
+  // The clock of the video encode engine(s) (if supported)
+  uint32 encoder_clock = 12;
+  // The clock of the video decode engine(s) (if supported)
+  uint32 decoder_clock = 13;
 
   // Power and temperatures
-  uint32 power_milliwatt = 12;
-  uint32 temperature = 13;
+  uint32 power_milliwatt = 14;
+  // Temperature of the GPU in degrees Celsius
+  int32 temperature = 15;
 
   // Process information
-  repeated GpuProcess processes = 14;
+  repeated GpuProcess processes = 16;
 }
 message GpuProcess {
+  // Process ID
   uint32 pid = 1;
+  // Total graphics utilization
   double graphics_utilization = 2;
+  // VRAM allocated to the process
   uint64 memory_usage = 3;
-  double video_utilization = 4;
+  // Total video encode utilization (if supported)
+  double encode_utilization = 4;
+  // Total video decode utilization (if supported)
+  double decode_utilization = 5;
 }
 
 // === Storage ===

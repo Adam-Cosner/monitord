@@ -4,6 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 pub mod cpu;
+pub mod gpu;
 pub mod memory;
 
 mod metrics {

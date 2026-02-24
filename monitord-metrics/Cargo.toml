@@ -9,12 +9,29 @@ edition = "2024"
 license = "MPL-2.0"
 
 [dependencies]
+# For the proto files
 prost = "0.14"
 tonic = "0.14"
+# To parse the /proc directory
 procfs = "0.18"
+# Error handling
 anyhow = "1.0"
+# Logging
 tracing = "0.1"
-dmidecode = "1.0"
+# NVIDIA GPU
+nvml-wrapper = "0.12.0"
+# AMD GPU
+libamdgpu_top = "0.11.2"
+# For getting OpenGL and Vulkan info
+wgpu = { version = "28.0.0", default-features = false, features = ["vulkan", "gles", "std"] }
+# To run async commands instantly
+pollster = "0.4.0"
+amdgpu_top_json = "0.11.2"
+
+[dev-dependencies]
+# For tests only
+tracing-subscriber = "0.3.22"
 
 [build-dependencies]
+# For compiling the proto files needed
 tonic-prost-build = "0.14"

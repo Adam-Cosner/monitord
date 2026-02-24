@@ -5,6 +5,5 @@
  */
 
 pub mod disk;
-pub mod gpu;
 pub mod net;
 pub mod proc;
