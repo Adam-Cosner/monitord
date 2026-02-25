@@ -7,6 +7,17 @@
 use tonic_prost_build::configure;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    configure().compile_protos(&["../proto/metrics.proto"], &["../proto"])?;
+    configure().compile_protos(
+        &[
+            "../proto/metrics/metrics.proto",
+            "../proto/metrics/cpu.proto",
+            "../proto/metrics/gpu.proto",
+            "../proto/metrics/memory.proto",
+            "../proto/metrics/network.proto",
+            "../proto/metrics/storage.proto",
+            "../proto/metrics/process.proto",
+        ],
+        &["../proto"],
+    )?;
     Ok(())
 }

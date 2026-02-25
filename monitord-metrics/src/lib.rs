@@ -7,6 +7,24 @@ pub mod cpu;
 pub mod gpu;
 pub mod memory;
 
-mod metrics {
+pub(crate) mod metrics {
+    pub mod cpu {
+        tonic::include_proto!("metrics.cpu");
+    }
+    pub mod gpu {
+        tonic::include_proto!("metrics.gpu");
+    }
+    pub mod memory {
+        tonic::include_proto!("metrics.memory");
+    }
+    pub mod network {
+        tonic::include_proto!("metrics.network");
+    }
+    pub mod storage {
+        tonic::include_proto!("metrics.storage");
+    }
+    pub mod process {
+        tonic::include_proto!("metrics.process");
+    }
     tonic::include_proto!("metrics");
 }

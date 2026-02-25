@@ -18,7 +18,7 @@ use procfs::Current;
 use std::process::Command;
 
 #[doc(inline)]
-pub use crate::metrics::Memory as Snapshot;
+pub use crate::metrics::memory::Snapshot;
 
 /// The metric collector, create an instance with `memory::Collector::new()` and collect with `collector.collect()`
 pub struct Collector {

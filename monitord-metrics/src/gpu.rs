@@ -22,9 +22,9 @@ use anyhow::Context;
 use std::path::PathBuf;
 
 #[doc(inline)]
-pub use crate::metrics::Gpu as Snapshot;
+pub use crate::metrics::gpu::Process;
 #[doc(inline)]
-pub use crate::metrics::GpuProcess as Process;
+pub use crate::metrics::gpu::Snapshot;
 
 pub struct Collector {
     gpus: Vec<Gpu>,
@@ -117,7 +117,7 @@ impl Collector {
                 };
 
                 // Get OpenGL and Vulkan drivers
-                let (opengl_driver, vulkan_driver) = get_oglv_driver(&path, &vendor);
+                let (opengl_driver, vulkan_driver) = get_opengl_vulkan_drivers(&path, &vendor);
 
                 tracing::trace!(
                     "Found a {} GPU at {}, OpenGL: {}, Vulkan: {}",
@@ -142,7 +142,7 @@ impl Collector {
     }
 }
 
-fn get_oglv_driver(path: &PathBuf, vendor: &GpuVendor) -> (String, String) {
+fn get_opengl_vulkan_drivers(path: &PathBuf, vendor: &GpuVendor) -> (String, String) {
     let driver_bench = std::time::Instant::now();
     tracing::debug!("Getting OpenGL and Vulkan drivers for GPU {:?}", path);
     let device_path = path.join("device");
@@ -153,6 +153,7 @@ fn get_oglv_driver(path: &PathBuf, vendor: &GpuVendor) -> (String, String) {
             .file_name()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_default();
+
         let instance_descriptor = wgpu::InstanceDescriptor {
             backends: wgpu::Backends::VULKAN | wgpu::Backends::GL,
             flags: wgpu::InstanceFlags::empty(),
@@ -170,7 +171,7 @@ fn get_oglv_driver(path: &PathBuf, vendor: &GpuVendor) -> (String, String) {
 
         for adapter in adapters {
             let adapter_info = adapter.get_info();
-            // Special case: Zink!
+            // Special case: Zink
             if adapter_info.name.contains("zink") {
                 gl = format!("[zink] {}", adapter_info.driver_info);
             }
