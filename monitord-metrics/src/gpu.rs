@@ -22,19 +22,21 @@ use anyhow::Context;
 use std::path::PathBuf;
 
 #[doc(inline)]
+pub use crate::metrics::gpu::Gpu;
+#[doc(inline)]
 pub use crate::metrics::gpu::Process;
 #[doc(inline)]
 pub use crate::metrics::gpu::Snapshot;
 
 pub struct Collector {
-    gpus: Vec<Gpu>,
+    gpus: Vec<GpuCache>,
     // Fields tba
     nvidia: nvidia::Collector,
     intel: intel::Collector,
     amd: amd::Collector,
 }
 
-struct Gpu {
+struct GpuCache {
     path: PathBuf,
     vendor: GpuVendor,
     opengl_driver: String,
@@ -69,8 +71,8 @@ impl Collector {
         }
     }
 
-    pub fn collect(&mut self) -> anyhow::Result<Vec<Snapshot>> {
-        let mut snapshots = Vec::new();
+    pub fn collect(&mut self) -> anyhow::Result<Snapshot> {
+        let mut gpus = Vec::new();
         if self.gpus.is_empty() {
             self.gpus = Self::enumerate_devices()?;
         }
@@ -85,16 +87,16 @@ impl Collector {
                 Ok(mut snapshot) => {
                     snapshot.opengl_driver = gpu.opengl_driver.clone();
                     snapshot.vulkan_driver = gpu.vulkan_driver.clone();
-                    snapshots.push(snapshot)
+                    gpus.push(snapshot)
                 }
                 Err(e) => tracing::warn!("Failed to collect a GPU's metrics: {}", e),
             };
         }
-        Ok(snapshots)
+        Ok(Snapshot { gpus })
     }
 
     // Iterates over /sys/class/drm to find the GPU devices. This is the best way to get them in a consistent order.
-    fn enumerate_devices() -> anyhow::Result<Vec<Gpu>> {
+    fn enumerate_devices() -> anyhow::Result<Vec<GpuCache>> {
         let enumerate_bench = std::time::Instant::now();
         tracing::debug!("Enumerating GPU device paths");
         let mut paths = Vec::new();
@@ -126,7 +128,7 @@ impl Collector {
                     opengl_driver,
                     vulkan_driver
                 );
-                paths.push(Gpu {
+                paths.push(GpuCache {
                     path,
                     vendor,
                     opengl_driver,
@@ -224,7 +226,7 @@ mod tests {
         let _ = collector.collect()?;
         std::thread::sleep(std::time::Duration::from_secs(1));
         let second = collector.collect()?;
-        for gpu in second.iter() {
+        for gpu in second.gpus.iter() {
             println!("GPU {}", gpu.brand_name);
             println!("  {}% Graphics", gpu.graphics_utilization);
             for proc in gpu.processes.iter() {

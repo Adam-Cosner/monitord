@@ -6,7 +6,6 @@
 
 mod config;
 mod error;
-mod metrics;
 mod server;
 mod transport {
     mod control {

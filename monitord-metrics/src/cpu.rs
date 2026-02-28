@@ -19,9 +19,6 @@
 //! let result = collector.collect().unwrap();
 //! assert!(!result.is_empty());
 //! ```
-use anyhow::Context;
-use procfs::{Current, CurrentSI};
-use std::path::PathBuf;
 
 #[doc(inline)]
 pub use crate::metrics::cpu::Snapshot;

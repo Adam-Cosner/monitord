@@ -19,7 +19,7 @@ impl Collector {
         }
     }
 
-    pub fn collect(&mut self, path: &PathBuf) -> anyhow::Result<super::Snapshot> {
+    pub fn collect(&mut self, path: &PathBuf) -> anyhow::Result<super::Gpu> {
         let amd_bench = std::time::Instant::now();
         tracing::trace!("Collecting metrics for amdgpu device {}", path.display());
         let (app, timestamp) = self.app.entry(path.clone()).or_insert_with(|| {
@@ -178,7 +178,7 @@ impl Collector {
             amd_bench.elapsed()
         );
 
-        Ok(super::Snapshot {
+        Ok(super::Gpu {
             brand_name,
             kernel_driver,
             opengl_driver: "".to_string(),

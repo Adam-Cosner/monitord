@@ -8,23 +8,27 @@ pub mod gpu;
 pub mod memory;
 
 pub(crate) mod metrics {
-    pub mod cpu {
-        tonic::include_proto!("metrics.cpu");
+    pub mod v1 {
+        pub mod cpu {
+            tonic::include_proto!("metrics.v1.cpu");
+        }
+        pub mod gpu {
+            tonic::include_proto!("metrics.v1.gpu");
+        }
+        pub mod memory {
+            tonic::include_proto!("metrics.v1.memory");
+        }
+        pub mod network {
+            tonic::include_proto!("metrics.v1.network");
+        }
+        pub mod storage {
+            tonic::include_proto!("metrics.v1.storage");
+        }
+        pub mod process {
+            tonic::include_proto!("metrics.v1.process");
+        }
+        tonic::include_proto!("metrics.v1");
     }
-    pub mod gpu {
-        tonic::include_proto!("metrics.gpu");
-    }
-    pub mod memory {
-        tonic::include_proto!("metrics.memory");
-    }
-    pub mod network {
-        tonic::include_proto!("metrics.network");
-    }
-    pub mod storage {
-        tonic::include_proto!("metrics.storage");
-    }
-    pub mod process {
-        tonic::include_proto!("metrics.process");
-    }
-    tonic::include_proto!("metrics");
+    //#[cfg(feature = "protov1")]
+    pub use v1::*;
 }

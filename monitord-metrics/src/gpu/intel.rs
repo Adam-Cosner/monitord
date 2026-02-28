@@ -17,7 +17,7 @@ impl Collector {
         }
     }
 
-    pub fn collect(&mut self, path: &PathBuf) -> anyhow::Result<super::Snapshot> {
+    pub fn collect(&mut self, path: &PathBuf) -> anyhow::Result<super::Gpu> {
         let driver_path = path.join("device/device/driver");
         if let Ok(driver_link) = std::fs::read_link(driver_path) {
             if driver_link.file_name().is_some_and(|name| name == "i915") {
@@ -40,13 +40,13 @@ impl Collector {
         }
     }
 
-    fn collect_i915(&mut self, path: &PathBuf) -> anyhow::Result<super::Snapshot> {
+    fn collect_i915(&mut self, path: &PathBuf) -> anyhow::Result<super::Gpu> {
         tracing::trace!("Collecting metrics for i915 device {}", path.display());
         // Implementation for collecting data for i915 driver
         Err(anyhow::anyhow!("i915 not yet implemented"))
     }
 
-    fn collect_xe(&mut self, path: &PathBuf) -> anyhow::Result<super::Snapshot> {
+    fn collect_xe(&mut self, path: &PathBuf) -> anyhow::Result<super::Gpu> {
         tracing::trace!("Collecting metrics for xe device {}", path.display());
         // Implementation for collecting data for xe driver
         Err(anyhow::anyhow!("xe not yet implemented"))

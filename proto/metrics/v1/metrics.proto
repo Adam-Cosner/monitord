@@ -5,22 +5,22 @@
  */
 
 syntax = "proto3";
-package metrics;
+package metrics.v1;
 
-import "metrics/cpu.proto";
-import "metrics/gpu.proto";
-import "metrics/memory.proto";
-import "metrics/network.proto";
-import "metrics/process.proto";
-import "metrics/storage.proto";
+import "metrics/v1/cpu.proto";
+import "metrics/v1/gpu.proto";
+import "metrics/v1/memory.proto";
+import "metrics/v1/network.proto";
+import "metrics/v1/process.proto";
+import "metrics/v1/storage.proto";
 
 message Report {
-  metrics.cpu.Snapshot cpu = 1;
-  metrics.memory.Snapshot memory = 2;
-  metrics.gpu.Snapshot gpu = 3;
-  metrics.network.Snapshot network = 4;
-  metrics.storage.Snapshot storage = 5;
-  metrics.process.Snapshot process = 6;
+  cpu.Snapshot cpu = 1;
+  memory.Snapshot memory = 2;
+  gpu.Snapshot gpu = 3;
+  network.Snapshot network = 4;
+  storage.Snapshot storage = 5;
+  process.Snapshot process = 6;
 }
 
 // // === Storage ===

@@ -9,13 +9,13 @@ use tonic_prost_build::configure;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     configure().compile_protos(
         &[
-            "../proto/metrics/metrics.proto",
-            "../proto/metrics/cpu.proto",
-            "../proto/metrics/gpu.proto",
-            "../proto/metrics/memory.proto",
-            "../proto/metrics/network.proto",
-            "../proto/metrics/storage.proto",
-            "../proto/metrics/process.proto",
+            "../proto/metrics/v1/metrics.proto",
+            "../proto/metrics/v1/cpu.proto",
+            "../proto/metrics/v1/gpu.proto",
+            "../proto/metrics/v1/memory.proto",
+            "../proto/metrics/v1/network.proto",
+            "../proto/metrics/v1/storage.proto",
+            "../proto/metrics/v1/process.proto",
         ],
         &["../proto"],
     )?;

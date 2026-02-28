@@ -1,0 +1,50 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
+syntax = "proto3";
+package control.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// === Core Service ===
+service ControlService {
+  rpc OpenNet(OpenNetRequest) returns (OpenNetResponse);
+  rpc FlushKeys(FlushKeysRequest) returns (FlushKeysResponse);
+  rpc DumpConnections(DumpConnectionsRequest) returns (DumpConnectionsResponse);
+}
+
+// === Open to network ===
+message OpenNetRequest {
+  string password = 1;
+  google.protobuf.Duration key_expiration = 2;
+  optional google.protobuf.Duration net_expiration = 3; // How long should the daemon be open to the network
+}
+message OpenNetResponse {
+  bool success = 1;
+}
+
+// === Flush Keys ===
+message FlushKeysRequest {
+  optional google.protobuf.Timestamp older_than = 1;
+  optional google.protobuf.Timestamp newer_than = 2;
+}
+message FlushKeysResponse {
+  bool success = 1;
+}
+
+// === Connection Dumping ===
+message DumpConnectionsRequest {}
+message DumpConnectionsResponse {
+  repeated ConnectionDump connection_dumps = 1;
+}
+message ConnectionDump {
+  google.protobuf.Timestamp connection_begin = 1;
+  string connection_address = 2;
+  google.protobuf.Duration report_interval = 3;
+  google.protobuf.Timestamp last_successful_publish = 4;
+  string connection_uuid = 5;
+}

@@ -5,8 +5,6 @@
  */
 
 syntax = "proto3";
-package metrics.process;
+package metrics.v1.network;
 
-message Snapshot {
-
-}
+message Snapshot {}

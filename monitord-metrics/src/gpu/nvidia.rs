@@ -6,8 +6,6 @@
 use anyhow::Context;
 use std::path::PathBuf;
 
-use super::{Process, Snapshot};
-
 pub(super) struct Collector {
     nvml: std::cell::OnceCell<anyhow::Result<nvml_wrapper::Nvml>>,
 }
@@ -20,7 +18,7 @@ impl Collector {
         }
     }
 
-    pub fn collect(&mut self, path: &PathBuf) -> anyhow::Result<super::Snapshot> {
+    pub fn collect(&mut self, path: &PathBuf) -> anyhow::Result<super::Gpu> {
         let driver_path = path.join("device/device/driver");
         if let Ok(driver_link) = std::fs::read_link(driver_path) {
             if driver_link.file_name().is_some_and(|name| name == "nvidia") {
@@ -36,7 +34,7 @@ impl Collector {
     }
 
     // Returns an error if there's an actual NVML error so it can be logged, but if there's no NVML, just return an empty GPU snapshot
-    fn collect_nvidia(&mut self, path: &PathBuf) -> anyhow::Result<super::Snapshot> {
+    fn collect_nvidia(&mut self, path: &PathBuf) -> anyhow::Result<super::Gpu> {
         let nvml_bench = std::time::Instant::now();
         tracing::trace!("Collecting metrics for nvidia device {}", path.display());
         let nvml = self.nvml.get_or_init(|| {
@@ -104,7 +102,7 @@ impl Collector {
                     let encode_utilization = process.enc_util as f64;
                     let decode_utilization = process.dec_util as f64;
 
-                    processes.push(Process {
+                    processes.push(super::Process {
                         pid,
                         graphics_utilization,
                         memory_usage,
@@ -119,7 +117,7 @@ impl Collector {
                     nvml_bench.elapsed()
                 );
 
-                Ok(Snapshot {
+                Ok(super::Gpu {
                     brand_name,
                     kernel_driver,
                     opengl_driver: "".to_string(),
@@ -145,7 +143,7 @@ impl Collector {
         }
     }
 
-    fn collect_nouveau(&mut self, path: &PathBuf) -> anyhow::Result<super::Snapshot> {
+    fn collect_nouveau(&mut self, path: &PathBuf) -> anyhow::Result<super::Gpu> {
         tracing::trace!("Collecting metrics for nouveau device {}", path.display());
         Err(anyhow::anyhow!("nouveau not yet implemented"))
     }
