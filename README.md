@@ -1,5 +1,9 @@
-# MonitorD
+<h1 style="text-align: center;">
+MonitorD
+</h1>
+<p style="text-align: center;">
 An in-development system monitoring daemon for Linux that can locally or remotely fetch system statistics and deliver them to connected clients.
+</p>
 
 ---
 
