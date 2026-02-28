@@ -4,11 +4,15 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-pub struct Config {
-    // nothing yet
+pub mod service {
+    pub mod v1 {
+        tonic::include_proto!("service.v1");
+    }
+    pub use v1::*;
 }
 
-/// Loads the configuration from the specified file path
-pub fn load_config_from_file(file_path: &str) -> Config {
-    todo!("Implement configuration loading from file")
+pub use monitord::metrics;
+
+pub fn main() {
+    println!("This is the daemon, ooo spoooky")
 }

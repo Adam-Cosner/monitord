@@ -5,48 +5,49 @@
  */
 
 syntax = "proto3";
-package service;
+package service.v1;
 
 import "google/protobuf/duration.proto";
-import "metrics/metrics.proto";
+import "google/protobuf/timestamp.proto";
+import "metrics/v1/metrics.proto";
 
 service Monitord {
-    rpc Report(stream ReportRequest) returns (stream ReportResponse);
+  rpc Report(stream ReportRequest) returns (stream ReportResponse);
 }
 
 message ReportRequest {
-    oneof payload {
-        ConnectionRequest request = 1;
-        ClientAck ack = 2;
-    }
+  oneof payload {
+    ConnectionRequest request = 1;
+    ClientAck ack = 2;
+  }
 }
 
 message ConnectionRequest {
-    google.protobuf.Duration interval = 1;
-    bool cpu_per_core = 2;
-    bool gpu_processes = 3;
-    repeated ProcessFilter process_filters = 4;
+  google.protobuf.Duration interval = 1;
+  bool cpu_per_core = 2;
+  bool gpu_processes = 3;
+  repeated ProcessFilter process_filters = 4;
 }
 
 message ProcessFilter {
-    oneof filter {
-        string by_user = 1;
-        PidRange by_pid = 2;
-        string by_name_regex = 3;
-        uint32 by_status = 4;
-    }
+  oneof filter {
+    string by_user = 1;
+    PidRange by_pid = 2;
+    string by_name_regex = 3;
+    uint32 by_status = 4;
+  }
 }
 
 message PidRange {
-    uint32 lower_inclusive = 1;
-    uint32 higher_exclusive = 2;
+  uint32 lower_inclusive = 1;
+  uint32 higher_exclusive = 2;
 }
 
 message ClientAck {
-    bool processed = 1;
+  bool processed = 1;
 }
 
 message ReportResponse {
-    google.protobuf.Timestamp timestamp = 1;
-    metrics.Report report = 2;
+  google.protobuf.Timestamp timestamp = 1;
+  metrics.v1.Report report = 2;
 }

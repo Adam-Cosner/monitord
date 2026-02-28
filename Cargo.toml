@@ -1,8 +1,73 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-[workspace]
-resolver = "3"
-members = ["monitord", "monitordctl", "monitord-metrics", "monitord-client"]
+[package]
+name = "monitord"
+version = "0.1.0"
+edition = "2024"
 license = "MPL-2.0"
+
+[[bin]]
+name = "monitord"
+path = "src/daemon/main.rs"
+required-features = ["daemon"]
+
+[[bin]]
+name = "monitordctl"
+path = "src/control/main.rs"
+required-features = ["control"]
+
+[lib]
+name = "monitord"
+path = "src/lib.rs"
+
+[features]
+default = ["client"]
+# Whether to include metric definitions
+metrics = [
+]
+# Enabled for collector building
+collector = [
+    "metrics",
+    "wgpu",
+    "nvml-wrapper",
+    "libamdgpu_top",
+    "procfs",
+    "pollster"
+]
+# Enabled for client usage
+client = ["metrics"]
+# Enabled for daemon build
+daemon = [
+    "collector",
+    "prost-types",
+    "tonic-prost"
+]
+# Enabled for control utility build
+control = []
+
+
+[dependencies]
+anyhow = "1.0"
+tracing = "0.1"
+tonic = "0.14"
+prost = "0.14"
+
+# Metrics dependencies
+
+# Collector dependencies
+wgpu = { version = "28.0", optional = true, default-features = false, features = ["vulkan", "gles", "std"] }
+nvml-wrapper = { version = "0.12", optional = true }
+libamdgpu_top = { version = "0.11", optional = true }
+procfs = { version = "0.18", optional = true }
+pollster = { version = "0.4", optional = true }
+
+# Daemon dependencies
+prost-types = { version = "0.14", optional = true }
+tonic-prost = { version = "0.14", optional = true }
+
+[build-dependencies]
+tonic-prost-build = "0.14"
+
+[dev-dependencies]
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
