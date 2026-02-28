@@ -1,13 +1,8 @@
-<h1 style="text-align: center;">
-MonitorD
-</h1>
-<p style="text-align: center;">
+<h1 align=center>MonitorD</h1>
 An in-development system monitoring daemon for Linux that can locally or remotely fetch system statistics and deliver them to connected clients.
-</p>
-
----
-
-# Components
+<br>
+<br>
+<h2 align=center>Components</h1>
 
 - ### __monitordctl__: The control utility
 - ### __monitord__: The service binary
