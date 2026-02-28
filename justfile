@@ -13,3 +13,6 @@ build-control:
 
 test-collectors:
     cargo test --release --features=collector
+
+clippy:
+    cargo clippy
