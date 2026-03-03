@@ -50,8 +50,8 @@ impl Collector {
         let swap_capacity = meminfo.swap_total;
         let swap_in_use = meminfo.swap_total - meminfo.swap_free;
 
-        let (speed, form_factor, ram_type) = match self.sp_rt_ff.clone() {
-            Some((speed, form_factor, ram_type)) => (speed, form_factor, ram_type),
+        let (speed, ram_type, form_factor) = match self.sp_rt_ff.clone() {
+            Some((speed, ram_type, form_factor)) => (speed, ram_type, form_factor),
             None => self.collect_from_udevadm().unwrap_or_default(),
         };
 
@@ -145,7 +145,7 @@ impl Collector {
             }
         }
 
-        self.sp_rt_ff = Some((speed.clone(), ram_type.clone(), form_factor.clone()));
+        self.sp_rt_ff = Some((speed, ram_type.clone(), form_factor.clone()));
         tracing::debug!(
             "udevadm command ran successfully, finished in {:?}",
             udevadm_bench.elapsed()
