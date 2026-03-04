@@ -12,7 +12,7 @@ build-control:
     cargo build --release --bin monitordctl --no-default-features --features=control
 
 test-collectors:
-    cargo test --release --features=collector
+    cargo test --release --features=collector -- --show-output
 
 clippy:
     cargo clippy

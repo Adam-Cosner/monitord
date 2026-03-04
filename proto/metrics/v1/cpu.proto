@@ -10,9 +10,9 @@ package metrics.v1.cpu;
 // Represents a single snapshot of the CPU(s) of the system
 message Snapshot {
   // A flat list of the operating system's logical CPUs
-  repeated Logical logical_cpus = 1;
+  repeated Logical logical = 1;
   // The physical topology of the CPU(s) of the system
-  repeated Package sockets = 2;
+  repeated Physical physical = 2;
 }
 
 // The operating system's logical CPUs
@@ -23,7 +23,7 @@ message Logical {
 }
 
 // A physical CPU package
-message Package {
+message Physical {
   uint32 package_id = 1;
 
   // Global hardware identification
@@ -36,17 +36,18 @@ message Package {
   string microcode_version = 7;
   string cpufreq_driver = 8;
   string cpufreq_governor = 9;
+  optional string cpufreq_mode = 10;
 
-  float package_temperature_c = 10;
-  float package_power_w = 11;
+  optional float package_temperature_c = 11;
+  optional float package_power_w = 12;
 
-  repeated Cluster clusters = 12;
+  repeated Cluster clusters = 13;
 }
 
 // A physical CPU cluster/die (CCDs on AMD)
 message Cluster {
   uint32 cluster_id = 1;
-  float cluster_temperature_c = 2;
+  optional float cluster_temperature_c = 2;
 
   repeated CorePhysical cores = 3;
   repeated Cache shared_caches = 4;
@@ -58,14 +59,17 @@ message CorePhysical {
   uint32 base_freq_mhz = 2;
   uint32 max_freq_mhz = 3;
 
-  repeated CoreLogical logical_cores = 4;
-  repeated Cache private_caches = 5;
+  // Intel coretemp is currently the only one I'm aware of that provides core temperature
+  optional float core_temperature_c = 4;
+
+  repeated CoreLogical logical_cores = 5;
+  repeated Cache private_caches = 6;
 }
 
 // A logical CPU core
 message CoreLogical {
   uint32 os_cpu_id = 1;
-  uint32 core_index = 2;
+  uint32 core_index = 2; // specifically if this is thread 0 or thread 1 in the core
 }
 
 // CPU cache
