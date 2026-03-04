@@ -370,7 +370,6 @@ mod cached {
             let cpuinfo = procfs::CpuInfo::current()?;
             for i in 0..cpuinfo.num_cores() {
                 let cpu_loc = topo.cpu_insert(&cpuinfo, i);
-                println!("Inserting loc: {:?}", cpu_loc);
                 topo.os_cpu_id_to_location.insert(i as u32, cpu_loc);
             }
 
