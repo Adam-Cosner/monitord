@@ -220,7 +220,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_gpu() -> Result<(), Box<dyn std::error::Error>> {
+    fn gpu() -> Result<(), Box<dyn std::error::Error>> {
         tracing_subscriber::fmt::init();
         let mut collector = Collector::new();
         let _ = collector.collect()?;

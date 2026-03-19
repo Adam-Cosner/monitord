@@ -3,12 +3,5 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-#[cfg(feature = "collector")]
-pub mod cpu;
-#[cfg(feature = "collector")]
-pub mod gpu;
-#[cfg(feature = "collector")]
-pub mod memory;
 
-#[cfg(feature = "collector")]
-pub(crate) mod helpers;
+pub(crate) mod sysfs;

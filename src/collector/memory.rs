@@ -157,7 +157,7 @@ impl Collector {
 
 mod tests {
     #[test]
-    fn test_memory_snapshot() -> anyhow::Result<()> {
+    fn memory() -> anyhow::Result<()> {
         let mut collector = super::Collector::new();
         let snapshot = collector.collect()?;
         println!("{:?}", snapshot);

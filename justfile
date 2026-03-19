@@ -11,6 +11,9 @@ build-daemon:
 build-control:
     cargo build --release --bin monitordctl --no-default-features --features=control
 
+test TEST:
+    RUST_LOG=debug cargo test {{ TEST }} --release --features=collector -- --show-output
+
 test-collectors:
     cargo test --release --features=collector -- --show-output
 

@@ -12,7 +12,7 @@ message Snapshot {
   // A flat list of the operating system's logical CPUs
   repeated Logical logical = 1;
   // The physical topology of the CPU(s) of the system
-  repeated Physical physical = 2;
+  repeated Package packages = 2;
 }
 
 // The operating system's logical CPUs
@@ -23,7 +23,7 @@ message Logical {
 }
 
 // A physical CPU package
-message Physical {
+message Package {
   uint32 package_id = 1;
 
   // Global hardware identification
@@ -49,12 +49,12 @@ message Cluster {
   uint32 cluster_id = 1;
   optional float cluster_temperature_c = 2;
 
-  repeated CorePhysical cores = 3;
+  repeated Core cores = 3;
   repeated Cache shared_caches = 4;
 }
 
 // A physical CPU core
-message CorePhysical {
+message Core {
   uint32 core_id = 1;
   uint32 base_freq_mhz = 2;
   uint32 max_freq_mhz = 3;
@@ -62,12 +62,12 @@ message CorePhysical {
   // Intel coretemp is currently the only one I'm aware of that provides core temperature
   optional float core_temperature_c = 4;
 
-  repeated CoreLogical logical_cores = 5;
+  repeated Thread threads = 5;
   repeated Cache private_caches = 6;
 }
 
 // A logical CPU core
-message CoreLogical {
+message Thread {
   uint32 os_cpu_id = 1;
   uint32 core_index = 2; // specifically if this is thread 0 or thread 1 in the core
 }
