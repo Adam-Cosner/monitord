@@ -4,7 +4,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-use std::{collections::BTreeMap, path::PathBuf, time::Instant};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+    time::Instant,
+};
 
 use crate::collector::helpers::sysfs;
 
@@ -385,7 +389,7 @@ fn read_hwmon_power(path: &PathBuf) -> Option<f32> {
         .map(|w| w as f32)
 }
 
-fn read_thermal_zone_temp(zone: &PathBuf) -> Option<f32> {
+fn read_thermal_zone_temp(zone: &Path) -> Option<f32> {
     // thermal zone temperatures are in millidegrees Celsius
     sysfs::read_u32(&zone.join("temp")).map(|milli| milli as f32 / 1000.0)
 }

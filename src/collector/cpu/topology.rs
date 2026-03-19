@@ -4,7 +4,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 //! CPU topology discovery and cache
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 use procfs::Current;
 
@@ -115,10 +118,7 @@ impl Topology {
             .entry(package_id)
             .or_insert_with(|| Package::from_cpuinfo(cpuinfo, cpu_idx));
 
-        let cluster = pkg
-            .clusters
-            .entry(cluster_id)
-            .or_insert_with(Cluster::default);
+        let cluster = pkg.clusters.entry(cluster_id).or_default();
 
         let core = cluster
             .cores
@@ -205,7 +205,7 @@ impl Topology {
 
     // Returns: (package_id, cluster_id, core_id, thread_count)
     fn locate_cpu(&self, cpu_idx: u32) -> Option<(u32, u32, u32, u32)> {
-        let os_id = cpu_idx as u32;
+        let os_id = cpu_idx;
         for (&pkg_id, pkg) in &self.packages {
             for (&cl_id, cluster) in &pkg.clusters {
                 for (&core_id, core) in &cluster.cores {
@@ -225,11 +225,11 @@ impl Package {
         let vendor_id = cpuinfo
             .vendor_id(cpu_idx)
             .map(|v| v.to_string())
-            .unwrap_or_else(String::new);
+            .unwrap_or_default();
         let model_name = cpuinfo
             .model_name(cpu_idx)
             .map(|v| v.to_string())
-            .unwrap_or_else(String::new);
+            .unwrap_or_default();
         let family = cpuinfo
             .get_field(cpu_idx, "cpu family")
             .and_then(|v| v.parse::<u32>().ok())
@@ -245,7 +245,7 @@ impl Package {
         let microcode_version = cpuinfo
             .get_field(cpu_idx, "microcode")
             .map(|v| v.to_string())
-            .unwrap_or_else(String::new);
+            .unwrap_or_default();
         let (cpufreq_driver, cpufreq_governor, cpufreq_mode) =
             sysfs::get_cpufreq_info(cpu_idx as u32);
 
@@ -284,7 +284,7 @@ impl Core {
 }
 
 impl Cache {
-    fn from_sysfs(path: &PathBuf) -> Option<Self> {
+    fn from_sysfs(path: &Path) -> Option<Self> {
         let level = sysfs::read_u32(&path.join("level")).unwrap_or(0);
         let cache_type =
             CacheType::from_string(&sysfs::read_string(&path.join("type")).unwrap_or_default());

@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 use libamdgpu_top::AMDGPU::MetricsInfo;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 pub(super) struct Collector {
@@ -19,16 +19,16 @@ impl Collector {
         }
     }
 
-    pub fn collect(&mut self, path: &PathBuf) -> anyhow::Result<super::Gpu> {
+    pub fn collect(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
         let amd_bench = std::time::Instant::now();
         tracing::trace!("Collecting metrics for amdgpu device {}", path.display());
-        let (app, timestamp) = self.app.entry(path.clone()).or_insert_with(|| {
+        let (app, timestamp) = self.app.entry(PathBuf::from(path)).or_insert_with(|| {
             let dev_path = path.join("device");
             let device_link = std::fs::read_link(dev_path)
                 .expect("Could not read device link, your sysfs is either broken or weird, please report this!")
                 .file_name()
                 .map(|file| file.to_string_lossy().to_string())
-                .unwrap_or_else(|| "".to_string());
+                .unwrap_or_default();
             let pci_bus = libamdgpu_top::PCI::BUS_INFO::from_str(device_link.as_str()).expect("Could not parse PCI Bus ID, your sysfs is either broken or weird, please report this!");
             let mut device_path = libamdgpu_top::DevicePath::try_from(pci_bus).expect("Could not get /sys paths from the PCI Bus ID, your sysfs is either broken or weird, please report this!");
             device_path.libdrm_amdgpu = libamdgpu_top::LibDrmAmdgpu::new().ok();
@@ -123,9 +123,9 @@ impl Collector {
             .as_ref()
             .map(|sensors| {
                 if let Some(average) = &sensors.average_power {
-                    average.value as u32
+                    average.value
                 } else if let Some(input) = &sensors.input_power {
-                    input.value as u32
+                    input.value
                 } else {
                     0
                 }

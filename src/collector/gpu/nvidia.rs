@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 use anyhow::Context;
-use std::path::PathBuf;
+use std::path::Path;
 
 pub(super) struct Collector {
     nvml: std::cell::OnceCell<anyhow::Result<nvml_wrapper::Nvml>>,
@@ -18,7 +18,7 @@ impl Collector {
         }
     }
 
-    pub fn collect(&mut self, path: &PathBuf) -> anyhow::Result<super::Gpu> {
+    pub fn collect(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
         let driver_path = path.join("device/device/driver");
         if let Ok(driver_link) = std::fs::read_link(driver_path) {
             if driver_link.file_name().is_some_and(|name| name == "nvidia") {
@@ -34,7 +34,7 @@ impl Collector {
     }
 
     // Returns an error if there's an actual NVML error so it can be logged, but if there's no NVML, just return an empty GPU snapshot
-    fn collect_nvidia(&mut self, path: &PathBuf) -> anyhow::Result<super::Gpu> {
+    fn collect_nvidia(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
         let nvml_bench = std::time::Instant::now();
         tracing::trace!("Collecting metrics for nvidia device {}", path.display());
         let nvml = self.nvml.get_or_init(|| {
@@ -69,7 +69,7 @@ impl Collector {
 
                 let (memory_capacity, memory_usage) = device
                     .memory_info()
-                    .map(|info| (info.total as u64, info.used as u64))
+                    .map(|info| (info.total, info.used))
                     .unwrap_or_default();
                 let memory_clock = device.clock_info(Clock::Memory).unwrap_or_default();
 
@@ -143,7 +143,7 @@ impl Collector {
         }
     }
 
-    fn collect_nouveau(&mut self, path: &PathBuf) -> anyhow::Result<super::Gpu> {
+    fn collect_nouveau(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
         tracing::trace!("Collecting metrics for nouveau device {}", path.display());
         Err(anyhow::anyhow!("nouveau not yet implemented"))
     }

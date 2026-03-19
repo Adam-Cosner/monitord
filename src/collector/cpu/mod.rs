@@ -32,6 +32,12 @@ pub struct Collector {
     sensors: sensors::Tracker,
 }
 
+impl Default for Collector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Collector {
     pub fn new() -> Self {
         tracing::info!("Creating CPU collector");
@@ -60,17 +66,19 @@ fn assemble(
     utilization: &utilization::Sample,
     sensors: &sensors::Sample,
 ) -> Snapshot {
-    let mut snapshot = Snapshot::default();
-    snapshot.logical = utilization
-        .per_core
-        .iter()
-        .enumerate()
-        .map(|(os_cpu_id, util)| Logical {
-            os_cpu_id: os_cpu_id as u32,
-            utilization: util.usage,
-            cur_freq_mhz: util.cur_freq_mhz,
-        })
-        .collect::<Vec<_>>();
+    let mut snapshot = Snapshot {
+        logical: utilization
+            .per_core
+            .iter()
+            .enumerate()
+            .map(|(os_cpu_id, util)| Logical {
+                os_cpu_id: os_cpu_id as u32,
+                utilization: util.usage,
+                cur_freq_mhz: util.cur_freq_mhz,
+            })
+            .collect::<Vec<_>>(),
+        packages: Vec::new(),
+    };
     // create the physical part
     for (&package_id, package) in topo.packages.iter() {
         let mut clusters = Vec::new();
@@ -95,7 +103,7 @@ fn assemble(
                     });
                 }
                 cores.push(Core {
-                    core_id: core_id,
+                    core_id,
                     base_freq_mhz: core.base_freq_mhz,
                     max_freq_mhz: core.max_freq_mhz,
                     core_temperature_c: sensors.core_temp((package_id, cluster_id, core_id)),
@@ -114,14 +122,14 @@ fn assemble(
                 });
             }
             clusters.push(Cluster {
-                cluster_id: cluster_id,
+                cluster_id,
                 cluster_temperature_c: sensors.cluster_temp((package_id, cluster_id)),
                 cores,
                 shared_caches,
             });
         }
         snapshot.packages.push(Package {
-            package_id: package_id,
+            package_id,
             vendor_id: package.vendor_id.clone(),
             model_name: package.model_name.clone(),
             family: package.family,
@@ -133,7 +141,7 @@ fn assemble(
             cpufreq_mode: package.cpufreq_mode.clone(),
             package_temperature_c: sensors.package_temp(package_id),
             package_power_w: sensors.package_power(package_id),
-            clusters: clusters,
+            clusters,
         });
     }
     snapshot

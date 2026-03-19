@@ -26,6 +26,12 @@ pub struct Collector {
     tried_udevadm: bool,
 }
 
+impl Default for Collector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Collector {
     /// Create a new instance of the collector
     pub fn new() -> Self {

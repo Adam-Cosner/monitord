@@ -60,6 +60,12 @@ impl std::fmt::Display for GpuVendor {
     }
 }
 
+impl Default for Collector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Collector {
     pub fn new() -> Self {
         tracing::info!("Creating GPU collector");
@@ -179,7 +185,7 @@ fn get_opengl_vulkan_drivers(path: &PathBuf, vendor: &GpuVendor) -> (String, Str
             }
             if adapter_info.device_pci_bus_id == pci_id {
                 if adapter_info.backend == wgpu::Backend::Gl {
-                    gl = format!("{}", adapter_info.driver_info);
+                    gl = adapter_info.driver_info.to_string();
                 } else if adapter_info.backend == wgpu::Backend::Vulkan {
                     vk = format!("[{}] {}", adapter_info.driver, adapter_info.driver_info);
                 }
