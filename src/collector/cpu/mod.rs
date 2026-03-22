@@ -62,12 +62,11 @@ impl Collector {
 
 fn assemble(
     topo: &topology::Topology,
-    utilization: &utilization::Sample,
+    utilization: &Vec<utilization::Utilization>,
     sensors: &sensors::Sample,
 ) -> Snapshot {
     let mut snapshot = Snapshot {
         logical: utilization
-            .per_core
             .iter()
             .enumerate()
             .map(|(os_cpu_id, util)| Logical {

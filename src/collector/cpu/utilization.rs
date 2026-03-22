@@ -7,15 +7,27 @@ use std::path::PathBuf;
  */
 use procfs::CurrentSI;
 
-use crate::collector::helpers::sysfs;
+use crate::collector::helpers::*;
 
 pub struct Tracker {
-    last: Option<procfs::KernelStats>,
+    last: Option<sample::Sample<procfs::KernelStats>>, // not using Sample here because I don't need the timestamp
 }
 
-#[derive(Debug, Clone)]
-pub struct Sample {
-    pub per_core: Vec<Utilization>,
+impl sample::Diffable for procfs::KernelStats {
+    type Delta = Vec<Utilization>;
+
+    fn diff(&self, other: &Self) -> Self::Delta {
+        let mut per_core = Vec::with_capacity(self.cpu_time.len());
+        for i in 0..other.cpu_time.len() {
+            let usage = diff_stats(i, &other, &self);
+            let cur_freq_mhz = get_cur_freq_mhz(i);
+            per_core.push(Utilization {
+                usage,
+                cur_freq_mhz,
+            })
+        }
+        per_core
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -29,21 +41,18 @@ impl Tracker {
         Self { last: None }
     }
 
-    pub fn sample(&mut self) -> anyhow::Result<Sample> {
-        let stat = procfs::KernelStats::current()?;
-        let mut per_core = Vec::with_capacity(stat.cpu_time.len());
-        if let Some(last) = self.last.take() {
-            for i in 0..stat.cpu_time.len() {
-                let usage = diff_stats(i, &last, &stat);
-                let cur_freq_mhz = get_cur_freq_mhz(i);
-                per_core.push(Utilization {
-                    usage,
-                    cur_freq_mhz,
-                })
-            }
-        }
+    pub fn sample(&mut self) -> anyhow::Result<Vec<Utilization>> {
+        let stat = sample::Sample::new(procfs::KernelStats::current()?);
+        let diff = self
+            .last
+            .as_ref()
+            .map(|last| &stat - last)
+            .unwrap_or(sample::Diff {
+                delta: Vec::new(),
+                elapsed: std::time::Duration::from_secs(0),
+            });
         self.last = Some(stat);
-        Ok(Sample { per_core })
+        Ok(diff.delta)
     }
 }
 

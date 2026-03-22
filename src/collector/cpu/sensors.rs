@@ -7,15 +7,14 @@
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
-    time::Instant,
 };
 
-use crate::collector::helpers::{cached::Cached, sysfs};
+use crate::collector::helpers::*;
 
 #[derive(Debug, Clone)]
 pub struct Tracker {
-    sources: Cached<Sources>,
-    last_energy: BTreeMap<u32, EnergyReading>, // for RAPL diff
+    sources: cached::Cached<Sources>,
+    last_energy: BTreeMap<u32, sample::Sample<u64>>, // for RAPL diff
 }
 
 #[derive(Debug, Clone)]
@@ -39,7 +38,7 @@ pub struct Power {
 impl Tracker {
     pub fn new() -> Self {
         Self {
-            sources: Cached::default(),
+            sources: cached::Cached::default(),
             last_energy: BTreeMap::new(),
         }
     }
@@ -85,10 +84,12 @@ impl Sample {
     }
 }
 
-#[derive(Debug, Clone)]
-struct EnergyReading {
-    energy_uj: u64,
-    timestamp: Instant,
+impl sample::Diffable for u64 {
+    type Delta = u64;
+
+    fn diff(&self, other: &Self) -> Self::Delta {
+        self - other
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -171,9 +172,8 @@ impl Sources {
 
     fn read_power(
         &mut self,
-        last_energy: &BTreeMap<u32, EnergyReading>,
-    ) -> (Power, BTreeMap<u32, EnergyReading>) {
-        let now = Instant::now();
+        last_energy: &BTreeMap<u32, sample::Sample<u64>>,
+    ) -> (Power, BTreeMap<u32, sample::Sample<u64>>) {
         let mut package = BTreeMap::new();
         let mut new_energy = BTreeMap::new();
 
@@ -181,7 +181,7 @@ impl Sources {
             let watts = match source {
                 PowerSource::Rapl { energy_path } => {
                     let (package, energy_reading) =
-                        read_rapl_energy(package_id, energy_path, now, last_energy);
+                        read_rapl_energy(package_id, energy_path, last_energy);
                     new_energy.insert(package_id, energy_reading);
 
                     package
@@ -352,28 +352,22 @@ fn read_core_temp(source: &ThermalSource, core_id: u32) -> Option<f32> {
 fn read_rapl_energy(
     package_id: u32,
     energy_path: &PathBuf,
-    now: Instant,
-    last_energy: &BTreeMap<u32, EnergyReading>,
-) -> (Option<f32>, EnergyReading) {
+    last_energy: &BTreeMap<u32, sample::Sample<u64>>,
+) -> (Option<f32>, sample::Sample<u64>) {
     let energy_uj = sysfs::read_u64(energy_path).unwrap_or_default();
+    let cur_energy = sample::Sample::new(energy_uj);
     let watts = if let Some(last) = last_energy.get(&package_id) {
-        let elapsed = now.duration_since(last.timestamp).as_secs_f64();
-        if elapsed > 0.0 {
-            let delta_uj = energy_uj.wrapping_sub(last.energy_uj);
-            Some((delta_uj as f64 / (elapsed * 1_000_000.0)) as f32)
+        let diff = &cur_energy - last;
+        if diff.elapsed.as_secs_f64() > 0.0 {
+            let delta_uj = energy_uj.wrapping_sub(last.value);
+            Some((delta_uj as f64 / (diff.elapsed.as_secs_f64() * 1_000_000.0)) as f32)
         } else {
             None
         }
     } else {
         None
     };
-    (
-        watts,
-        EnergyReading {
-            energy_uj,
-            timestamp: now,
-        },
-    )
+    (watts, cur_energy)
 }
 
 // === Low-level hwmon / thermal zone readers ===

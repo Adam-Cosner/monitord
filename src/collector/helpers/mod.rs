@@ -5,4 +5,5 @@
  */
 
 pub(crate) mod cached;
+pub(crate) mod sample;
 pub(crate) mod sysfs;
