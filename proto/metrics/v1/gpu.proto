@@ -14,57 +14,37 @@ message Snapshot {
 
 // Represents a single physical GPU
 message Gpu {
-  // The GPU's branding name (i.e. NVIDIA RTX 4090)
-  string brand_name = 1;
-  // The name and version of the kernel level driver
-  string kernel_driver = 2;
-  // The name and version of the userspace OpenGL driver
-  string opengl_driver = 3;
-  // The name and version of the userspace Vulkan driver
-  string vulkan_driver = 4;
+  string brand_name = 1; // The GPU's branding name (i.e. NVIDIA RTX 4090)
 
-  // Utilization of the graphics engine
-  double graphics_utilization = 5;
-  // The clock of the graphics engine
-  uint32 graphics_clock = 6;
+  string kernel_driver = 2; // The name and version of the kernel level driver
+  string opengl_driver = 3; // The name and version of the userspace OpenGL driver
+  string vulkan_driver = 4; // The name and version of the userspace Vulkan driver
 
-  // The total amount of VRAM on the GPU
-  uint64 memory_capacity = 7;
-  // The amount of VRAM currently in use
-  uint64 memory_usage = 8;
-  // The clock of the VRAM
-  uint32 memory_clock = 9;
+  double graphics_utilization = 5; // Utilization of the graphics engine
+  uint32 graphics_clock = 6; // The clock of the graphics engine
+
+  uint64 memory_capacity = 7; // The total amount of VRAM on the GPU
+  uint64 memory_usage = 8; // The amount of VRAM currently in use
+  uint32 memory_clock = 9; // The clock of the VRAM
 
   // NOTE ABOUT VIDEO ENCODE/DECODE:
   // AMD reports clock of encode and decode engines separately and utilization is merged
   // NVIDIA reports utilization of encode and decode engines separately and clock is merged
 
-  // Utilization of the video encode engine (if supported)
-  double encoder_utilization = 10;
-  // Utilization of the video decode engine (if supported)
-  double decoder_utilization = 11;
-  // The clock of the video encode engine(s) (if supported)
-  uint32 encoder_clock = 12;
-  // The clock of the video decode engine(s) (if supported)
-  uint32 decoder_clock = 13;
+  double encoder_utilization = 10; // Utilization of the video encode engine (if supported)
+  double decoder_utilization = 11; // Utilization of the video decode engine (if supported)
+  uint32 encoder_clock = 12; // The clock of the video encode engine(s) (if supported)
+  uint32 decoder_clock = 13; // The clock of the video decode engine(s) (if supported)
 
-  // Power and temperatures
-  uint32 power_milliwatt = 14;
-  // Temperature of the GPU in degrees Celsius
-  int32 temperature = 15;
+  uint32 power_milliwatt = 14; // Power and temperatures
+  int32 temperature = 15; // Temperature of the GPU in degrees Celsius
 
-  // Process information
-  repeated Process processes = 16;
+  repeated Process processes = 16; // Process information
 }
 message Process {
-  // Process ID
-  uint32 pid = 1;
-  // Total graphics utilization
-  double graphics_utilization = 2;
-  // VRAM allocated to the process
-  uint64 memory_usage = 3;
-  // Total video encode utilization (if supported)
-  double encode_utilization = 4;
-  // Total video decode utilization (if supported)
-  double decode_utilization = 5;
+  uint32 pid = 1; // Process ID
+  double graphics_utilization = 2; // Total graphics utilization
+  uint64 memory_usage = 3; // VRAM allocated to the process
+  double encode_utilization = 4; // Total video encode utilization (if supported)
+  double decode_utilization = 5; // Total video decode utilization (if supported)
 }

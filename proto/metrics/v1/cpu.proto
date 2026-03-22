@@ -9,17 +9,15 @@ package metrics.v1.cpu;
 
 // Represents a single snapshot of the CPU(s) of the system
 message Snapshot {
-  // A flat list of the operating system's logical CPUs
-  repeated Logical logical = 1;
-  // The physical topology of the CPU(s) of the system
-  repeated Package packages = 2;
+  repeated Logical logical = 1; // A flat list of the operating system's logical CPUs
+  repeated Package packages = 2; // The physical topology of the CPU(s) of the system
 }
 
 // The operating system's logical CPUs
 message Logical {
-  uint32 os_cpu_id = 1;
-  float utilization = 2;
-  uint32 cur_freq_mhz = 3;
+  uint32 os_cpu_id = 1; // The operating system's ID for this logical CPU
+  float utilization = 2; // The utilization percentage of this logical CPU (0.0 to 100.0)
+  uint32 cur_freq_mhz = 3; // The current frequency of this logical CPU in MHz
 }
 
 // A physical CPU package
@@ -27,49 +25,48 @@ message Package {
   uint32 package_id = 1;
 
   // Global hardware identification
-  string vendor_id = 2;
-  string model_name = 3;
-  uint32 family = 4;
-  uint32 model = 5;
-  uint32 stepping = 6;
+  string vendor_id = 2; // The vendor ID of the CPU package i.e. AuthenticAMD and GenuineIntel
+  string model_name = 3; // The model name of the CPU
+  uint32 family = 4; // The family id of the CPU
+  uint32 model = 5; // The model id of the CPU
+  uint32 stepping = 6; // The stepping of the CPU
 
-  string microcode_version = 7;
-  string cpufreq_driver = 8;
-  string cpufreq_governor = 9;
-  optional string cpufreq_mode = 10;
+  string microcode_version = 7; // Hex code for the microcode version of the CPU
+  string cpufreq_driver = 8; // The scheduling driver in use by the kernel
+  string cpufreq_governor = 9; // The scheduling governor in use by the kernel (may be ignored if cpufreq_mode is set)
+  optional string cpufreq_mode = 10; // The driver-specific scheduling mode in use by the kernel
 
-  optional float package_temperature_c = 11;
-  optional float package_power_w = 12;
+  optional float package_temperature_c = 11; // the temperature of the entire CPU package
+  optional float package_power_w = 12; // The power consumption of the entire CPU package
 
   repeated Cluster clusters = 13;
 }
 
 // A physical CPU cluster/die (CCDs on AMD)
 message Cluster {
-  uint32 cluster_id = 1;
-  optional float cluster_temperature_c = 2;
+  uint32 cluster_id = 1; // The ID of the cluster/die
+  optional float cluster_temperature_c = 2; // The temperature of the cluster/die
 
-  repeated Core cores = 3;
-  repeated Cache shared_caches = 4;
+  repeated Core cores = 3; // The cores in the cluster/die
+  repeated Cache shared_caches = 4; // The shared caches in the cluster/die (L3)
 }
 
 // A physical CPU core
 message Core {
-  uint32 core_id = 1;
-  uint32 base_freq_mhz = 2;
-  uint32 max_freq_mhz = 3;
+  uint32 core_id = 1; // The ID of the core
+  uint32 base_freq_mhz = 2; // The base frequency of the core in MHz
+  uint32 max_freq_mhz = 3; // The maximum frequency of the core in MHz
 
-  // Intel coretemp is currently the only one I'm aware of that provides core temperature
-  optional float core_temperature_c = 4;
+  optional float core_temperature_c = 4; // The temperature of the core in Celsius (currently only Intel coretemp provides this)
 
-  repeated Thread threads = 5;
-  repeated Cache private_caches = 6;
+  repeated Thread threads = 5; // The logical threads in the core (e.g. hyperthreading)
+  repeated Cache private_caches = 6; // The private caches in the core (L1 and L2)
 }
 
 // A logical CPU core
 message Thread {
-  uint32 os_cpu_id = 1;
-  uint32 core_index = 2; // specifically if this is thread 0 or thread 1 in the core
+  uint32 os_cpu_id = 1; // The OS-identified logical CPU ID
+  uint32 core_index = 2; // The index of the thread in the core (0 or 1)
 }
 
 // CPU cache
@@ -81,9 +78,9 @@ message Cache {
     UNIFIED = 3;
   }
 
-  uint32 level = 1;
-  CacheType cache_type = 2;
-  uint32 size_kb = 3;
-  uint32 line_size_bytes = 4;
-  uint32 associativity = 5;
+  uint32 level = 1; // The cache level (1 = L1, 2 = L2, 3 = L3)
+  CacheType cache_type = 2; // The type of cache (instruction, data, or unified)
+  uint32 size_kb = 3; // The size of the cache in kilobytes
+  uint32 line_size_bytes = 4; // The line size of the cache in bytes
+  uint32 associativity = 5; // The ways of associativity of the cache
 }
