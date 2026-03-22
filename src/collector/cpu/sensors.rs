@@ -10,11 +10,11 @@ use std::{
     time::Instant,
 };
 
-use crate::collector::helpers::sysfs;
+use crate::collector::helpers::{cached::Cached, sysfs};
 
 #[derive(Debug, Clone)]
 pub struct Tracker {
-    sources: Option<Sources>,
+    sources: Cached<Sources>,
     last_energy: BTreeMap<u32, EnergyReading>, // for RAPL diff
 }
 
@@ -39,7 +39,7 @@ pub struct Power {
 impl Tracker {
     pub fn new() -> Self {
         Self {
-            sources: None,
+            sources: Cached::default(),
             last_energy: BTreeMap::new(),
         }
     }
@@ -47,7 +47,8 @@ impl Tracker {
     pub fn read(&mut self, topology: &super::topology::Topology) -> anyhow::Result<Sample> {
         let sources = self
             .sources
-            .get_or_insert_with(|| Sources::detect(topology));
+            .get_or_try_mut(|| Ok(Sources::detect(topology)))
+            .ok_or_else(|| anyhow::anyhow!("Failed to detect sensors"))?;
         let temperatures = sources.read_temperatures(topology);
         let (power, new_energy) = sources.read_power(&self.last_energy);
         self.last_energy = new_energy;
