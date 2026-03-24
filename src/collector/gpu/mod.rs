@@ -232,13 +232,7 @@ mod tests {
         let _ = collector.collect()?;
         std::thread::sleep(std::time::Duration::from_secs(1));
         let second = collector.collect()?;
-        for gpu in second.gpus.iter() {
-            println!("GPU {}", gpu.brand_name);
-            println!("  {}% Graphics", gpu.graphics_utilization);
-            for proc in gpu.processes.iter() {
-                println!("    {} {}% Graphics", proc.pid, proc.graphics_utilization);
-            }
-        }
+        println!("{:#?}", second);
         Ok(())
     }
 }
