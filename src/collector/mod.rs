@@ -9,6 +9,8 @@ pub mod cpu;
 pub mod gpu;
 #[cfg(feature = "collector")]
 pub mod memory;
+#[cfg(feature = "collector")]
+pub mod network;
 
 #[cfg(feature = "collector")]
 pub(crate) mod helpers;
