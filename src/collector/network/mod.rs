@@ -77,7 +77,13 @@ impl Collector {
             let wifi = if adapter_type == adapter::AdapterType::Wifi {
                 self.wifi_reader
                     .get_or_try_mut(wifi::WifiReader::new)
-                    .and_then(|r| r.read(&name).ok())
+                    .and_then(|r| {
+                        let res = r.read(&name);
+                        if let Err(e) = &res {
+                            tracing::warn!("Failed to read wifi info for {}: {}", name, e);
+                        }
+                        res.ok()
+                    })
             } else {
                 None
             };
