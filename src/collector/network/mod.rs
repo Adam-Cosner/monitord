@@ -73,8 +73,10 @@ impl Collector {
 
             let usage = self.diff_rates(&name, &counters);
 
+            let is_up = sysfs::read_string(&path.join("operstate")).unwrap_or_default() == "up";
+
             let adapter_type = classify_adapter(&path);
-            let wifi = if adapter_type == adapter::AdapterType::Wifi {
+            let wifi = if adapter_type == adapter::AdapterType::Wifi && is_up {
                 self.wifi_reader
                     .get_or_try_mut(wifi::WifiReader::new)
                     .and_then(|r| {
@@ -107,7 +109,7 @@ impl Collector {
                 ipv6_addresses,
                 adapter_type: adapter_type as i32,
                 mtu: sysfs::read_u32(&path.join("mtu")).unwrap_or_default(),
-                is_up: sysfs::read_string(&path.join("operstate")).unwrap_or_default() == "up",
+                is_up,
                 rx_bytes_total: counters.value.rx_bytes,
                 tx_bytes_total: counters.value.tx_bytes,
                 rx_packets_total: counters.value.rx_packets,
