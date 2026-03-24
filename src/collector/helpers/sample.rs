@@ -7,17 +7,18 @@
 //! A simple struct representing timestamped samples.
 
 #[derive(Debug, Clone)]
-pub struct Sample<T> {
+pub struct Sample<T: Diffable> {
     pub value: T,
     pub timestamp: std::time::Instant,
 }
 
+#[derive(Debug, Clone)]
 pub struct Diff<D> {
     pub delta: D,
     pub elapsed: std::time::Duration,
 }
 
-impl<T> Sample<T> {
+impl<T: Diffable> Sample<T> {
     pub fn new(value: T) -> Self {
         Self {
             value,
