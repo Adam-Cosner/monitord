@@ -21,7 +21,7 @@ impl Collector {
     }
 
     pub fn collect(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
-        let driver_path = path.join("device/device/driver");
+        let driver_path = path.join("device/driver");
         if let Ok(driver_link) = std::fs::read_link(driver_path) {
             if driver_link.file_name().is_some_and(|name| name == "nvidia") {
                 self.collect_nvidia(path)
