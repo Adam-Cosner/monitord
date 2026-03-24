@@ -169,9 +169,10 @@ fn get_opengl_vulkan_drivers(path: &PathBuf, vendor: &GpuVendor) -> (String, Str
                 for_device_loss: None,
                 for_resource_creation: None,
             },
+            display: None,
             backend_options: wgpu::BackendOptions::default(),
         };
-        let instance = wgpu::Instance::new(&instance_descriptor);
+        let instance = wgpu::Instance::new(instance_descriptor);
 
         let adapters = pollster::block_on(
             instance.enumerate_adapters(wgpu::Backends::GL | wgpu::Backends::VULKAN),
