@@ -6,17 +6,12 @@
 
 //! Contains the implementation of a "lazy-init try once" cache for values that are expensive to compute.
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum Cached<T> {
-    Pending,      // Has not been calculated yet
+    #[default]
+    Pending, // Has not been calculated yet
     Unavailable,  // Failed to calculate
     Available(T), // Calculated successfully
-}
-
-impl<T> Default for Cached<T> {
-    fn default() -> Self {
-        Self::Pending
-    }
 }
 
 impl<T> Cached<T> {

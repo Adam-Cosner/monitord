@@ -19,6 +19,12 @@ pub struct Collector {
     wifi_reader: Cached<wifi::WifiReader>,
 }
 
+impl Default for Collector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug)]
 struct Counters {
     rx_bytes: u64,
@@ -118,7 +124,7 @@ impl Collector {
     }
 
     fn diff_rates(&self, name: &str, new: &sample::Sample<Counters>) -> sample::Diff<UsageDiff> {
-        if let Some(old) = self.counters.get(&name.to_string()) {
+        if let Some(old) = self.counters.get(name) {
             new - old
         } else {
             sample::Diff {

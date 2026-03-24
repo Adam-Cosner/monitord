@@ -19,7 +19,7 @@ impl sample::Diffable for procfs::KernelStats {
     fn diff(&self, other: &Self) -> Self::Delta {
         let mut per_core = Vec::with_capacity(self.cpu_time.len());
         for i in 0..other.cpu_time.len() {
-            let usage = diff_stats(i, &other, &self);
+            let usage = diff_stats(i, other, self);
             let cur_freq_mhz = get_cur_freq_mhz(i);
             per_core.push(Utilization {
                 usage,

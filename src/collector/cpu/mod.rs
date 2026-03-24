@@ -62,7 +62,7 @@ impl Collector {
 
 fn assemble(
     topo: &topology::Topology,
-    utilization: &Vec<utilization::Utilization>,
+    utilization: &[utilization::Utilization],
     sensors: &sensors::Sample,
 ) -> Snapshot {
     let mut snapshot = Snapshot {

@@ -106,51 +106,37 @@ impl WifiReader {
 
         for msg in recv {
             let msg = msg?;
-            match msg.nl_payload() {
-                NlPayload::Payload(payload) => {
-                    for attr in payload.attrs().iter() {
-                        let buffer = attr.nla_payload().to_owned();
-                        let buf = buffer.as_ref();
-                        // Check for interface type 2 (NL80211_IFTYPE_STATION) because that's the only type we're interested in
-                        if *attr.nla_type().nla_type() == NL80211_ATTR_IFTYPE {
-                            if attr.nla_payload().as_ref()[0] != 2 {
-                                continue;
-                            }
-                        }
+            if let NlPayload::Payload(payload) = msg.nl_payload() {
+                for attr in payload.attrs().iter() {
+                    let buffer = attr.nla_payload().to_owned();
+                    let buf = buffer.as_ref();
+                    // Check for interface type 2 (NL80211_IFTYPE_STATION) because that's the only type we're interested in
+                    if *attr.nla_type().nla_type() == NL80211_ATTR_IFTYPE
+                        && attr.nla_payload().as_ref()[0] != 2
+                    {
+                        continue;
+                    }
 
-                        match *attr.nla_type().nla_type() {
-                            NL80211_ATTR_IFINDEX => {
-                                interface
-                                    .get_or_insert_with(|| InterfaceInfo {
-                                        ssid: String::new(),
-                                        frequency: 0,
-                                        index: Buffer::new(),
-                                    })
-                                    .index = buffer;
-                            }
-                            NL80211_ATTR_WIPHY_FREQ => {
-                                interface
-                                    .get_or_insert_with(|| InterfaceInfo {
-                                        ssid: String::new(),
-                                        frequency: 0,
-                                        index: Buffer::new(),
-                                    })
-                                    .frequency = u32::from_be_bytes(buf[..4].try_into()?);
-                            }
-                            NL80211_ATTR_SSID => {
-                                interface
-                                    .get_or_insert_with(|| InterfaceInfo {
-                                        ssid: String::new(),
-                                        frequency: 0,
-                                        index: Buffer::new(),
-                                    })
-                                    .ssid = String::from_utf8_lossy(buf).into_owned();
-                            }
-                            _ => {}
+                    match *attr.nla_type().nla_type() {
+                        NL80211_ATTR_IFINDEX => {
+                            interface.get_or_insert_default().index = buffer;
                         }
+                        NL80211_ATTR_WIPHY_FREQ => {
+                            interface
+                                .get_or_insert_with(|| InterfaceInfo {
+                                    ssid: String::new(),
+                                    frequency: 0,
+                                    index: Buffer::new(),
+                                })
+                                .frequency = u32::from_be_bytes(buf[..4].try_into()?);
+                        }
+                        NL80211_ATTR_SSID => {
+                            interface.get_or_insert_default().ssid =
+                                String::from_utf8_lossy(buf).into_owned();
+                        }
+                        _ => {}
                     }
                 }
-                _ => {}
             }
         }
         interface.ok_or_else(|| anyhow::anyhow!("Interface could not be found"))
@@ -190,85 +176,57 @@ impl WifiReader {
 
         for msg in recv {
             let msg = msg?;
-            match msg.nl_payload() {
-                NlPayload::Payload(payload) => {
-                    for attr in payload.attrs().iter() {
-                        if *attr.nla_type().nla_type() == NL80211_ATTR_STA_INFO {
-                            if let Ok(handle) = attr.get_attr_handle::<Attr>() {
-                                for sta_attr in handle.iter() {
-                                    let buffer = sta_attr.nla_payload();
-                                    let buf = buffer.as_ref();
-                                    match *sta_attr.nla_type().nla_type() {
-                                        NL80211_STA_INFO_TX_BITRATE => {
-                                            if let Ok(nest_handle) =
-                                                sta_attr.get_attr_handle::<Attr>()
+            if let NlPayload::Payload(payload) = msg.nl_payload() {
+                for attr in payload.attrs().iter() {
+                    if *attr.nla_type().nla_type() == NL80211_ATTR_STA_INFO
+                        && let Ok(handle) = attr.get_attr_handle::<Attr>()
+                    {
+                        for sta_attr in handle.iter() {
+                            let buffer = sta_attr.nla_payload();
+                            let buf = buffer.as_ref();
+                            match *sta_attr.nla_type().nla_type() {
+                                NL80211_STA_INFO_TX_BITRATE => {
+                                    if let Ok(nest_handle) = sta_attr.get_attr_handle::<Attr>() {
+                                        for rate_attr in nest_handle.iter() {
+                                            let buffer = rate_attr.nla_payload();
+                                            let buf = buffer.as_ref();
+                                            if *rate_attr.nla_type().nla_type()
+                                                == NL80211_RATE_INFO_BITRATE32
                                             {
-                                                for rate_attr in nest_handle.iter() {
-                                                    let buffer = rate_attr.nla_payload();
-                                                    let buf = buffer.as_ref();
-                                                    match *rate_attr.nla_type().nla_type() {
-                                                        NL80211_RATE_INFO_BITRATE32 => {
-                                                            station
-                                                                .get_or_insert_with(|| {
-                                                                    StationInfo {
-                                                                        link_speed_up: 0,
-                                                                        link_speed_down: 0,
-                                                                        signal_strength: 0,
-                                                                    }
-                                                                })
-                                                                .link_speed_up = u32::from_be_bytes(
-                                                                buf[..4].try_into()?,
-                                                            );
-                                                        }
-                                                        _ => {}
-                                                    }
-                                                }
+                                                station.get_or_insert_default().link_speed_up =
+                                                    u32::from_be_bytes(buf[..4].try_into()?);
                                             }
                                         }
-                                        NL80211_STA_INFO_RX_BITRATE => {
-                                            if let Ok(nest_handle) =
-                                                sta_attr.get_attr_handle::<Attr>()
-                                            {
-                                                for rate_attr in nest_handle.iter() {
-                                                    let buffer = rate_attr.nla_payload();
-                                                    let buf = buffer.as_ref();
-                                                    match *rate_attr.nla_type().nla_type() {
-                                                        NL80211_RATE_INFO_BITRATE32 => {
-                                                            station
-                                                                .get_or_insert_with(|| {
-                                                                    StationInfo {
-                                                                        link_speed_up: 0,
-                                                                        link_speed_down: 0,
-                                                                        signal_strength: 0,
-                                                                    }
-                                                                })
-                                                                .link_speed_down =
-                                                                u32::from_be_bytes(
-                                                                    buf[..4].try_into()?,
-                                                                );
-                                                        }
-                                                        _ => {}
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        NL80211_STA_INFO_SIGNAL_AVG => {
-                                            station
-                                                .get_or_insert_with(|| StationInfo {
-                                                    link_speed_up: 0,
-                                                    link_speed_down: 0,
-                                                    signal_strength: 0,
-                                                })
-                                                .signal_strength = buf[0] as i8;
-                                        }
-                                        _ => {}
                                     }
                                 }
+                                NL80211_STA_INFO_RX_BITRATE => {
+                                    if let Ok(nest_handle) = sta_attr.get_attr_handle::<Attr>() {
+                                        for rate_attr in nest_handle.iter() {
+                                            let buffer = rate_attr.nla_payload();
+                                            let buf = buffer.as_ref();
+                                            if *rate_attr.nla_type().nla_type()
+                                                == NL80211_RATE_INFO_BITRATE32
+                                            {
+                                                station.get_or_insert_default().link_speed_down =
+                                                    u32::from_be_bytes(buf[..4].try_into()?);
+                                            }
+                                        }
+                                    }
+                                }
+                                NL80211_STA_INFO_SIGNAL_AVG => {
+                                    station
+                                        .get_or_insert(StationInfo {
+                                            link_speed_up: 0,
+                                            link_speed_down: 0,
+                                            signal_strength: 0,
+                                        })
+                                        .signal_strength = buf[0] as i8;
+                                }
+                                _ => {}
                             }
                         }
                     }
                 }
-                _ => {}
             }
         }
 
@@ -276,12 +234,14 @@ impl WifiReader {
     }
 }
 
+#[derive(Default)]
 struct InterfaceInfo {
     ssid: String,
     frequency: u32,
     index: Buffer,
 }
 
+#[derive(Default)]
 struct StationInfo {
     link_speed_up: u32,
     link_speed_down: u32,

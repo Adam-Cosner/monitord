@@ -243,7 +243,7 @@ fn collect_from_udev_database() -> anyhow::Result<Vec<Dimm>> {
         }
     }
 
-    Ok(dimms.into_iter().map(|(_, v)| v).collect())
+    Ok(dimms.into_values().collect())
 }
 
 mod tests {
