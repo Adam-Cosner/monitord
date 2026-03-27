@@ -3,6 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
+
+//! CPU utilization tracking.
+
 use procfs::CurrentSI;
 use std::path::PathBuf;
 
@@ -75,7 +78,7 @@ fn diff_stats(
     ((active_cur - active_last) as f32 / (total_cur - total_last) as f32) * 100.0
 }
 
-// Active, total
+/// Returns the active and total CPU times for a given `procfs::CpuTime` respectively.
 fn cpu_times(time: &procfs::CpuTime) -> (u64, u64) {
     let active = time.user
         + time.nice

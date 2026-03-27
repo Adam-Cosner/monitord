@@ -9,9 +9,12 @@
 #[derive(Debug, Clone, Default)]
 pub enum Discovery<T> {
     #[default]
-    Pending, // Has not been calculated yet
-    Unavailable,  // Failed to calculate
-    Available(T), // Calculated successfully
+    /// Has not been calculated yet.
+    Pending,
+    /// Failed to calculate.
+    Unavailable,
+    /// Calculated successfully
+    Available(T),
 }
 
 #[allow(unused)]

@@ -3,6 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
+//! CPU temperature and power sensor tracking.
 
 use std::{
     collections::BTreeMap,
@@ -133,7 +134,7 @@ enum PowerSource {
     None,
 }
 
-// Detection
+// === Detection ===
 impl Sources {
     fn detect(topology: &super::topology::Topology) -> Self {
         let mut thermal = BTreeMap::new();

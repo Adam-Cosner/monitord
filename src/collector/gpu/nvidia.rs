@@ -41,7 +41,7 @@ impl Collector {
         }
     }
 
-    // Returns an error if there's an actual NVML error so it can be logged, but if there's no NVML, just return an empty GPU snapshot
+    /// Returns an error if there's an actual NVML error so it can be logged, but if there's no NVML, just return an empty GPU snapshot
     fn collect_nvidia(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
         let nvml_bench = std::time::Instant::now();
         tracing::trace!(
@@ -133,6 +133,7 @@ impl Collector {
         }
     }
 
+    /// Currently does nothing as I haven't read up on nouveau's metric reporting if there even is any
     fn collect_nouveau(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
         tracing::trace!(
             "[gpu/nvidia] collecting metrics for nouveau device {}",
