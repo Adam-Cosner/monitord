@@ -26,13 +26,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_prost_build::configure()
         .build_server(true)
         .build_client(false)
-        .compile_protos(&["proto/service/v1/service.proto"], &["proto/"])?;
+        .compile_protos(
+            &[
+                "proto/service/v1/service.proto",
+                "proto/control/v1/control.proto",
+            ],
+            &["proto/"],
+        )?;
 
     #[cfg(feature = "control")]
     tonic_prost_build::configure()
         .build_server(false)
         .build_client(true)
-        .compile_protos(&["proto/service/v1/service.proto"], &["proto/"])?;
+        .compile_protos(&["proto/service/v1/control.proto"], &["proto/"])?;
 
     Ok(())
 }
