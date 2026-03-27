@@ -85,6 +85,7 @@ impl Collector {
     }
 }
 
+/// Iterates over adapters to find the OpenGL and Vulkan drivers for a given PCI ID and vendor.
 fn iterate_adapters(
     adapters: &[wgpu::Adapter],
     pci_id: &str,

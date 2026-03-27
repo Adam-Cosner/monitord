@@ -19,7 +19,7 @@ use crate::collector::helpers::sysfs;
 #[derive(Debug, Clone)]
 pub struct Topology {
     pub packages: BTreeMap<u32, Package>,
-    /// A lookup table for CPU indices to their package, cluster, core, and thread IDs.
+    /// A lookup table for CPU indices to their package, cluster, and core.
     lookup: BTreeMap<u32, (u32, u32, u32)>,
 }
 
