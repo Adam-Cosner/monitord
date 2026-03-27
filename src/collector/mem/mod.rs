@@ -19,6 +19,7 @@ use super::helpers::discovery::Discovery;
 use anyhow::Context;
 use procfs::Current;
 
+use crate::collector::store;
 #[doc(inline)]
 pub use crate::metrics::memory::*;
 
@@ -33,6 +34,32 @@ impl Default for Collector {
     }
 }
 
+impl super::Collector for Collector {
+    type Output = Snapshot;
+
+    fn name(&self) -> &'static str {
+        "mem"
+    }
+
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+
+    fn collect(&mut self, store: &store::Store) -> anyhow::Result<()> {
+        match self.collect_memory() {
+            Ok(snapshot) => store
+                .mem
+                .set(snapshot)
+                .expect("mem snapshot was already set previously, do not reuse Store instances!"),
+            Err(e) => {
+                tracing::error!("collector failed: {e}");
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Collector {
     /// Create a new instance of the collector
     pub fn new() -> Self {
@@ -43,7 +70,7 @@ impl Collector {
     }
 
     /// Collects a `memory::Snapshot`
-    pub fn collect(&mut self) -> anyhow::Result<Snapshot> {
+    pub fn collect_memory(&mut self) -> anyhow::Result<Snapshot> {
         tracing::debug!("[MEMORY] collecting metrics");
         let meminfo =
             procfs::Meminfo::current().with_context(|| format!("{} on {}", file!(), line!()))?;
@@ -248,11 +275,25 @@ fn collect_from_udev_database() -> anyhow::Result<Vec<Dimm>> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::collector::Collector;
+
     #[test]
     fn memory() -> anyhow::Result<()> {
+        tracing_subscriber::fmt::init();
         let mut collector = super::Collector::new();
-        let snapshot = collector.collect()?;
-        println!("{:#?}", snapshot);
+        let mut store = store::Store::new();
+        collector.collect(&store)?;
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        store = store::Store::new();
+        collector.collect(&store)?;
+        assert!(
+            store
+                .mem
+                .get()
+                .is_some_and(|m| !m.dimms.is_empty() && m.logical.is_some())
+        );
+        println!("{:#?}", store.mem.get());
         Ok(())
     }
 }

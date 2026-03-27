@@ -21,6 +21,7 @@ mod nvidia;
 use anyhow::Context;
 use std::path::PathBuf;
 
+use crate::collector::store;
 #[doc(inline)]
 pub use crate::metrics::gpu::Gpu;
 #[doc(inline)]
@@ -36,18 +37,10 @@ pub struct Collector {
     amd: amd::Collector,
 }
 
-struct GpuCache {
-    path: PathBuf,
-    vendor: GpuVendor,
-    opengl_driver: String,
-    vulkan_driver: String,
-}
-
-enum GpuVendor {
-    Intel,
-    Nvidia,
-    Amd,
-    // TODO: Add support for smaller vendors at a later date
+impl Default for Collector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl std::fmt::Display for GpuVendor {
@@ -60,9 +53,29 @@ impl std::fmt::Display for GpuVendor {
     }
 }
 
-impl Default for Collector {
-    fn default() -> Self {
-        Self::new()
+impl super::Collector for Collector {
+    type Output = Snapshot;
+
+    fn name(&self) -> &'static str {
+        "gpu"
+    }
+
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+
+    fn collect(&mut self, store: &store::Store) -> anyhow::Result<()> {
+        match self.collect_gpus() {
+            Ok(gpus) => store
+                .gpu
+                .set(gpus)
+                .expect("gpu snapshot was already set previously, do not reuse Store instances!"),
+            Err(e) => {
+                tracing::error!("collector failed: {e}");
+                return Err(e);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -77,7 +90,7 @@ impl Collector {
         }
     }
 
-    pub fn collect(&mut self) -> anyhow::Result<Snapshot> {
+    pub fn collect_gpus(&mut self) -> anyhow::Result<Snapshot> {
         let mut gpus = Vec::new();
         if self.gpus.is_empty() {
             self.gpus = Self::enumerate_devices()?;
@@ -222,18 +235,35 @@ fn get_opengl_vulkan_drivers(path: &PathBuf, vendor: &GpuVendor) -> (String, Str
     (gl, vk)
 }
 
+struct GpuCache {
+    path: PathBuf,
+    vendor: GpuVendor,
+    opengl_driver: String,
+    vulkan_driver: String,
+}
+
+enum GpuVendor {
+    Intel,
+    Nvidia,
+    Amd,
+    // TODO: Add support for smaller vendors at a later date
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::collector::Collector;
 
     #[test]
     fn gpu() -> Result<(), Box<dyn std::error::Error>> {
         tracing_subscriber::fmt::init();
-        let mut collector = Collector::new();
-        let _ = collector.collect()?;
+        let mut collector = super::Collector::new();
+        let mut store = store::Store::new();
+        collector.collect(&store)?;
         std::thread::sleep(std::time::Duration::from_secs(1));
-        let second = collector.collect()?;
-        println!("{:#?}", second);
+        store = store::Store::new();
+        collector.collect(&store)?;
+        println!("{:#?}", store.gpu.get());
         Ok(())
     }
 }

@@ -9,6 +9,12 @@ pub(super) struct Collector {
     // Fields for the collector
 }
 
+impl Default for Collector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Collector {
     pub fn new() -> Self {
         tracing::debug!("Initializing Intel GPU collector");

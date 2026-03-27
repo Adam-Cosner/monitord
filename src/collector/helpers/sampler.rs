@@ -14,6 +14,12 @@ pub struct Sampler<T: Differential> {
     last: Option<Sample<T>>,
 }
 
+impl<T: Differential> Default for Sampler<T> {
+    fn default() -> Self {
+        Self { last: None }
+    }
+}
+
 impl<T: Differential> Sampler<T> {
     /// Initializes a new sampler with no previous sample.
     pub fn new() -> Self {

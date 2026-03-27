@@ -15,9 +15,17 @@ use crate::collector::helpers::sysfs;
 
 // DATA STRUCTURES
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Topology {
     pub packages: BTreeMap<u32, Package>,
+}
+
+impl Default for Topology {
+    fn default() -> Self {
+        Self {
+            packages: BTreeMap::new(),
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone)]

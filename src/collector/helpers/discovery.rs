@@ -3,19 +3,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-//! Helper data type that is used for fallible lazy discovery of values, such as static device information.
-//! The data type can detect when a probe fails, and, depending on whether the init function was `probe` or `require`, either it sets the data as unavailable or it returns an error and allows for retry respectively.
+//! Represents a value that is lazily computed and then cached for later usage.
 
 /// A wrapper around a value that will be lazily computed and cached.
 #[derive(Debug, Clone, Default)]
 pub enum Discovery<T> {
     #[default]
-    /// Has not been calculated yet, or can be retried after failure
-    Pending,
-    /// Data is permanently unavailable, any attempts to get the data will result in `None` being returned
-    Unavailable,
-    /// Data has been successfully computed and is cached for reuse
-    Available(T),
+    Pending, // Has not been calculated yet
+    Unavailable,  // Failed to calculate
+    Available(T), // Calculated successfully
 }
 
 #[allow(unused)]

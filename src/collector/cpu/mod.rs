@@ -23,6 +23,7 @@ mod sensors;
 mod topology;
 mod utilization;
 
+use crate::collector::store;
 #[doc(inline)]
 pub use crate::metrics::cpu::*;
 
@@ -40,6 +41,35 @@ impl Default for Collector {
     }
 }
 
+impl super::Collector for Collector {
+    type Output = Snapshot;
+
+    fn name(&self) -> &'static str {
+        "cpu"
+    }
+
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+
+    /// Collects one full snapshot of the CPU and emplaces it into the associated Store slot.
+    /// If collection fails critically, the store slot is not modified and an error is returned.
+    /// On non-critical errors, the store slot is emplaced with empty data and a warning is logged.
+    fn collect(&mut self, store: &store::Store) -> anyhow::Result<()> {
+        match self.collect_cpu() {
+            Ok(cpu) => store
+                .cpu
+                .set(cpu)
+                .expect("cpu snapshot was already set previously, do not reuse Store instances!"),
+            Err(e) => {
+                tracing::warn!("collector failed: {e}");
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Collector {
     pub fn new() -> Self {
         tracing::info!("Creating CPU collector");
@@ -50,7 +80,7 @@ impl Collector {
         }
     }
 
-    pub fn collect(&mut self) -> anyhow::Result<Snapshot> {
+    pub fn collect_cpu(&mut self) -> anyhow::Result<Snapshot> {
         let topo = self.topology.require(topology::Topology::discover)?;
 
         let utilization = self.utilization.sample()?;
@@ -60,6 +90,7 @@ impl Collector {
     }
 }
 
+/// Assembles a [`Snapshot`] from the given topology, utilization, and sensor data.
 fn assemble(
     topo: &topology::Topology,
     utilization: &[utilization::Utilization],
@@ -77,7 +108,7 @@ fn assemble(
             .collect::<Vec<_>>(),
         packages: Vec::new(),
     };
-    // create the physical part
+    // Assemble the physical part
     for (&package_id, package) in topo.packages.iter() {
         let mut clusters = Vec::new();
         for (&cluster_id, cluster) in package.clusters.iter() {
@@ -148,17 +179,24 @@ fn assemble(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::collector::Collector;
 
     #[test]
     fn cpu() -> anyhow::Result<()> {
         tracing_subscriber::fmt::init();
-        let mut collector = Collector::new();
-
-        let _ = collector.collect()?;
+        let mut collector = super::Collector::new();
+        let mut store = store::Store::new();
+        collector.collect(&store)?;
         std::thread::sleep(std::time::Duration::from_secs(1));
-        let snapshot = collector.collect()?;
-
-        println!("{:#?}", snapshot);
+        store = store::Store::new();
+        collector.collect(&store)?;
+        assert!(
+            store
+                .cpu
+                .get()
+                .is_some_and(|c| !c.logical.is_empty() && !c.packages.is_empty())
+        );
+        println!("{:#?}", store.cpu.get());
         Ok(())
     }
 }

@@ -11,6 +11,12 @@ pub(super) struct Collector {
     app: std::collections::HashMap<PathBuf, (libamdgpu_top::app::AppAmdgpuTop, std::time::Instant)>,
 }
 
+impl Default for Collector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Collector {
     pub fn new() -> Self {
         tracing::debug!("Initializing AMD GPU collector");
