@@ -77,3 +77,4 @@ tonic-prost-build = "0.14"
 
 [dev-dependencies]
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio = { version = "1.50", features = ["full"] }
