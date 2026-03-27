@@ -60,47 +60,7 @@ impl Collector {
                     });
 
                     if let Ok(adapters) = adapters {
-                        for adapter in adapters {
-                            let adapter_info = adapter.get_info();
-                            // Special case: Zink
-                            if adapter_info.name.contains("zink") {
-                                gl = format!("[zink] {}", adapter_info.driver_info);
-                            }
-                            if adapter_info.device_pci_bus_id == pci_id {
-                                if adapter_info.backend == wgpu::Backend::Gl {
-                                    gl = adapter_info.driver_info.to_string();
-                                } else if adapter_info.backend == wgpu::Backend::Vulkan {
-                                    vk = format!(
-                                        "[{}] {}",
-                                        adapter_info.driver, adapter_info.driver_info
-                                    );
-                                }
-                            } else if adapter_info.vendor
-                                == match vendor {
-                                    GpuVendor::Nvidia => 0x10de,
-                                    GpuVendor::Amd => 0x1002,
-                                    GpuVendor::Intel => 0x8086,
-                                }
-                            {
-                                if adapter_info.backend == wgpu::Backend::Gl {
-                                    let driver_name = if adapter_info.name.contains("radeonsi") {
-                                        "radeonsi"
-                                    } else if adapter_info.name.contains("NVIDIA") {
-                                        "NVIDIA"
-                                    } else if adapter_info.name.contains("i915") {
-                                        "i915"
-                                    } else {
-                                        adapter_info.name.as_str()
-                                    };
-                                    gl = format!("[{}] {}", driver_name, adapter_info.driver_info);
-                                } else if adapter_info.backend == wgpu::Backend::Vulkan {
-                                    vk = format!(
-                                        "[{}] {}",
-                                        adapter_info.driver, adapter_info.driver_info
-                                    );
-                                }
-                            }
-                        }
+                        (gl, vk) = iterate_adapters(&adapters, &pci_id, vendor);
                     }
                 }
                 tracing::debug!(
@@ -120,4 +80,48 @@ impl Collector {
             }
         }
     }
+}
+
+fn iterate_adapters(
+    adapters: &[wgpu::Adapter],
+    pci_id: &str,
+    vendor: &GpuVendor,
+) -> (String, String) {
+    let mut gl = String::from("none");
+    let mut vk = String::from("none");
+    for adapter in adapters {
+        let adapter_info = adapter.get_info();
+        // Special case: Zink
+        if adapter_info.name.contains("zink") {
+            gl = format!("[zink] {}", adapter_info.driver_info);
+        } else if adapter_info.device_pci_bus_id == pci_id {
+            if adapter_info.backend == wgpu::Backend::Gl {
+                gl = adapter_info.driver_info.to_string();
+            } else if adapter_info.backend == wgpu::Backend::Vulkan {
+                vk = format!("[{}] {}", adapter_info.driver, adapter_info.driver_info);
+            }
+        } else if adapter_info.vendor
+            == match vendor {
+                GpuVendor::Nvidia => 0x10de,
+                GpuVendor::Amd => 0x1002,
+                GpuVendor::Intel => 0x8086,
+            }
+        {
+            if adapter_info.backend == wgpu::Backend::Gl {
+                let driver_name = if adapter_info.name.contains("radeonsi") {
+                    "radeonsi"
+                } else if adapter_info.name.contains("NVIDIA") {
+                    "NVIDIA"
+                } else if adapter_info.name.contains("i915") {
+                    "i915"
+                } else {
+                    adapter_info.name.as_str()
+                };
+                gl = format!("[{}] {}", driver_name, adapter_info.driver_info);
+            } else if adapter_info.backend == wgpu::Backend::Vulkan {
+                vk = format!("[{}] {}", adapter_info.driver, adapter_info.driver_info);
+            }
+        }
+    }
+    (gl, vk)
 }
