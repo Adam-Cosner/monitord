@@ -11,6 +11,29 @@ pub mod gpu;
 pub mod mem;
 #[cfg(feature = "collector")]
 pub mod net;
+#[cfg(feature = "collector")]
+pub mod store;
+
+#[cfg(feature = "collector")]
+pub trait Collector: Send {
+    /// The data type produced by this collector.
+    type Output: Send;
+
+    /// The name of the collector, for use in dependency ordering.
+    fn name(&self) -> &'static str;
+
+    /// The names of the collectors that this collector depends on.
+    fn dependencies(&self) -> &[&'static str];
+
+    /// Collect the data, using the store as a shared data source that dependent collectors can read from.
+    /// Value is placed into the store slot associated with this collector.
+    /// The reason it's emplaced into the parameter instead of return type is so that dependent collectors have access to the data without needing special function signatures.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the associated snapshot is already set in the store.
+    fn collect(&mut self, store: &store::Store) -> anyhow::Result<()>;
+}
 
 #[cfg(feature = "collector")]
 pub(crate) mod helpers;

@@ -35,6 +35,35 @@ impl Default for Collector {
     }
 }
 
+impl super::Collector for Collector {
+    type Output = Snapshot;
+
+    fn name(&self) -> &'static str {
+        "net"
+    }
+
+    fn dependencies(&self) -> &[&'static str] {
+        &[]
+    }
+
+    /// Collects one full snapshot of network adapters and emplaces it into the associated Store slot.
+    /// If collection fails critically, the store slot is not modified and an error is returned.
+    /// On non-critical errors, the store slot is emplaced with empty data and a warning is logged.
+    fn collect(&mut self, store: &store::Store) -> anyhow::Result<()> {
+        match self.collect_adapters() {
+            Ok(adapters) => store
+                .net
+                .set(adapters)
+                .ok()
+                .expect("net snapshot was already set somehow, this should not happen!"),
+            Err(e) => {
+                tracing::error!("collector failed: {e}");
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
+}
 
 impl Collector {
     pub fn new() -> Self {
