@@ -150,17 +150,9 @@ impl Topology {
         let thread_count = self
             .packages
             .get(package_id)
-            .map(|p| {
-                p.clusters
-                    .get(cluster_id)
-                    .map(|c| {
-                        c.cores
-                            .get(core_id)
-                            .map(|core| core.threads.len() as u32)
-                            .unwrap_or(1)
-                    })
-                    .unwrap_or(1)
-            })
+            .and_then(|p| p.clusters.get(cluster_id))
+            .and_then(|c| c.cores.get(core_id))
+            .map(|c| c.threads.len() as u32)
             .unwrap_or(1);
 
         let cache_dir = PathBuf::from(format!("/sys/devices/system/cpu/cpu{cpu_idx}/cache"));
