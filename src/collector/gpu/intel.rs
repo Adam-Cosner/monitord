@@ -5,9 +5,7 @@
  */
 use std::path::Path;
 
-pub(super) struct Collector {
-    // Fields for the collector
-}
+pub(super) struct Collector {}
 
 impl Default for Collector {
     fn default() -> Self {
@@ -18,9 +16,7 @@ impl Default for Collector {
 impl Collector {
     pub fn new() -> Self {
         tracing::debug!("Initializing Intel GPU collector");
-        Collector {
-            // Initialize fields
-        }
+        Collector {}
     }
 
     pub fn collect(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
@@ -47,14 +43,18 @@ impl Collector {
     }
 
     fn collect_i915(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
-        tracing::trace!("Collecting metrics for i915 device {}", path.display());
-        // Implementation for collecting data for i915 driver
+        tracing::trace!(
+            "[gpu/intel] collecting metrics for i915 device {}",
+            path.display()
+        );
         Err(anyhow::anyhow!("i915 not yet implemented"))
     }
 
     fn collect_xe(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
-        tracing::trace!("Collecting metrics for xe device {}", path.display());
-        // Implementation for collecting data for xe driver
+        tracing::trace!(
+            "[gpu/intel] collecting metrics for xe device {}",
+            path.display()
+        );
         Err(anyhow::anyhow!("xe not yet implemented"))
     }
 }

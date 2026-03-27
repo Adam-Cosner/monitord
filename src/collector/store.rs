@@ -28,6 +28,12 @@ pub struct Store {
     pub net: OnceLock<net::Snapshot>,
 }
 
+impl Default for Store {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Store {
     pub fn new() -> Self {
         Self {

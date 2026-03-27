@@ -6,6 +6,15 @@
 
 //! Network collector module.
 //! Collects network adapter information and Wi-Fi information (if using wireless).
+//!
+//! # Example
+//!
+//! ```no_run
+//! let mut collector = monitord::collector::net::Collector::new();
+//! let store = monitord::collector::store::Store::new();
+//! collector.collect(&store).unwrap();
+//! assert!(store.net.get().is_some());
+//! ```
 mod wifi;
 
 use super::{
@@ -56,7 +65,7 @@ impl super::Collector for Collector {
                 .set(adapters)
                 .expect("net snapshot was already set previously, do not reuse Store instances!"),
             Err(e) => {
-                tracing::error!("collector failed: {e}");
+                tracing::error!("[net] collect failed: {e}");
                 return Err(e);
             }
         }
@@ -73,6 +82,7 @@ impl Collector {
     }
 
     fn collect_adapters(&mut self) -> anyhow::Result<Snapshot> {
+        let addresses = get_addresses()?;
         match std::fs::read_dir("/sys/class/net") {
             Ok(dir) => {
                 let mut adapters = Vec::new();
@@ -98,7 +108,7 @@ impl Collector {
                                 Ok(wifi_info) => Some(wifi_info),
                                 Err(e) => {
                                     tracing::warn!(
-                                        "[NET] Failed to read wifi info for {}: {}",
+                                        "[net] failed to read wifi info for {}: {}",
                                         interface_name,
                                         e
                                     );
@@ -109,7 +119,6 @@ impl Collector {
                         None
                     };
 
-                    let addresses = get_addresses()?;
                     let ipv4_addresses = addresses
                         .iter()
                         .filter(|a| a.addr.is_ipv4() && a.name == interface_name)
@@ -156,8 +165,7 @@ impl Collector {
                 Ok(Snapshot { adapters })
             }
             Err(e) => {
-                use crate::collector::Collector;
-                tracing::warn!("[{}] unable to read /sys/class/net: {}", self.name(), e);
+                tracing::warn!("[net] unable to read /sys/class/net: {}", e);
                 Ok(Snapshot::default())
             }
         }
@@ -196,8 +204,8 @@ impl Differential for Counters {
 
     fn delta(&self, previous: &Self) -> Self::Delta {
         CounterDelta {
-            rx_bytes: self.rx_bytes - previous.rx_bytes,
-            tx_bytes: self.tx_bytes - previous.tx_bytes,
+            rx_bytes: self.rx_bytes.wrapping_sub(previous.rx_bytes),
+            tx_bytes: self.tx_bytes.wrapping_sub(previous.tx_bytes),
         }
     }
 }

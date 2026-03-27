@@ -10,14 +10,16 @@
 //!
 //! # Example
 //!
-//! ```
-//! let collector = monitord_metrics::cpu::Collector::new();
+//! ```no_run
+//! let mut collector = monitord::collector::cpu::Collector::new();
+//! let store = monitord::collector::store::Store::new();
 //! // The first collect call will return nothing as collection requires a current and last sample to calculate usages
-//! let empty = collector.collect().unwrap();
-//! assert!(empty.is_empty());
+//! collector.collect(&store).unwrap();
+//! assert!(store.cpu.get().is_some_and(|c| !c.logical.is_empty()));
 //! std::thread::sleep(std::time::Duration::from_secs(1));
-//! let result = collector.collect().unwrap();
-//! assert!(!result.is_empty());
+//! let store = monitord::collector::store::Store::new();
+//! collector.collect(&store).unwrap();
+//! assert!(store.cpu.get().is_some_and(|c| !c.logical.is_empty()));
 //! ```
 mod sensors;
 mod topology;
@@ -62,7 +64,7 @@ impl super::Collector for Collector {
                 .set(cpu)
                 .expect("cpu snapshot was already set previously, do not reuse Store instances!"),
             Err(e) => {
-                tracing::warn!("collector failed: {e}");
+                tracing::error!("[cpu] collect failed: {e}");
                 return Err(e);
             }
         }
@@ -72,7 +74,7 @@ impl super::Collector for Collector {
 
 impl Collector {
     pub fn new() -> Self {
-        tracing::info!("Creating CPU collector");
+        tracing::info!("[cpu] creating collector");
         Self {
             topology: Discovery::default(),
             utilization: utilization::Tracker::new(),
@@ -80,7 +82,7 @@ impl Collector {
         }
     }
 
-    pub fn collect_cpu(&mut self) -> anyhow::Result<Snapshot> {
+    fn collect_cpu(&mut self) -> anyhow::Result<Snapshot> {
         let topo = self.topology.require(topology::Topology::discover)?;
 
         let utilization = self.utilization.sample()?;

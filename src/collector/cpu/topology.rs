@@ -18,12 +18,14 @@ use crate::collector::helpers::sysfs;
 #[derive(Debug, Clone)]
 pub struct Topology {
     pub packages: BTreeMap<u32, Package>,
+    lookup: BTreeMap<u32, (u32, u32, u32, u32)>,
 }
 
 impl Default for Topology {
     fn default() -> Self {
         Self {
             packages: BTreeMap::new(),
+            lookup: BTreeMap::new(),
         }
     }
 }
@@ -93,9 +95,7 @@ impl From<CacheType> for i32 {
 impl Topology {
     pub fn discover() -> anyhow::Result<Self> {
         let cpuinfo = procfs::CpuInfo::current()?;
-        let mut topo = Self {
-            packages: BTreeMap::new(),
-        };
+        let mut topo = Self::default();
 
         for cpu_idx in 0..cpuinfo.num_cores() {
             topo.insert_cpu(&cpuinfo, cpu_idx as u32);
@@ -134,6 +134,8 @@ impl Topology {
             .or_insert_with(|| Core::from_sysfs(cpu_idx));
 
         let thread_index = core.threads.len() as u32;
+        self.lookup
+            .insert(os_cpu_id, (package_id, cluster_id, core_id, thread_index));
         core.threads.entry(os_cpu_id).or_insert(Thread {
             os_cpu_id,
             thread_index,
@@ -141,9 +143,25 @@ impl Topology {
     }
 
     fn attach_caches(&mut self, cpu_idx: u32) {
-        let Some((package_id, cluster_id, core_id, thread_count)) = self.locate_cpu(cpu_idx) else {
+        let Some((package_id, cluster_id, core_id, _)) = self.lookup.get(&cpu_idx) else {
             return;
         };
+
+        let thread_count = self
+            .packages
+            .get(package_id)
+            .map(|p| {
+                p.clusters
+                    .get(cluster_id)
+                    .map(|c| {
+                        c.cores
+                            .get(core_id)
+                            .map(|core| core.threads.len() as u32)
+                            .unwrap_or(1)
+                    })
+                    .unwrap_or(1)
+            })
+            .unwrap_or(1);
 
         let cache_dir = PathBuf::from(format!("/sys/devices/system/cpu/cpu{cpu_idx}/cache"));
         let Ok(entries) = std::fs::read_dir(&cache_dir) else {
@@ -176,7 +194,7 @@ impl Topology {
                     .and_then(|p| p.clusters.get_mut(&cluster_id))
                 else {
                     tracing::error!(
-                        "Could not locate cluster {cluster_id} for package {package_id}"
+                        "[cpu] could not locate cluster {cluster_id} for package {package_id}"
                     );
                     continue;
                 };
@@ -196,7 +214,7 @@ impl Topology {
                     .and_then(|c| c.cores.get_mut(&core_id))
                 else {
                     tracing::error!(
-                        "Could not locate cluster {cluster_id} for package {package_id}"
+                        "[cpu] could not locate core {core_id} for cluster {cluster_id} for package {package_id}"
                     );
                     continue;
                 };
@@ -209,21 +227,6 @@ impl Topology {
                 }
             }
         }
-    }
-
-    // Returns: (package_id, cluster_id, core_id, thread_count)
-    fn locate_cpu(&self, cpu_idx: u32) -> Option<(u32, u32, u32, u32)> {
-        let os_id = cpu_idx;
-        for (&pkg_id, pkg) in &self.packages {
-            for (&cl_id, cluster) in &pkg.clusters {
-                for (&core_id, core) in &cluster.cores {
-                    if core.threads.contains_key(&os_id) {
-                        return Some((pkg_id, cl_id, core_id, core.threads.len() as u32));
-                    }
-                }
-            }
-        }
-        None
     }
 }
 

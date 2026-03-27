@@ -19,7 +19,7 @@ impl Default for Collector {
 
 impl Collector {
     pub fn new() -> Self {
-        tracing::debug!("Initializing AMD GPU collector");
+        tracing::debug!("[gpu/amd] Initializing AMD GPU collector");
         Collector {
             app: std::collections::HashMap::new(),
         }
@@ -27,7 +27,10 @@ impl Collector {
 
     pub fn collect(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
         let amd_bench = std::time::Instant::now();
-        tracing::trace!("Collecting metrics for amdgpu device {}", path.display());
+        tracing::trace!(
+            "[gpu/amd] collecting metrics for amdgpu device {}",
+            path.display()
+        );
         let (app, timestamp) = self.app.entry(PathBuf::from(path)).or_insert_with(|| {
             let dev_path = path.join("device");
             let device_link = std::fs::read_link(dev_path)
@@ -179,7 +182,7 @@ impl Collector {
         *timestamp = std::time::Instant::now();
 
         tracing::trace!(
-            "Collected metrics for amdgpu device {} in {:?}",
+            "[gpu/amd] Collected metrics for amdgpu device {} in {:?}",
             path.display(),
             amd_bench.elapsed()
         );

@@ -91,7 +91,7 @@ impl Differential for u64 {
     type Delta = u64;
 
     fn delta(&self, other: &Self) -> Self::Delta {
-        self - other
+        self.wrapping_sub(*other)
     }
 }
 
@@ -150,9 +150,7 @@ impl Sources {
         };
 
         for (&package_id, source) in self.thermal.iter() {
-            temps
-                .package
-                .insert(package_id, read_package_temp(source, package_id));
+            temps.package.insert(package_id, read_package_temp(source));
 
             if let Some(package) = topology.packages.get(&package_id) {
                 for (&cluster_id, cluster) in package.clusters.iter() {
@@ -302,7 +300,7 @@ fn detect_amd_power() -> PowerSource {
 
 // === Temperature reading ===
 
-fn read_package_temp(source: &ThermalSource, _package_id: u32) -> Option<f32> {
+fn read_package_temp(source: &ThermalSource) -> Option<f32> {
     match source {
         ThermalSource::Coretemp { hwmon } => {
             // temp1_input is typically the package temperature
@@ -318,12 +316,12 @@ fn read_package_temp(source: &ThermalSource, _package_id: u32) -> Option<f32> {
     }
 }
 
-fn read_cluster_temp(source: &ThermalSource, _cluster_id: u32) -> Option<f32> {
+fn read_cluster_temp(source: &ThermalSource, cluster_id: u32) -> Option<f32> {
     match source {
         ThermalSource::K10temp { hwmon } | ThermalSource::Zenpower { hwmon } => {
             // CCD temperatures: temp3_input, temp4_input, etc.
             // CCD n maps to temp(n+3)_input on most AMD chips
-            let path = hwmon.join(format!("temp{}_input", _cluster_id + 3));
+            let path = hwmon.join(format!("temp{}_input", cluster_id + 3));
             read_hwmon_temp(&path)
         }
         _ => None, // Most other sources don't expose per-cluster temps

@@ -20,7 +20,7 @@ impl Default for Collector {
 
 impl Collector {
     pub fn new() -> Self {
-        tracing::debug!("Initializing NVIDIA GPU collector");
+        tracing::debug!("[gpu/nvidia] Initializing NVIDIA GPU collector");
         Collector {
             nvml: Discovery::default(),
         }
@@ -44,7 +44,10 @@ impl Collector {
     // Returns an error if there's an actual NVML error so it can be logged, but if there's no NVML, just return an empty GPU snapshot
     fn collect_nvidia(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
         let nvml_bench = std::time::Instant::now();
-        tracing::trace!("Collecting metrics for nvidia device {}", path.display());
+        tracing::trace!(
+            "[gpu/nvidia] Collecting metrics for nvidia device {}",
+            path.display()
+        );
         let nvml = self.nvml.probe(|| {
             nvml_wrapper::Nvml::init()
                 .with_context(|| "Failed to initialize NVML")
@@ -65,7 +68,7 @@ impl Collector {
                         .unwrap_or_default()
                 })
                 .unwrap_or_default();
-            tracing::info!("Checking device_real: {:?}", device_real);
+            tracing::info!("[gpu/nvidia] Checking device_real: {:?}", device_real);
             let device = nvml.device_by_pci_bus_id(device_real)?;
 
             let graphics_utilization = device
@@ -82,16 +85,12 @@ impl Collector {
 
             let encoder_utilization = device
                 .encoder_utilization()
-                .map(|enc_util| {
-                    enc_util.utilization as f64 * 100.0 / enc_util.sampling_period as f64
-                })
+                .map(|enc_util| enc_util.utilization as f64)
                 .unwrap_or_default();
 
             let decoder_utilization = device
                 .decoder_utilization()
-                .map(|dec_util| {
-                    dec_util.utilization as f64 * 100.0 / dec_util.sampling_period as f64
-                })
+                .map(|dec_util| dec_util.utilization as f64)
                 .unwrap_or_default();
             let video_clock = device.clock_info(Clock::Video).unwrap_or_default();
 
@@ -119,7 +118,7 @@ impl Collector {
             }
 
             tracing::trace!(
-                "Collected metrics for nvidia device {} in {:?}",
+                "[gpu/nvidia] Collected metrics for nvidia device {} in {:?}",
                 path.display(),
                 nvml_bench.elapsed()
             );
@@ -150,7 +149,10 @@ impl Collector {
     }
 
     fn collect_nouveau(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
-        tracing::trace!("Collecting metrics for nouveau device {}", path.display());
+        tracing::trace!(
+            "[gpu/nvidia] collecting metrics for nouveau device {}",
+            path.display()
+        );
         Err(anyhow::anyhow!("nouveau not yet implemented"))
     }
 }

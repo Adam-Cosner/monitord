@@ -8,10 +8,11 @@
 //!
 //! # Example
 //!
-//! ```
-//! let collector = monitord_metrics::memory::Collector::new();
-//! let result = collector.collect().unwrap();
-//! assert!()
+//! ```no_run
+//! let mut collector = monitord::collector::mem::Collector::new();
+//! let store = monitord::collector::store::Store::new();
+//! collector.collect(&store).unwrap();
+//! assert!(store.mem.get().is_some());
 //! ```
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -23,7 +24,7 @@ use crate::collector::store;
 #[doc(inline)]
 pub use crate::metrics::memory::*;
 
-/// The metric collector, create an instance with `memory::Collector::new()` and collect with `collector.collect()`
+/// The metric collector, create an instance with `mem::Collector::new()` and collect with `collector.collect(&store)`
 pub struct Collector {
     cached_dimms: Discovery<Vec<Dimm>>,
 }
@@ -52,7 +53,7 @@ impl super::Collector for Collector {
                 .set(snapshot)
                 .expect("mem snapshot was already set previously, do not reuse Store instances!"),
             Err(e) => {
-                tracing::error!("collector failed: {e}");
+                tracing::error!("[mem] collect failed: {e}");
                 return Err(e);
             }
         }
@@ -63,7 +64,7 @@ impl super::Collector for Collector {
 impl Collector {
     /// Create a new instance of the collector
     pub fn new() -> Self {
-        tracing::info!("[MEMORY] initializing new collector");
+        tracing::info!("[mem] creating collector");
         Self {
             cached_dimms: Discovery::default(),
         }
@@ -71,7 +72,7 @@ impl Collector {
 
     /// Collects a `memory::Snapshot`
     pub fn collect_memory(&mut self) -> anyhow::Result<Snapshot> {
-        tracing::debug!("[MEMORY] collecting metrics");
+        tracing::debug!("[mem] collecting metrics");
         let meminfo =
             procfs::Meminfo::current().with_context(|| format!("{} on {}", file!(), line!()))?;
         tracing::trace!("Read /proc/meminfo");
@@ -107,20 +108,20 @@ fn collect_dimms() -> anyhow::Result<Vec<Dimm>> {
     match collect_from_dmi() {
         Ok(dimms) => return Ok(dimms),
         Err(e) => tracing::warn!(
-            "[MEMORY] DMI reading failed, falling back to udev (this is okay, just means the program doesn't have access): {e}"
+            "[mem] DMI reading failed, falling back to udev (this is okay, just means the program doesn't have access): {e}"
         ),
     }
     match collect_from_udev_database() {
         Ok(dimms) => return Ok(dimms),
         Err(e) => tracing::warn!(
-            "[MEMORY] udev database reading failed (this happens on non-systemd distros): {e}"
+            "[mem] udev database reading failed (this happens on non-systemd distros): {e}"
         ),
     }
     Ok(Vec::new())
 }
 
 fn collect_from_dmi() -> anyhow::Result<Vec<Dimm>> {
-    tracing::debug!("[MEMORY] attempting to parse DMI tables");
+    tracing::debug!("[mem] attempting to parse DMI tables");
     // read in bytes from /sys/firmware/dmi/tables/DMI
     let bytes = std::fs::read(PathBuf::from("/sys/firmware/dmi/tables/DMI"))?;
     let entrypoint = dmidecode::EntryPoint::search(bytes.as_slice())?;
@@ -224,7 +225,7 @@ fn ramtype_to_string(ram_type: dmidecode::memory_device::Type) -> String {
 }
 
 fn collect_from_udev_database() -> anyhow::Result<Vec<Dimm>> {
-    tracing::debug!("[MEMORY] attempting to read udev database");
+    tracing::debug!("[mem] attempting to read udev database");
     let udev_filedata = std::fs::read_to_string("/run/udev/data/+dmi:id")?;
     let udev_filedata_lines = udev_filedata.lines().collect::<Vec<&str>>();
 
