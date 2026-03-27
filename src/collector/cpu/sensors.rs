@@ -44,6 +44,7 @@ pub struct Power {
 }
 
 impl Tracker {
+    /// Creates a new `Tracker`
     pub fn new() -> Self {
         Self {
             sources: Discovery::default(),
@@ -51,6 +52,7 @@ impl Tracker {
         }
     }
 
+    /// Reads the CPU sensor data and returns a `Sample`.
     pub fn read(&mut self, topology: &super::topology::Topology) -> anyhow::Result<Sample> {
         let sources = self
             .sources
@@ -315,7 +317,7 @@ fn read_package_temp(source: &ThermalSource) -> Option<f32> {
             sysfs::read_hwmon_temp(&hwmon.join("temp1_input"))
         }
         ThermalSource::ViaCputemp { hwmon } => sysfs::read_hwmon_temp(&hwmon.join("temp1_input")),
-        ThermalSource::ThermalZone { zone } => read_thermal_zone_temp(zone),
+        ThermalSource::ThermalZone { zone } => sysfs::read_hwmon_temp(&zone.join("temp")),
         ThermalSource::None => None,
     }
 }
@@ -355,11 +357,5 @@ fn read_rapl_energy(
         .entry(package_id)
         .or_insert_with(Sampler::new)
         .push(energy_uj);
-    let watts = delta.map(|d| (d.change as f64 / (d.interval.as_secs_f64() * 1_000_000.0)) as f32);
-    watts
-}
-
-fn read_thermal_zone_temp(zone: &Path) -> Option<f32> {
-    // thermal zone temperatures are in millidegrees Celsius
-    sysfs::read_u32(&zone.join("temp")).map(|milli| milli as f32 / 1000.0)
+    delta.map(|d| (d.change as f64 / (d.interval.as_secs_f64() * 1_000_000.0)) as f32)
 }
