@@ -54,7 +54,6 @@ impl super::Collector for Collector {
             Ok(adapters) => store
                 .net
                 .set(adapters)
-                .ok()
                 .expect("net snapshot was already set somehow, this should not happen!"),
             Err(e) => {
                 tracing::error!("collector failed: {e}");
