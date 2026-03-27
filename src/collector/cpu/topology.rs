@@ -331,8 +331,5 @@ fn read_cluster_id(cpu_idx: u32) -> u32 {
     let die_id_path = PathBuf::from(format!(
         "/sys/devices/system/cpu/cpu{cpu_idx}/topology/die_id"
     ));
-    std::fs::read_to_string(&die_id_path)
-        .ok()
-        .and_then(|s| s.trim().parse().ok())
-        .unwrap_or(0)
+    sysfs::read_u32(&die_id_path).unwrap_or(0)
 }

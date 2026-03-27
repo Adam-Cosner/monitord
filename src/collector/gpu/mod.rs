@@ -27,6 +27,7 @@ mod opengl_vulkan;
 use anyhow::Context;
 use std::path::PathBuf;
 
+use crate::collector::helpers::*;
 use crate::collector::store;
 #[doc(inline)]
 pub use crate::metrics::gpu::Gpu;
@@ -136,7 +137,7 @@ impl Collector {
             // Read vendor name
             let vendor_path = path.join("device/vendor");
             // If there is no vendor file, it's likely either a connector or a render node so it's okay to skip
-            if let Ok(vendor_val) = std::fs::read_to_string(&vendor_path) {
+            if let Some(vendor_val) = sysfs::read_string(&vendor_path) {
                 let vendor = match vendor_val.trim() {
                     "0x8086" => GpuVendor::Intel,
                     "0x10de" => GpuVendor::Nvidia,
