@@ -289,8 +289,11 @@ impl Core {
 impl Cache {
     fn from_sysfs(path: &Path) -> Option<Self> {
         let level = sysfs::read_u32(&path.join("level")).unwrap_or(0);
-        let cache_type =
-            CacheType::from_string(&sysfs::read_string(&path.join("type")).unwrap_or_default());
+        let cache_type = CacheType::from(
+            sysfs::read_string(&path.join("type"))
+                .unwrap_or_default()
+                .as_str(),
+        );
         let size_kb = sysfs::read_string(&path.join("size"))
             .as_ref()
             .and_then(|s| s.strip_suffix('K'))
@@ -308,8 +311,8 @@ impl Cache {
     }
 }
 
-impl CacheType {
-    fn from_string(s: &str) -> Self {
+impl From<&str> for CacheType {
+    fn from(s: &str) -> Self {
         match s {
             "Instruction" => CacheType::Instruction,
             "Data" => CacheType::Data,
