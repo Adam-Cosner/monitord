@@ -68,7 +68,7 @@ impl Collector {
                         .unwrap_or_default()
                 })
                 .unwrap_or_default();
-            tracing::info!("[gpu/nvidia] Checking device_real: {:?}", device_real);
+            tracing::debug!("[gpu/nvidia] Checking device_real: {:?}", device_real);
             let device = nvml.device_by_pci_bus_id(device_real)?;
 
             let graphics_utilization = device
