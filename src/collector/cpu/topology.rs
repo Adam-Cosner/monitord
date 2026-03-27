@@ -346,7 +346,7 @@ fn read_cluster_id(cpu_idx: u32) -> u32 {
     sysfs::read_u32(&die_id_path).unwrap_or(0)
 }
 
-pub fn get_cpufreq_info(cpu_idx: u32) -> (String, String, Option<String>) {
+fn get_cpufreq_info(cpu_idx: u32) -> (String, String, Option<String>) {
     let driver = sysfs::read_string(&PathBuf::from(format!(
         "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/scaling_driver"
     )))
