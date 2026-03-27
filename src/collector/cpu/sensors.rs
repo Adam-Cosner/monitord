@@ -343,7 +343,7 @@ fn read_core_temp(source: &ThermalSource, core_id: u32) -> Option<f32> {
 
 fn read_rapl_energy(
     package_id: u32,
-    energy_path: &PathBuf,
+    energy_path: &Path,
     energy: &mut BTreeMap<u32, Sampler<u64>>,
 ) -> Option<f32> {
     let energy_uj = sysfs::read_u64(energy_path).unwrap_or_default();
@@ -357,12 +357,12 @@ fn read_rapl_energy(
 
 // === Low-level hwmon / thermal zone readers ===
 
-fn read_hwmon_temp(path: &PathBuf) -> Option<f32> {
+fn read_hwmon_temp(path: &Path) -> Option<f32> {
     // hwmon temperatures are in millidegrees Celsius
     sysfs::read_u32(path).map(|milli| milli as f32 / 1000.0)
 }
 
-fn read_hwmon_power(path: &PathBuf) -> Option<f32> {
+fn read_hwmon_power(path: &Path) -> Option<f32> {
     // hwmon power is in microwatts
     sysfs::read_u64(path)
         .map(|uw| uw as f64 / 1_000_000.0)
@@ -376,7 +376,7 @@ fn read_thermal_zone_temp(zone: &Path) -> Option<f32> {
 
 // === Hwmon discovery helpers ===
 
-fn first_hwmon_subdir(hwmon_parent: &PathBuf) -> Option<PathBuf> {
+fn first_hwmon_subdir(hwmon_parent: &Path) -> Option<PathBuf> {
     std::fs::read_dir(hwmon_parent)
         .ok()?
         .flatten()
