@@ -26,6 +26,7 @@ impl Collector {
         }
     }
 
+    /// Returns the OpenGL and Vulkan drivers for the GPU at the given path respectively.
     pub fn get_drivers(&mut self, path: &Path, vendor: &GpuVendor) -> (String, String) {
         let instance = self.instance.require(|| {
             let instance_descriptor = wgpu::InstanceDescriptor {

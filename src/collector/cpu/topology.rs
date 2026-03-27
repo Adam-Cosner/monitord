@@ -15,9 +15,11 @@ use crate::collector::helpers::sysfs;
 
 // DATA STRUCTURES
 
+/// Represents the cached topology of the CPUs in the system.
 #[derive(Debug, Clone)]
 pub struct Topology {
     pub packages: BTreeMap<u32, Package>,
+    /// A lookup table for CPU indices to their package, cluster, core, and thread IDs.
     lookup: BTreeMap<u32, (u32, u32, u32, u32)>,
 }
 
@@ -30,6 +32,7 @@ impl Default for Topology {
     }
 }
 
+/// Represents the cached topology of a CPU package.
 #[derive(Default, Debug, Clone)]
 pub struct Package {
     pub vendor_id: String,
@@ -44,12 +47,14 @@ pub struct Package {
     pub clusters: BTreeMap<u32, Cluster>,
 }
 
+/// Represents the cached topology of a CPU cluster.
 #[derive(Default, Debug, Clone)]
 pub struct Cluster {
     pub cores: BTreeMap<u32, Core>,
     pub shared_caches: Vec<Cache>,
 }
 
+/// Represents the cached topology of a CPU core.
 #[derive(Default, Debug, Clone)]
 pub struct Core {
     pub base_freq_mhz: u32,
@@ -58,12 +63,14 @@ pub struct Core {
     pub private_caches: Vec<Cache>,
 }
 
+/// Represents the cached topology of a CPU thread.
 #[derive(Default, Debug, Clone)]
 pub struct Thread {
     pub os_cpu_id: u32,
     pub thread_index: u32, // 0 or 1 within the core
 }
 
+/// Represents the cached information about a CPU cache.
 #[derive(Debug, Clone)]
 pub struct Cache {
     pub level: u32,
@@ -73,11 +80,16 @@ pub struct Cache {
     pub associativity: u32,
 }
 
+/// The type of a CPU cache.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
 pub enum CacheType {
+    /// The cache type is unknown or not specified.
     Unknown,
+    /// The cache is an instruction cache.
     Instruction,
+    /// The cache is a data cache.
     Data,
+    /// The cache is unified (instruction and data).
     Unified,
 }
 
@@ -93,6 +105,7 @@ impl From<CacheType> for i32 {
 }
 
 impl Topology {
+    /// Discovers the topology of the CPUs in the system.
     pub fn discover() -> anyhow::Result<Self> {
         let cpuinfo = procfs::CpuInfo::current()?;
         let mut topo = Self::default();
@@ -109,6 +122,7 @@ impl Topology {
         Ok(topo)
     }
 
+    /// Inserts a CPU into the topology cache and reads its information.
     fn insert_cpu(&mut self, cpuinfo: &procfs::CpuInfo, cpu_idx: u32) {
         let package_id = cpuinfo.physical_id(cpu_idx as usize).unwrap_or(0);
         let cluster_id = read_cluster_id(cpu_idx);
@@ -142,6 +156,7 @@ impl Topology {
         });
     }
 
+    /// Reads and attaches cache information to the topology.
     fn attach_caches(&mut self, cpu_idx: u32) {
         let Some((package_id, cluster_id, core_id, _)) = self.lookup.get(&cpu_idx) else {
             return;
@@ -223,6 +238,7 @@ impl Topology {
 }
 
 impl Package {
+    /// Creates a [`Package`] from the CPU information for a given CPU index.
     fn from_cpuinfo(cpuinfo: &procfs::CpuInfo, cpu_idx: u32) -> Self {
         let cpu_idx = cpu_idx as usize;
         let vendor_id = cpuinfo
@@ -287,6 +303,7 @@ impl Core {
 }
 
 impl Cache {
+    /// Creates a [`Cache`] from the sysfs information for a given cache path.
     fn from_sysfs(path: &Path) -> Option<Self> {
         let level = sysfs::read_u32(&path.join("level")).unwrap_or(0);
         let cache_type = CacheType::from(

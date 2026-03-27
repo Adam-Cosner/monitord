@@ -98,6 +98,7 @@ impl Collector {
         }
     }
 
+    /// Collects the GPU metrics and returns a snapshot.
     fn collect_gpus(&mut self) -> anyhow::Result<Snapshot> {
         let mut gpus = Vec::new();
         if self.gpus.is_empty() {
@@ -122,7 +123,7 @@ impl Collector {
         Ok(Snapshot { gpus })
     }
 
-    // Iterates over /sys/class/drm to find the GPU devices. This is the best way to get them in a consistent order.
+    /// Iterates over /sys/class/drm to find the GPU devices. This is the best way to get them in a consistent order.
     fn enumerate_devices(&mut self) -> anyhow::Result<Vec<GpuCache>> {
         let enumerate_bench = std::time::Instant::now();
         tracing::debug!("Enumerating GPU device paths");
@@ -172,6 +173,7 @@ impl Collector {
     }
 }
 
+/// Caches information about a GPU device.
 struct GpuCache {
     path: PathBuf,
     vendor: GpuVendor,
@@ -179,6 +181,7 @@ struct GpuCache {
     vulkan_driver: String,
 }
 
+/// The vendor of a GPU device.
 enum GpuVendor {
     Intel,
     Nvidia,

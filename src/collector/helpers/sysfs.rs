@@ -8,20 +8,24 @@
 
 use std::path::{Path, PathBuf};
 
+/// Reads a string from a given path, trimming whitespace and converting to a `String`.
 pub fn read_string(path: &Path) -> Option<String> {
     std::fs::read_to_string(path)
         .map(|s| s.trim().to_string())
         .ok()
 }
 
+/// Reads a 32-bit unsigned integer from a given path.
 pub fn read_u32(path: &Path) -> Option<u32> {
     read_string(path).and_then(|s| s.parse::<u32>().ok())
 }
 
+/// Reads a 64-bit unsigned integer from a given path.
 pub fn read_u64(path: &Path) -> Option<u64> {
     read_string(path).and_then(|s| s.parse::<u64>().ok())
 }
 
+/// Counts the number of CPUs in a given CPU list string (e.g. "0-3,5,7-9")
 pub fn count_cpu_list(cpu_list: &str) -> Option<u32> {
     let mut count = 0;
     for range in cpu_list.trim().split(',') {

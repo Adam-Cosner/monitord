@@ -15,18 +15,21 @@ use crate::collector::helpers::{
     *,
 };
 
+/// Tracker for the CPU sensors.
 #[derive(Debug, Clone)]
 pub struct Tracker {
     sources: Discovery<Sources>,
     last_energy: BTreeMap<u32, Sampler<u64>>, // for RAPL diff
 }
 
+/// A single sample of CPU sensor data.
 #[derive(Debug, Clone)]
 pub struct Sample {
     pub temperatures: Temperatures,
     pub power: Power,
 }
 
+/// A sample of CPU temperature sensor data.
 #[derive(Debug, Clone)]
 pub struct Temperatures {
     pub package: BTreeMap<u32, Option<f32>>,
@@ -34,6 +37,7 @@ pub struct Temperatures {
     pub core: BTreeMap<(u32, u32, u32), Option<f32>>,
 }
 
+/// A sample of CPU power sensor data.
 #[derive(Debug, Clone)]
 pub struct Power {
     pub package: BTreeMap<u32, Option<f32>>,
