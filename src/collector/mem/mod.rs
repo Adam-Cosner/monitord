@@ -246,6 +246,7 @@ fn collect_from_udev_database() -> anyhow::Result<Vec<Dimm>> {
     Ok(dimms.into_values().collect())
 }
 
+#[cfg(test)]
 mod tests {
     #[test]
     fn memory() -> anyhow::Result<()> {
