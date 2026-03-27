@@ -57,7 +57,7 @@ pub struct Cluster {
 /// Represents the cached topology of a CPU core.
 #[derive(Default, Debug, Clone)]
 pub struct Core {
-    pub base_freq_mhz: u32,
+    pub min_freq_mhz: u32,
     pub max_freq_mhz: u32,
     pub threads: BTreeMap<u32, Thread>,
     pub private_caches: Vec<Cache>,
@@ -285,16 +285,16 @@ impl Package {
 impl Core {
     /// Creates a [`Core`] from the sysfs information for a given CPU index.
     fn from_sysfs(cpu_idx: u32) -> Self {
-        let base_freq_mhz = sysfs::read_u32(&PathBuf::from(format!(
-            "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/scaling_min_freq"
+        let min_freq_mhz = sysfs::read_u32(&PathBuf::from(format!(
+            "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/cpuinfo_min_freq"
         )))
         .unwrap_or(0);
         let max_freq_mhz = sysfs::read_u32(&PathBuf::from(format!(
-            "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/scaling_max_freq"
+            "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/cpuinfo_max_freq"
         )))
         .unwrap_or(0);
         Self {
-            base_freq_mhz,
+            min_freq_mhz,
             max_freq_mhz,
             threads: BTreeMap::new(),
             private_caches: Vec::new(),

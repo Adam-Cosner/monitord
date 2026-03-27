@@ -135,7 +135,7 @@ fn assemble(
                 }
                 cores.push(Core {
                     core_id,
-                    base_freq_mhz: core.base_freq_mhz,
+                    min_freq_mhz: core.min_freq_mhz,
                     max_freq_mhz: core.max_freq_mhz,
                     core_temperature_c: sensors.core_temp((package_id, cluster_id, core_id)),
                     threads,

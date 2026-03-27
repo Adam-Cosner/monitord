@@ -54,7 +54,7 @@ message Cluster {
 // A physical CPU core
 message Core {
   uint32 core_id = 1; // The ID of the core
-  uint32 base_freq_mhz = 2; // The base frequency of the core in MHz
+  uint32 min_freq_mhz = 2; // The base frequency of the core in MHz
   uint32 max_freq_mhz = 3; // The maximum frequency of the core in MHz
 
   optional float core_temperature_c = 4; // The temperature of the core in Celsius (currently only Intel coretemp provides this)
