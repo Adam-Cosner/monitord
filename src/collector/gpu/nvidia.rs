@@ -6,17 +6,17 @@
 use anyhow::Context;
 use std::path::Path;
 
-use crate::collector::helpers::cached::Cached;
+use crate::collector::helpers::discovery::Discovery;
 
 pub(super) struct Collector {
-    nvml: Cached<nvml_wrapper::Nvml>,
+    nvml: Discovery<nvml_wrapper::Nvml>,
 }
 
 impl Collector {
     pub fn new() -> Self {
         tracing::debug!("Initializing NVIDIA GPU collector");
         Collector {
-            nvml: Cached::default(),
+            nvml: Discovery::default(),
         }
     }
 
@@ -39,7 +39,7 @@ impl Collector {
     fn collect_nvidia(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
         let nvml_bench = std::time::Instant::now();
         tracing::trace!("Collecting metrics for nvidia device {}", path.display());
-        let nvml = self.nvml.get_or_try(|| {
+        let nvml = self.nvml.probe(|| {
             nvml_wrapper::Nvml::init()
                 .with_context(|| "Failed to initialize NVML")
                 .inspect_err(|err| tracing::error!("{}", err))

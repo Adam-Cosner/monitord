@@ -9,12 +9,16 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::collector::helpers::*;
+use crate::collector::helpers::{
+    discovery::Discovery,
+    sampler::{Differential, Sampler},
+    *,
+};
 
 #[derive(Debug, Clone)]
 pub struct Tracker {
-    sources: cached::Cached<Sources>,
-    last_energy: BTreeMap<u32, sample::Sample<u64>>, // for RAPL diff
+    sources: Discovery<Sources>,
+    last_energy: BTreeMap<u32, Sampler<u64>>, // for RAPL diff
 }
 
 #[derive(Debug, Clone)]
@@ -38,7 +42,7 @@ pub struct Power {
 impl Tracker {
     pub fn new() -> Self {
         Self {
-            sources: cached::Cached::default(),
+            sources: Discovery::default(),
             last_energy: BTreeMap::new(),
         }
     }
@@ -46,11 +50,10 @@ impl Tracker {
     pub fn read(&mut self, topology: &super::topology::Topology) -> anyhow::Result<Sample> {
         let sources = self
             .sources
-            .get_or_try_mut(|| Ok(Sources::detect(topology)))
+            .probe_mut(|| Ok(Sources::detect(topology)))
             .ok_or_else(|| anyhow::anyhow!("Failed to detect sensors"))?;
         let temperatures = sources.read_temperatures(topology);
-        let (power, new_energy) = sources.read_power(&self.last_energy);
-        self.last_energy = new_energy;
+        let power = sources.read_power(&mut self.last_energy);
         Ok(Sample {
             temperatures,
             power,
@@ -84,10 +87,10 @@ impl Sample {
     }
 }
 
-impl sample::Diffable for u64 {
+impl Differential for u64 {
     type Delta = u64;
 
-    fn diff(&self, other: &Self) -> Self::Delta {
+    fn delta(&self, other: &Self) -> Self::Delta {
         self - other
     }
 }
@@ -170,21 +173,12 @@ impl Sources {
         temps
     }
 
-    fn read_power(
-        &mut self,
-        last_energy: &BTreeMap<u32, sample::Sample<u64>>,
-    ) -> (Power, BTreeMap<u32, sample::Sample<u64>>) {
+    fn read_power(&mut self, last_energy: &mut BTreeMap<u32, Sampler<u64>>) -> Power {
         let mut package = BTreeMap::new();
-        let mut new_energy = BTreeMap::new();
-
         for (&package_id, source) in self.power.iter() {
             let watts = match source {
                 PowerSource::Rapl { energy_path } => {
-                    let (package, energy_reading) =
-                        read_rapl_energy(package_id, energy_path, last_energy);
-                    new_energy.insert(package_id, energy_reading);
-
-                    package
+                    read_rapl_energy(package_id, energy_path, last_energy)
                 }
                 PowerSource::Hwmon { path } => read_hwmon_power(path),
                 PowerSource::None => None,
@@ -192,7 +186,7 @@ impl Sources {
             package.insert(package_id, watts);
         }
 
-        (Power { package }, new_energy)
+        Power { package }
     }
 }
 
@@ -352,22 +346,15 @@ fn read_core_temp(source: &ThermalSource, core_id: u32) -> Option<f32> {
 fn read_rapl_energy(
     package_id: u32,
     energy_path: &PathBuf,
-    last_energy: &BTreeMap<u32, sample::Sample<u64>>,
-) -> (Option<f32>, sample::Sample<u64>) {
+    energy: &mut BTreeMap<u32, Sampler<u64>>,
+) -> Option<f32> {
     let energy_uj = sysfs::read_u64(energy_path).unwrap_or_default();
-    let cur_energy = sample::Sample::new(energy_uj);
-    let watts = if let Some(last) = last_energy.get(&package_id) {
-        let diff = &cur_energy - last;
-        if diff.elapsed.as_secs_f64() > 0.0 {
-            let delta_uj = energy_uj.wrapping_sub(last.value);
-            Some((delta_uj as f64 / (diff.elapsed.as_secs_f64() * 1_000_000.0)) as f32)
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-    (watts, cur_energy)
+    let delta = energy
+        .entry(package_id)
+        .or_insert_with(Sampler::new)
+        .push(energy_uj);
+    let watts = delta.map(|d| (d.change as f64 / (d.interval.as_secs_f64() * 1_000_000.0)) as f32);
+    watts
 }
 
 // === Low-level hwmon / thermal zone readers ===

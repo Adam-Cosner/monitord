@@ -26,10 +26,10 @@ mod utilization;
 #[doc(inline)]
 pub use crate::metrics::cpu::*;
 
-use super::helpers::cached::Cached;
+use super::helpers::discovery::Discovery;
 
 pub struct Collector {
-    topology: Cached<topology::Topology>,
+    topology: Discovery<topology::Topology>,
     utilization: utilization::Tracker,
     sensors: sensors::Tracker,
 }
@@ -44,14 +44,14 @@ impl Collector {
     pub fn new() -> Self {
         tracing::info!("Creating CPU collector");
         Self {
-            topology: Cached::default(),
+            topology: Discovery::default(),
             utilization: utilization::Tracker::new(),
             sensors: sensors::Tracker::new(),
         }
     }
 
     pub fn collect(&mut self) -> anyhow::Result<Snapshot> {
-        let topo = self.topology.get_or_require(topology::Topology::discover)?;
+        let topo = self.topology.require(topology::Topology::discover)?;
 
         let utilization = self.utilization.sample()?;
         let sensors = self.sensors.read(topo)?;

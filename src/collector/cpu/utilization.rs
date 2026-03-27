@@ -7,16 +7,40 @@ use std::path::PathBuf;
  */
 use procfs::CurrentSI;
 
-use crate::collector::helpers::*;
+use crate::collector::helpers::{
+    sampler::{Differential, Sampler},
+    *,
+};
 
 pub struct Tracker {
-    last: Option<sample::Sample<procfs::KernelStats>>, // not using Sample here because I don't need the timestamp
+    sampler: Sampler<procfs::KernelStats>,
 }
 
-impl sample::Diffable for procfs::KernelStats {
+impl Tracker {
+    pub fn new() -> Self {
+        Self {
+            sampler: Sampler::new(),
+        }
+    }
+
+    pub fn sample(&mut self) -> anyhow::Result<Vec<Utilization>> {
+        match procfs::KernelStats::current() {
+            Ok(stat) => match self.sampler.push(stat) {
+                Some(delta) => Ok(delta.change),
+                None => Ok(Vec::new()),
+            },
+            Err(e) => {
+                tracing::warn!("[CPU] failed to read /proc/stat: {}", e);
+                Ok(Vec::new())
+            }
+        }
+    }
+}
+
+impl Differential for procfs::KernelStats {
     type Delta = Vec<Utilization>;
 
-    fn diff(&self, other: &Self) -> Self::Delta {
+    fn delta(&self, other: &Self) -> Self::Delta {
         let mut per_core = Vec::with_capacity(self.cpu_time.len());
         for i in 0..other.cpu_time.len() {
             let usage = diff_stats(i, other, self);
@@ -34,26 +58,6 @@ impl sample::Diffable for procfs::KernelStats {
 pub struct Utilization {
     pub usage: f32,
     pub cur_freq_mhz: u32,
-}
-
-impl Tracker {
-    pub fn new() -> Self {
-        Self { last: None }
-    }
-
-    pub fn sample(&mut self) -> anyhow::Result<Vec<Utilization>> {
-        let stat = sample::Sample::new(procfs::KernelStats::current()?);
-        let diff = self
-            .last
-            .as_ref()
-            .map(|last| &stat - last)
-            .unwrap_or(sample::Diff {
-                delta: Vec::new(),
-                elapsed: std::time::Duration::from_secs(0),
-            });
-        self.last = Some(stat);
-        Ok(diff.delta)
-    }
 }
 
 fn diff_stats(

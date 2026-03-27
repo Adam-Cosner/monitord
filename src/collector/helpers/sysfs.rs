@@ -4,19 +4,21 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-use std::path::PathBuf;
+//! Contains helper functions for reading from /sys files.
 
-pub fn read_string(path: &PathBuf) -> Option<String> {
+use std::path::{Path, PathBuf};
+
+pub fn read_string(path: &Path) -> Option<String> {
     std::fs::read_to_string(path)
         .map(|s| s.trim().to_string())
         .ok()
 }
 
-pub fn read_u32(path: &PathBuf) -> Option<u32> {
+pub fn read_u32(path: &Path) -> Option<u32> {
     read_string(path).and_then(|s| s.parse::<u32>().ok())
 }
 
-pub fn read_u64(path: &PathBuf) -> Option<u64> {
+pub fn read_u64(path: &Path) -> Option<u64> {
     read_string(path).and_then(|s| s.parse::<u64>().ok())
 }
 

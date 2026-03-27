@@ -4,6 +4,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-pub(crate) mod cached;
-pub(crate) mod sample;
+//! Helper modules for the collectors.
+
+pub(crate) mod discovery;
+pub(crate) mod sampler;
 pub(crate) mod sysfs;

@@ -15,7 +15,7 @@
 //! ```
 use std::{collections::BTreeMap, path::PathBuf};
 
-use super::helpers::cached::Cached;
+use super::helpers::discovery::Discovery;
 use anyhow::Context;
 use procfs::Current;
 
@@ -24,7 +24,7 @@ pub use crate::metrics::memory::*;
 
 /// The metric collector, create an instance with `memory::Collector::new()` and collect with `collector.collect()`
 pub struct Collector {
-    cached_dimms: Cached<Vec<Dimm>>,
+    cached_dimms: Discovery<Vec<Dimm>>,
 }
 
 impl Default for Collector {
@@ -38,7 +38,7 @@ impl Collector {
     pub fn new() -> Self {
         tracing::info!("[MEMORY] initializing new collector");
         Self {
-            cached_dimms: Cached::default(),
+            cached_dimms: Discovery::default(),
         }
     }
 
@@ -68,7 +68,7 @@ impl Collector {
 
         let dimms = self
             .cached_dimms
-            .get_or_try(collect_dimms)
+            .probe(collect_dimms)
             .cloned()
             .unwrap_or_default();
 
