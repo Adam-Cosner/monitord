@@ -88,7 +88,7 @@ impl super::Collector for Collector {
 
 impl Collector {
     pub fn new() -> Self {
-        tracing::info!("Creating GPU collector");
+        tracing::info!("[gpu] creating collector");
         Collector {
             gpus: Vec::new(),
             oglv_collector: opengl_vulkan::Collector::new(),
