@@ -20,7 +20,7 @@ use crate::collector::helpers::sysfs;
 pub struct Topology {
     pub packages: BTreeMap<u32, Package>,
     /// A lookup table for CPU indices to their package, cluster, core, and thread IDs.
-    lookup: BTreeMap<u32, (u32, u32, u32, u32)>,
+    lookup: BTreeMap<u32, (u32, u32, u32)>,
 }
 
 impl Default for Topology {
@@ -149,7 +149,7 @@ impl Topology {
 
         let thread_index = core.threads.len() as u32;
         self.lookup
-            .insert(os_cpu_id, (package_id, cluster_id, core_id, thread_index));
+            .insert(os_cpu_id, (package_id, cluster_id, core_id));
         core.threads.entry(os_cpu_id).or_insert(Thread {
             os_cpu_id,
             thread_index,
@@ -158,7 +158,7 @@ impl Topology {
 
     /// Reads and attaches cache information to the topology.
     fn attach_caches(&mut self, cpu_idx: u32) {
-        let Some((package_id, cluster_id, core_id, _)) = self.lookup.get(&cpu_idx) else {
+        let Some((package_id, cluster_id, core_id)) = self.lookup.get(&cpu_idx) else {
             return;
         };
 
