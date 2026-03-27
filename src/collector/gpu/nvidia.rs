@@ -100,22 +100,7 @@ impl Collector {
                 .temperature(TemperatureSensor::Gpu)
                 .unwrap_or_default() as i32;
 
-            let mut processes = Vec::new();
-            for process in device.process_utilization_stats(None).iter().flatten() {
-                let pid = process.pid;
-                let graphics_utilization = process.sm_util as f64;
-                let memory_usage = process.mem_util as u64;
-                let encode_utilization = process.enc_util as f64;
-                let decode_utilization = process.dec_util as f64;
-
-                processes.push(super::Process {
-                    pid,
-                    graphics_utilization,
-                    memory_usage,
-                    encode_utilization,
-                    decode_utilization,
-                })
-            }
+            let processes = collect_processes(&device);
 
             tracing::trace!(
                 "[gpu/nvidia] Collected metrics for nvidia device {} in {:?}",
@@ -155,4 +140,24 @@ impl Collector {
         );
         Err(anyhow::anyhow!("nouveau not yet implemented"))
     }
+}
+
+fn collect_processes(device: &nvml_wrapper::Device) -> Vec<super::Process> {
+    let mut processes = Vec::new();
+    for process in device.process_utilization_stats(None).iter().flatten() {
+        let pid = process.pid;
+        let graphics_utilization = process.sm_util as f64;
+        let memory_usage = process.mem_util as u64;
+        let encode_utilization = process.enc_util as f64;
+        let decode_utilization = process.dec_util as f64;
+
+        processes.push(super::Process {
+            pid,
+            graphics_utilization,
+            memory_usage,
+            encode_utilization,
+            decode_utilization,
+        })
+    }
+    processes
 }
