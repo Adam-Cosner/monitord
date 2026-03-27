@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn cpu() -> anyhow::Result<()> {
-        tracing_subscriber::fmt::init();
+        let _ = tracing_subscriber::fmt::try_init();
         let mut collector = super::Collector::new();
         let mut store = store::Store::new();
         collector.collect(&store)?;
