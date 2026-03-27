@@ -3,10 +3,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
+//! Reader for OpenGL and Vulkan driver information
 
 use crate::collector::{gpu::GpuVendor, helpers::discovery::Discovery};
 use std::path::Path;
 
+/// Collects OpenGL and Vulkan driver information
 pub struct Collector {
     instance: Discovery<wgpu::Instance>,
     adapters: Discovery<Vec<wgpu::Adapter>>,
