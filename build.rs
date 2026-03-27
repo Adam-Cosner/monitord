@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_prost_build::configure()
         .build_server(false)
         .build_client(true)
-        .compile_protos(&["proto/service/v1/control.proto"], &["proto/"])?;
+        .compile_protos(&["proto/control/v1/control.proto"], &["proto/"])?;
 
     Ok(())
 }
