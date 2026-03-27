@@ -14,5 +14,8 @@ build-control:
 test TEST:
     RUST_LOG=debug cargo test {{ TEST }} --release --features=collector -- --show-output
 
+test-all:
+    RUST_LOG=debug cargo test --release --features=collector -- --show-output
+
 clippy:
     cargo clippy --release --features=daemon
