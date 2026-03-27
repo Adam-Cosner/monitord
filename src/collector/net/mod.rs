@@ -209,6 +209,12 @@ struct CounterDelta {
     tx_bytes: u64,
 }
 
+const ARPHRD_ETHER: u32 = 1;
+const ARPHRD_TUNNEL: u32 = 768;
+const ARPHRD_LOOPBACK: u32 = 772;
+const ARPHRD_SIT: u32 = 776;
+const ARPHRD_NONE: u32 = 65534;
+
 fn classify_adapter(path: &Path) -> adapter::AdapterType {
     if path.join("wireless").exists() || path.join("phy80211").exists() {
         adapter::AdapterType::Wifi
@@ -216,9 +222,11 @@ fn classify_adapter(path: &Path) -> adapter::AdapterType {
         adapter::AdapterType::Bridge
     } else {
         match sysfs::read_u32(&path.join("type")) {
-            Some(772) => adapter::AdapterType::Loopback,
-            Some(1) => adapter::AdapterType::Ethernet,
-            Some(65534) | Some(768) | Some(776) => adapter::AdapterType::Virtual,
+            Some(ARPHRD_LOOPBACK) => adapter::AdapterType::Loopback,
+            Some(ARPHRD_ETHER) => adapter::AdapterType::Ethernet,
+            Some(ARPHRD_NONE) | Some(ARPHRD_TUNNEL) | Some(ARPHRD_SIT) => {
+                adapter::AdapterType::Virtual
+            }
             _ => adapter::AdapterType::Unknown,
         }
     }
