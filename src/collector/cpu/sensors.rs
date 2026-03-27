@@ -178,7 +178,7 @@ impl Sources {
                 PowerSource::Rapl { energy_path } => {
                     read_rapl_energy(package_id, energy_path, last_energy)
                 }
-                PowerSource::Hwmon { path } => read_hwmon_power(path),
+                PowerSource::Hwmon { path } => sysfs::read_hwmon_power(path),
                 PowerSource::None => None,
             };
             package.insert(package_id, watts);
@@ -200,17 +200,17 @@ fn detect_thermal(package_id: u32, vendor: &str) -> ThermalSource {
 
 fn detect_coretemp(package_id: u32) -> ThermalSource {
     let platform = PathBuf::from(format!("/sys/devices/platform/coretemp.{package_id}/hwmon"));
-    match first_hwmon_subdir(&platform) {
+    match sysfs::first_hwmon_subdir(&platform) {
         Some(hwmon) => ThermalSource::Coretemp { hwmon },
         None => detect_thermal_zone(),
     }
 }
 
 fn detect_amd_thermal() -> ThermalSource {
-    if let Some(hwmon) = find_pci_driver_hwmon("zenpower") {
+    if let Some(hwmon) = sysfs::find_pci_driver_hwmon("zenpower") {
         return ThermalSource::Zenpower { hwmon };
     }
-    if let Some(hwmon) = find_pci_driver_hwmon("k10temp") {
+    if let Some(hwmon) = sysfs::find_pci_driver_hwmon("k10temp") {
         return ThermalSource::K10temp { hwmon };
     }
     detect_thermal_zone()
@@ -220,7 +220,7 @@ fn detect_via_thermal(package_id: u32) -> ThermalSource {
     let platform = PathBuf::from(format!(
         "/sys/devices/platform/via_cputemp.{package_id}/hwmon"
     ));
-    match first_hwmon_subdir(&platform) {
+    match sysfs::first_hwmon_subdir(&platform) {
         Some(hwmon) => ThermalSource::ViaCputemp { hwmon },
         None => detect_thermal_zone(),
     }
@@ -283,13 +283,13 @@ fn detect_rapl(package_id: u32) -> PowerSource {
 
 fn detect_amd_power() -> PowerSource {
     // AMD exposes power through the same hwmon as thermal ON SOME SYSTEMS
-    if let Some(hwmon) = find_pci_driver_hwmon("zenpower") {
+    if let Some(hwmon) = sysfs::find_pci_driver_hwmon("zenpower") {
         let path = hwmon.join("power1_input");
         if path.exists() {
             return PowerSource::Hwmon { path };
         }
     }
-    if let Some(hwmon) = find_pci_driver_hwmon("k10temp") {
+    if let Some(hwmon) = sysfs::find_pci_driver_hwmon("k10temp") {
         let path = hwmon.join("power1_input");
         if path.exists() {
             return PowerSource::Hwmon { path };
@@ -304,13 +304,13 @@ fn read_package_temp(source: &ThermalSource) -> Option<f32> {
     match source {
         ThermalSource::Coretemp { hwmon } => {
             // temp1_input is typically the package temperature
-            read_hwmon_temp(&hwmon.join("temp1_input"))
+            sysfs::read_hwmon_temp(&hwmon.join("temp1_input"))
         }
         ThermalSource::K10temp { hwmon } | ThermalSource::Zenpower { hwmon } => {
             // Tctl or Tdie — temp1 is usually Tctl
-            read_hwmon_temp(&hwmon.join("temp1_input"))
+            sysfs::read_hwmon_temp(&hwmon.join("temp1_input"))
         }
-        ThermalSource::ViaCputemp { hwmon } => read_hwmon_temp(&hwmon.join("temp1_input")),
+        ThermalSource::ViaCputemp { hwmon } => sysfs::read_hwmon_temp(&hwmon.join("temp1_input")),
         ThermalSource::ThermalZone { zone } => read_thermal_zone_temp(zone),
         ThermalSource::None => None,
     }
@@ -322,7 +322,7 @@ fn read_cluster_temp(source: &ThermalSource, cluster_id: u32) -> Option<f32> {
             // CCD temperatures: temp3_input, temp4_input, etc.
             // CCD n maps to temp(n+3)_input on most AMD chips
             let path = hwmon.join(format!("temp{}_input", cluster_id + 3));
-            read_hwmon_temp(&path)
+            sysfs::read_hwmon_temp(&path)
         }
         _ => None, // Most other sources don't expose per-cluster temps
     }
@@ -333,7 +333,7 @@ fn read_core_temp(source: &ThermalSource, core_id: u32) -> Option<f32> {
         ThermalSource::Coretemp { hwmon } => {
             // Core temps start at temp2_input (temp1 is package)
             let path = hwmon.join(format!("temp{}_input", core_id + 2));
-            read_hwmon_temp(&path)
+            sysfs::read_hwmon_temp(&path)
         }
         _ => None, // AMD k10temp/zenpower don't expose per-core temps
     }
@@ -355,42 +355,7 @@ fn read_rapl_energy(
     watts
 }
 
-// === Low-level hwmon / thermal zone readers ===
-
-fn read_hwmon_temp(path: &Path) -> Option<f32> {
-    // hwmon temperatures are in millidegrees Celsius
-    sysfs::read_u32(path).map(|milli| milli as f32 / 1000.0)
-}
-
-fn read_hwmon_power(path: &Path) -> Option<f32> {
-    // hwmon power is in microwatts
-    sysfs::read_u64(path)
-        .map(|uw| uw as f64 / 1_000_000.0)
-        .map(|w| w as f32)
-}
-
 fn read_thermal_zone_temp(zone: &Path) -> Option<f32> {
     // thermal zone temperatures are in millidegrees Celsius
     sysfs::read_u32(&zone.join("temp")).map(|milli| milli as f32 / 1000.0)
-}
-
-// === Hwmon discovery helpers ===
-
-fn first_hwmon_subdir(hwmon_parent: &Path) -> Option<PathBuf> {
-    std::fs::read_dir(hwmon_parent)
-        .ok()?
-        .flatten()
-        .find(|e| e.file_name().to_string_lossy().starts_with("hwmon"))
-        .map(|e| e.path())
-}
-
-fn find_pci_driver_hwmon(driver_name: &str) -> Option<PathBuf> {
-    let driver_path = PathBuf::from(format!("/sys/bus/pci/drivers/{driver_name}"));
-    for entry in std::fs::read_dir(&driver_path).ok()?.flatten() {
-        let path = entry.path();
-        if let Some(hwmon) = first_hwmon_subdir(&path.join("hwmon")) {
-            return Some(hwmon);
-        }
-    }
-    None
 }

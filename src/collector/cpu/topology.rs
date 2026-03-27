@@ -257,8 +257,7 @@ impl Package {
             .get_field(cpu_idx, "microcode")
             .map(|v| v.to_string())
             .unwrap_or_default();
-        let (cpufreq_driver, cpufreq_governor, cpufreq_mode) =
-            sysfs::get_cpufreq_info(cpu_idx as u32);
+        let (cpufreq_driver, cpufreq_governor, cpufreq_mode) = get_cpufreq_info(cpu_idx as u32);
 
         Self {
             vendor_id,
@@ -276,6 +275,7 @@ impl Package {
 }
 
 impl Core {
+    /// Creates a [`Core`] from the sysfs information for a given CPU index.
     fn from_sysfs(cpu_idx: u32) -> Self {
         let base_freq_mhz = sysfs::read_u32(&PathBuf::from(format!(
             "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/scaling_min_freq"
@@ -332,4 +332,25 @@ fn read_cluster_id(cpu_idx: u32) -> u32 {
         "/sys/devices/system/cpu/cpu{cpu_idx}/topology/die_id"
     ));
     sysfs::read_u32(&die_id_path).unwrap_or(0)
+}
+
+pub fn get_cpufreq_info(cpu_idx: u32) -> (String, String, Option<String>) {
+    let driver = sysfs::read_string(&PathBuf::from(format!(
+        "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/scaling_driver"
+    )))
+    .unwrap_or_default();
+    let governor = sysfs::read_string(&PathBuf::from(format!(
+        "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/scaling_governor"
+    )))
+    .unwrap_or_default();
+    let mode = match driver.as_str() {
+        "intel_pstate" => sysfs::read_string(&PathBuf::from(
+            "/sys/devices/system/cpu/intel_pstate/status",
+        )),
+        "amd-pstate" | "amd-pstate-epp" => {
+            sysfs::read_string(&PathBuf::from("/sys/devices/system/cpu/amd_pstate/status"))
+        }
+        _ => None,
+    };
+    (driver, governor, mode)
 }

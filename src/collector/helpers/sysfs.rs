@@ -34,23 +34,37 @@ pub fn count_cpu_list(cpu_list: &str) -> Option<u32> {
     Some(count)
 }
 
-pub fn get_cpufreq_info(cpu_idx: u32) -> (String, String, Option<String>) {
-    let driver = read_string(&PathBuf::from(format!(
-        "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/scaling_driver"
-    )))
-    .unwrap_or_default();
-    let governor = read_string(&PathBuf::from(format!(
-        "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/scaling_governor"
-    )))
-    .unwrap_or_default();
-    let mode = match driver.as_str() {
-        "intel_pstate" => read_string(&PathBuf::from(
-            "/sys/devices/system/cpu/intel_pstate/status",
-        )),
-        "amd-pstate" | "amd-pstate-epp" => {
-            read_string(&PathBuf::from("/sys/devices/system/cpu/amd_pstate/status"))
+/// Reads a temperature from a given hwmon path, converting from millidegrees Celsius to degrees Celsius.
+pub fn read_hwmon_temp(path: &Path) -> Option<f32> {
+    // hwmon temperatures are in millidegrees Celsius
+    read_u32(path).map(|milli| milli as f32 / 1000.0)
+}
+
+/// Reads a power value from a given hwmon path, converting from microwatts to watts.
+pub fn read_hwmon_power(path: &Path) -> Option<f32> {
+    // hwmon power is in microwatts
+    read_u64(path)
+        .map(|uw| uw as f64 / 1_000_000.0)
+        .map(|w| w as f32)
+}
+
+/// Returns the first hwmon subdirectory under a given path.
+pub fn first_hwmon_subdir(hwmon_parent: &Path) -> Option<PathBuf> {
+    std::fs::read_dir(hwmon_parent)
+        .ok()?
+        .flatten()
+        .find(|e| e.file_name().to_string_lossy().starts_with("hwmon"))
+        .map(|e| e.path())
+}
+
+/// Finds the hwmon path for a given PCI driver name.
+pub fn find_pci_driver_hwmon(driver_name: &str) -> Option<PathBuf> {
+    let driver_path = PathBuf::from(format!("/sys/bus/pci/drivers/{driver_name}"));
+    for entry in std::fs::read_dir(&driver_path).ok()?.flatten() {
+        let path = entry.path();
+        if let Some(hwmon) = first_hwmon_subdir(&path.join("hwmon")) {
+            return Some(hwmon);
         }
-        _ => None,
-    };
-    (driver, governor, mode)
+    }
+    None
 }
