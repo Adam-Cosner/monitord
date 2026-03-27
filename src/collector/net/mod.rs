@@ -90,76 +90,7 @@ impl Collector {
                 for interface in dir.flatten() {
                     let interface_name = interface.file_name().to_string_lossy().into_owned();
                     let interface_path = interface.path();
-
-                    let packet_counters = Counters::read(&interface_path);
-                    let counter_delta = self
-                        .counters
-                        .entry(interface_name.clone())
-                        .or_insert_with(Sampler::new)
-                        .push(packet_counters.clone());
-                    let is_up = sysfs::read_string(&interface_path.join("operstate"))
-                        .map(|s| s == "up")
-                        .unwrap_or(false);
-                    let adapter_type = classify_adapter(&interface_path);
-                    let wifi = if adapter_type == adapter::AdapterType::Wifi && is_up {
-                        self.wifi_reader
-                            .probe_mut(wifi::WifiReader::new)
-                            .and_then(|reader| match reader.read(&interface_name) {
-                                Ok(wifi_info) => Some(wifi_info),
-                                Err(e) => {
-                                    tracing::warn!(
-                                        "[net] failed to read wifi info for {}: {}",
-                                        interface_name,
-                                        e
-                                    );
-                                    None
-                                }
-                            })
-                    } else {
-                        None
-                    };
-
-                    let ipv4_addresses = addresses
-                        .iter()
-                        .filter(|a| a.addr.is_ipv4() && a.name == interface_name)
-                        .map(|a| format!("{}/{}", a.addr, a.prefix_len))
-                        .collect::<Vec<_>>();
-                    let ipv6_addresses = addresses
-                        .iter()
-                        .filter(|a| a.addr.is_ipv6() && a.name == interface_name)
-                        .map(|a| format!("{}/{}", a.addr, a.prefix_len))
-                        .collect::<Vec<_>>();
-
-                    adapters.push(Adapter {
-                        interface_name,
-                        mac_address: sysfs::read_string(&interface_path.join("address"))
-                            .unwrap_or_default(),
-                        ipv4_addresses,
-                        ipv6_addresses,
-                        adapter_type: adapter_type as i32,
-                        mtu: sysfs::read_u32(&interface_path.join("mtu")).unwrap_or_default(),
-                        is_up,
-                        rx_bytes_total: packet_counters.rx_bytes,
-                        tx_bytes_total: packet_counters.tx_bytes,
-                        rx_packets_total: packet_counters.rx_packets,
-                        tx_packets_total: packet_counters.tx_packets,
-                        rx_errors_total: packet_counters.rx_errors,
-                        tx_errors_total: packet_counters.tx_errors,
-                        rx_drops_total: packet_counters.rx_drops,
-                        tx_drops_total: packet_counters.tx_drops,
-                        rx_bytes_per_second: counter_delta
-                            .as_ref()
-                            .map(|delta| {
-                                (delta.change.rx_bytes as f64 / delta.interval.as_secs_f64()) as u64
-                            })
-                            .unwrap_or_default(),
-                        tx_bytes_per_second: counter_delta
-                            .map(|delta| {
-                                (delta.change.tx_bytes as f64 / delta.interval.as_secs_f64()) as u64
-                            })
-                            .unwrap_or_default(),
-                        wifi_info: wifi,
-                    });
+                    adapters.push(self.build_adapter(&interface_name, &interface_path, &addresses));
                 }
 
                 Ok(Snapshot { adapters })
@@ -168,6 +99,68 @@ impl Collector {
                 tracing::warn!("[net] unable to read /sys/class/net: {}", e);
                 Ok(Snapshot::default())
             }
+        }
+    }
+
+    fn build_adapter(&mut self, name: &str, path: &Path, addresses: &[IfAddr]) -> Adapter {
+        let ipv4_addresses = get_ipv4_addresses(addresses, name);
+        let ipv6_addresses = get_ipv6_addresses(addresses, name);
+        let adapter_type = classify_adapter(path);
+        let is_up = sysfs::read_string(&path.join("operstate"))
+            .map(|s| s == "up")
+            .unwrap_or(false);
+        let packet_counters = Counters::read(path);
+        let counter_delta = self
+            .counters
+            .entry(name.to_string())
+            .or_insert_with(Sampler::new)
+            .push(packet_counters.clone());
+        let wifi = self.read_wifi(adapter_type, is_up, name);
+        Adapter {
+            interface_name: name.to_string(),
+            mac_address: sysfs::read_string(&path.join("address")).unwrap_or_default(),
+            ipv4_addresses,
+            ipv6_addresses,
+            adapter_type: adapter_type as i32,
+            mtu: sysfs::read_u32(&path.join("mtu")).unwrap_or_default(),
+            is_up,
+            rx_bytes_total: packet_counters.rx_bytes,
+            tx_bytes_total: packet_counters.tx_bytes,
+            rx_packets_total: packet_counters.rx_packets,
+            tx_packets_total: packet_counters.tx_packets,
+            rx_errors_total: packet_counters.rx_errors,
+            tx_errors_total: packet_counters.tx_errors,
+            rx_drops_total: packet_counters.rx_drops,
+            tx_drops_total: packet_counters.tx_drops,
+            rx_bytes_per_second: counter_delta
+                .as_ref()
+                .map(|delta| (delta.change.rx_bytes as f64 / delta.interval.as_secs_f64()) as u64)
+                .unwrap_or_default(),
+            tx_bytes_per_second: counter_delta
+                .map(|delta| (delta.change.tx_bytes as f64 / delta.interval.as_secs_f64()) as u64)
+                .unwrap_or_default(),
+            wifi_info: wifi,
+        }
+    }
+
+    fn read_wifi(
+        &mut self,
+        adapter_type: adapter::AdapterType,
+        is_up: bool,
+        name: &str,
+    ) -> Option<WifiInfo> {
+        if adapter_type == adapter::AdapterType::Wifi && is_up {
+            self.wifi_reader
+                .probe_mut(wifi::WifiReader::new)
+                .and_then(|reader| match reader.read(name) {
+                    Ok(wifi_info) => Some(wifi_info),
+                    Err(e) => {
+                        tracing::warn!("[net] failed to read wifi info for {}: {}", name, e);
+                        None
+                    }
+                })
+        } else {
+            None
         }
     }
 }
@@ -229,6 +222,22 @@ fn classify_adapter(path: &Path) -> adapter::AdapterType {
             _ => adapter::AdapterType::Unknown,
         }
     }
+}
+
+fn get_ipv4_addresses(addresses: &[IfAddr], name: &str) -> Vec<String> {
+    addresses
+        .iter()
+        .filter(|a| a.addr.is_ipv4() && a.name == name)
+        .map(|a| format!("{}/{}", a.addr, a.prefix_len))
+        .collect::<Vec<_>>()
+}
+
+fn get_ipv6_addresses(addresses: &[IfAddr], name: &str) -> Vec<String> {
+    addresses
+        .iter()
+        .filter(|a| a.addr.is_ipv6() && a.name == name)
+        .map(|a| format!("{}/{}", a.addr, a.prefix_len))
+        .collect::<Vec<_>>()
 }
 
 struct IfAddr {
