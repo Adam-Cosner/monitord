@@ -11,6 +11,7 @@
 //! # Example
 //!
 //! ```no_run
+//! use monitord::collector::Collector;
 //! let mut collector = monitord::collector::cpu::Collector::new();
 //! let store = monitord::collector::store::Store::new();
 //! // The first collect call will return nothing as collection requires a current and last sample to calculate usages

@@ -9,6 +9,7 @@
 //! # Example
 //!
 //! ```no_run
+//! use monitord::collector::Collector;
 //! let mut collector = monitord::collector::mem::Collector::new();
 //! let store = monitord::collector::store::Store::new();
 //! collector.collect(&store).unwrap();

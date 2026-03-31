@@ -10,9 +10,10 @@
 //!
 //! Example usage:
 //! ```no_run
+//! use monitord::collector::store::Store;
 //! let mut store = Store::new();
 //! // does not need to be mutable due to OnceLock's interior mutability
-//! collector.collect(&store);
+//! // collector.collect(&store);
 //!
 //! ```
 

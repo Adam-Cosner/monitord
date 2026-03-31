@@ -9,6 +9,7 @@
 //! # Example
 //!
 //! ```no_run
+//! use monitord::collector::Collector;
 //! let mut collector = monitord::collector::gpu::Collector::new();
 //! let store = monitord::collector::store::Store::new();
 //! // The first collect call will only return NVIDIA GPUs due to it being the only driver that stores metrics
@@ -16,7 +17,7 @@
 //! std::thread::sleep(std::time::Duration::from_secs(1));
 //! // Subsequent collect calls will return all supported GPUs
 //! collector.collect(&store).unwrap();
-//! assert!(store.gpu.get().is_some_and(|g| g.len() > 0));
+//! assert!(store.gpu.get().is_some_and(|g| g.gpus.len() > 0));
 //! ```
 
 mod amd;
