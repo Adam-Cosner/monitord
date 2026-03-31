@@ -25,6 +25,14 @@ pub fn read_u64(path: &Path) -> Option<u64> {
     read_string(path).and_then(|s| s.parse::<u64>().ok())
 }
 
+/// Reads a hexadecimal value from a given path, converting it to a `u64`.
+pub fn read_hex(path: &Path) -> Option<u64> {
+    read_string(path)
+        .as_ref()
+        .and_then(|s| s.strip_prefix("0x"))
+        .and_then(|s| u64::from_str_radix(&s, 16).ok())
+}
+
 /// Counts the number of CPUs in a given CPU list string (e.g. "0-3,5,7-9")
 pub fn count_cpu_list(cpu_list: &str) -> Option<u32> {
     let mut count = 0;
