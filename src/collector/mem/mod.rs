@@ -109,7 +109,7 @@ fn collect_dimms() -> anyhow::Result<Vec<Dimm>> {
     match collect_from_dmi() {
         Ok(dimms) => return Ok(dimms),
         Err(e) => tracing::warn!(
-            "dmi reading failed, falling back to udev (this is okay, just means the program doesn't have access): {e}"
+            "dmi reading failed, falling back to udev (this is okay for testing, just means the program doesn't have root access): {e}"
         ),
     }
     match collect_from_udev_database() {
