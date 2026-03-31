@@ -31,12 +31,12 @@ collector = [
     "metrics",
     "wgpu",
     "nvml-wrapper",
-    "libamdgpu_top",
     "procfs",
     "pollster",
     "dmidecode",
     "nix",
-    "neli"
+    "neli",
+    "num"
 ]
 # Enabled for client usage
 client = ["metrics"]
@@ -61,12 +61,12 @@ prost = "0.14"
 # Collector dependencies
 wgpu = { version = "29.0", optional = true, default-features = false, features = ["vulkan", "gles", "std"] }
 nvml-wrapper = { version = "0.12", optional = true }
-libamdgpu_top = { version = "0.11", optional = true }
 procfs = { version = "0.18", optional = true }
 pollster = { version = "0.4", optional = true }
 dmidecode = { version = "1.0", optional = true }
 nix = { version = "0.31", optional = true, default-features = false, features = ["net"] }
 neli = { version = "0.7", optional = true }
+num = { version = "0.4", optional = true }
 
 # Daemon dependencies
 prost-types = { version = "0.14", optional = true }
@@ -74,6 +74,7 @@ tonic-prost = { version = "0.14", optional = true }
 
 [build-dependencies]
 tonic-prost-build = "0.14"
+inline-c = { version = "0.1.8", optional = true }
 
 [dev-dependencies]
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

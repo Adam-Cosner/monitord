@@ -131,7 +131,7 @@ impl Collector {
         for entry in std::fs::read_dir("/sys/class/drm")
             .with_context(|| format!("{} at {}", file!(), line!()))?
             .flatten()
-            .filter(|entry| entry.file_name().to_string_lossy().starts_with("card"))
+            .filter(|entry| entry.file_name().to_string_lossy().starts_with("renderD"))
         {
             let path = entry.path();
 
