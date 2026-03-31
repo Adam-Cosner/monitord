@@ -15,7 +15,7 @@ impl Default for Collector {
 
 impl Collector {
     pub fn new() -> Self {
-        tracing::debug!("Initializing Intel GPU collector");
+        tracing::debug!("initializing Intel GPU collector");
         Collector {}
     }
 
@@ -37,24 +37,18 @@ impl Collector {
             }
         } else {
             Err(anyhow::anyhow!(
-                "Failed to determine Intel GPU driver, this is a bug. Please report this issue."
+                "failed to determine Intel GPU driver, this is a bug. Please report this issue."
             ))
         }
     }
 
     fn collect_i915(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
-        tracing::trace!(
-            "[gpu/intel] collecting metrics for i915 device {}",
-            path.display()
-        );
+        tracing::trace!("collecting metrics for i915 device {}", path.display());
         Err(anyhow::anyhow!("i915 not yet implemented"))
     }
 
     fn collect_xe(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
-        tracing::trace!(
-            "[gpu/intel] collecting metrics for xe device {}",
-            path.display()
-        );
+        tracing::trace!("collecting metrics for xe device {}", path.display());
         Err(anyhow::anyhow!("xe not yet implemented"))
     }
 }

@@ -64,7 +64,7 @@ impl super::Collector for Collector {
                 .set(cpu)
                 .expect("cpu snapshot was already set previously, do not reuse Store instances!"),
             Err(e) => {
-                tracing::error!("[cpu] collect failed: {e}");
+                tracing::error!("collect failed: {e}");
                 return Err(e);
             }
         }
@@ -74,7 +74,7 @@ impl super::Collector for Collector {
 
 impl Collector {
     pub fn new() -> Self {
-        tracing::info!("[cpu] creating collector");
+        tracing::info!("creating collector");
         Self {
             topology: Discovery::default(),
             utilization: utilization::Tracker::new(),

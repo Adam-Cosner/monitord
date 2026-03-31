@@ -12,10 +12,10 @@ build-control:
     cargo build --release --bin monitordctl --no-default-features --features=control
 
 test TEST:
-    RUST_LOG=debug cargo test {{ TEST }} --release --features=collector -- --show-output
+    RUST_LOG=debug,wgpu=warn cargo test {{ TEST }} --release --features=collector -- --show-output
 
 test-all:
-    RUST_LOG=debug cargo test --release --features=collector -- --show-output
+    RUST_LOG=debug,wgpu=warn cargo test --release --features=collector -- --show-output
 
 clippy:
     cargo clippy --release --features=daemon

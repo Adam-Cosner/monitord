@@ -28,7 +28,7 @@ impl<T> Discovery<T> {
             *self = match init() {
                 Ok(value) => Self::Available(value),
                 Err(e) => {
-                    tracing::warn!("Discovery probe failed: {}", e);
+                    tracing::warn!("discovery probe failed: {}", e);
                     Self::Unavailable
                 }
             };
@@ -45,7 +45,7 @@ impl<T> Discovery<T> {
             *self = match init() {
                 Ok(value) => Self::Available(value),
                 Err(e) => {
-                    tracing::warn!("Discovery probe failed: {}", e);
+                    tracing::warn!("discovery probe failed: {}", e);
                     Self::Unavailable
                 }
             };

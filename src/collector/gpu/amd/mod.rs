@@ -24,7 +24,7 @@ const DEFAULT_NAME: &'static str = "AMD Radeon Graphics";
 
 impl Collector {
     pub fn new() -> Self {
-        tracing::debug!("[gpu/amd] initializing AMD GPU collector");
+        tracing::debug!("initializing AMD GPU collector");
         Collector {
             device_names: HashMap::new(),
         }
@@ -101,7 +101,7 @@ impl Collector {
             .file_name()
             .map(|card| card.to_string_lossy().to_string())
         else {
-            tracing::info!("[gpu/amd] could not get card name!");
+            tracing::info!("could not get card name!");
             return DEFAULT_NAME.to_string();
         };
 
@@ -110,7 +110,7 @@ impl Collector {
                 .and_then(|dev| dev.strip_prefix("0x").map(|dev| dev.to_string()))
                 .map(|dev| dev.to_string())
             else {
-                tracing::info!("[gpu/amd] could not get device id file!");
+                tracing::info!("could not get device id file!");
                 self.device_names.insert(card_id, DEFAULT_NAME.to_string());
                 return DEFAULT_NAME.to_string();
             };
@@ -119,7 +119,7 @@ impl Collector {
                 .and_then(|dev| dev.strip_prefix("0x").map(|dev| dev.to_string()))
                 .map(|dev| dev.to_string())
             else {
-                tracing::info!("[gpu/amd] could not get revision id file!");
+                tracing::info!("could not get revision id file!");
                 self.device_names.insert(card_id, DEFAULT_NAME.to_string());
                 return DEFAULT_NAME.to_string();
             };
@@ -127,12 +127,12 @@ impl Collector {
             let Some(amdgpu_ids) =
                 sysfs::read_string(&PathBuf::from("/usr/share/libdrm/amdgpu.ids"))
             else {
-                tracing::info!("[gpu/amd] could not open amdgpu.ids file!");
+                tracing::info!("could not open amdgpu.ids file!");
                 self.device_names.insert(card_id, DEFAULT_NAME.to_string());
                 return DEFAULT_NAME.to_string();
             };
 
-            tracing::info!("[gpu/amd] checking amdgpu.ids file for {device} {revision}");
+            tracing::info!("checking amdgpu.ids file for {device} {revision}");
 
             for line in amdgpu_ids.lines() {
                 let dev_rev_name: Vec<&str> = line.split(',').map(|val| val.trim()).collect();
@@ -151,7 +151,7 @@ impl Collector {
                 }
             }
 
-            tracing::info!("[gpu/amd] could not find a match for gpu name, returning default");
+            tracing::info!("could not find a match for gpu name, returning default");
             self.device_names.insert(card_id, DEFAULT_NAME.to_string());
             return DEFAULT_NAME.to_string();
         };

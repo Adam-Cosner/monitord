@@ -46,7 +46,7 @@ impl Collector {
         match instance {
             Ok(instance) => {
                 let driver_bench = std::time::Instant::now();
-                tracing::debug!("Getting OpenGL and Vulkan drivers for GPU {:?}", path);
+                tracing::debug!("getting OpenGL and Vulkan drivers for GPU {:?}", path);
                 let device_path = path.join("device");
                 let mut gl = String::from("none");
                 let mut vk = String::from("none");
@@ -67,7 +67,7 @@ impl Collector {
                     }
                 }
                 tracing::debug!(
-                    "Got OpenGL and Vulkan drivers for GPU {:?} took {:?}",
+                    "got OpenGL and Vulkan drivers for GPU {:?} took {:?}",
                     path,
                     driver_bench.elapsed()
                 );
@@ -75,7 +75,7 @@ impl Collector {
             }
             Err(e) => {
                 tracing::warn!(
-                    "Failed to get OpenGL and Vulkan drivers for GPU {:?}: {}",
+                    "failed to get OpenGL and Vulkan drivers for GPU {:?}: {}",
                     path,
                     e
                 );

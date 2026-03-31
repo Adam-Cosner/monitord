@@ -32,7 +32,7 @@ impl Tracker {
                 None => Ok(Vec::new()),
             },
             Err(e) => {
-                tracing::warn!("[cpu] failed to read /proc/stat: {}", e);
+                tracing::warn!("failed to read /proc/stat: {}", e);
                 Ok(Vec::new())
             }
         }

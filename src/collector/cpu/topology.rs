@@ -201,7 +201,7 @@ impl Topology {
                     .and_then(|p| p.clusters.get_mut(&cluster_id))
                 else {
                     tracing::error!(
-                        "[cpu] could not locate cluster {cluster_id} for package {package_id}"
+                        "could not locate cluster {cluster_id} for package {package_id}"
                     );
                     continue;
                 };
@@ -221,7 +221,7 @@ impl Topology {
                     .and_then(|c| c.cores.get_mut(&core_id))
                 else {
                     tracing::error!(
-                        "[cpu] could not locate core {core_id} for cluster {cluster_id} for package {package_id}"
+                        "could not locate core {core_id} for cluster {cluster_id} for package {package_id}"
                     );
                     continue;
                 };

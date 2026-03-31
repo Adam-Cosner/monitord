@@ -78,7 +78,7 @@ impl super::Collector for Collector {
                 .set(gpus)
                 .expect("gpu snapshot was already set previously, do not reuse Store instances!"),
             Err(e) => {
-                tracing::error!("[gpu] collector failed: {e}");
+                tracing::error!("collector failed: {e}");
                 return Err(e);
             }
         }
@@ -88,7 +88,7 @@ impl super::Collector for Collector {
 
 impl Collector {
     pub fn new() -> Self {
-        tracing::info!("[gpu] creating collector");
+        tracing::info!("creating collector");
         Collector {
             gpus: Vec::new(),
             oglv_collector: opengl_vulkan::Collector::new(),
@@ -117,7 +117,7 @@ impl Collector {
                     snapshot.vulkan_driver = gpu.vulkan_driver.clone();
                     gpus.push(snapshot)
                 }
-                Err(e) => tracing::warn!("Failed to collect a GPU's metrics: {}", e),
+                Err(e) => tracing::warn!("failed to collect a GPU's metrics: {}", e),
             };
         }
         Ok(Snapshot { gpus })
@@ -126,7 +126,7 @@ impl Collector {
     /// Iterates over /sys/class/drm to find the GPU devices. This is the best way to get them in a consistent order.
     fn enumerate_devices(&mut self) -> anyhow::Result<Vec<GpuCache>> {
         let enumerate_bench = std::time::Instant::now();
-        tracing::debug!("Enumerating GPU device paths");
+        tracing::debug!("enumerating GPU device paths");
         let mut paths = Vec::new();
         for entry in std::fs::read_dir("/sys/class/drm")
             .with_context(|| format!("{} at {}", file!(), line!()))?
@@ -151,7 +151,7 @@ impl Collector {
                     self.oglv_collector.get_drivers(&path, &vendor);
 
                 tracing::trace!(
-                    "Found a {} GPU at {}, OpenGL: {}, Vulkan: {}",
+                    "found a {} GPU at {}, OpenGL: {}, Vulkan: {}",
                     vendor,
                     path.display(),
                     opengl_driver,
@@ -166,7 +166,7 @@ impl Collector {
             }
         }
         tracing::debug!(
-            "Enumerated GPU device paths in {:?}",
+            "enumerated GPU device paths in {:?}",
             enumerate_bench.elapsed()
         );
         Ok(paths)

@@ -20,7 +20,7 @@ impl Default for Collector {
 
 impl Collector {
     pub fn new() -> Self {
-        tracing::debug!("[gpu/nvidia] Initializing NVIDIA GPU collector");
+        tracing::debug!("initializing NVIDIA GPU collector");
         Collector {
             nvml: Discovery::default(),
         }
@@ -44,13 +44,10 @@ impl Collector {
     /// Returns an error if there's an actual NVML error so it can be logged, but if there's no NVML, just return an empty GPU snapshot
     fn collect_nvidia(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
         let nvml_bench = std::time::Instant::now();
-        tracing::trace!(
-            "[gpu/nvidia] Collecting metrics for nvidia device {}",
-            path.display()
-        );
+        tracing::trace!("collecting metrics for nvidia device {}", path.display());
         let nvml = self.nvml.probe(|| {
             nvml_wrapper::Nvml::init()
-                .with_context(|| "Failed to initialize NVML")
+                .with_context(|| "failed to initialize NVML")
                 .inspect_err(|err| tracing::error!("{}", err))
         });
         if let Some(nvml) = nvml {
@@ -68,7 +65,7 @@ impl Collector {
                         .unwrap_or_default()
                 })
                 .unwrap_or_default();
-            tracing::debug!("[gpu/nvidia] Checking device_real: {:?}", device_real);
+            tracing::debug!("checking device_real: {:?}", device_real);
             let device = nvml.device_by_pci_bus_id(device_real)?;
 
             let graphics_utilization = device
@@ -103,7 +100,7 @@ impl Collector {
             let processes = collect_processes(&device);
 
             tracing::trace!(
-                "[gpu/nvidia] Collected metrics for nvidia device {} in {:?}",
+                "collected metrics for nvidia device {} in {:?}",
                 path.display(),
                 nvml_bench.elapsed()
             );
@@ -135,10 +132,7 @@ impl Collector {
 
     /// Currently does nothing as I haven't read up on nouveau's metric reporting if there even is any
     fn collect_nouveau(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
-        tracing::trace!(
-            "[gpu/nvidia] collecting metrics for nouveau device {}",
-            path.display()
-        );
+        tracing::trace!("collecting metrics for nouveau device {}", path.display());
         Err(anyhow::anyhow!("nouveau not yet implemented"))
     }
 }

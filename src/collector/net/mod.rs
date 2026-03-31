@@ -65,7 +65,7 @@ impl super::Collector for Collector {
                 .set(adapters)
                 .expect("net snapshot was already set previously, do not reuse Store instances!"),
             Err(e) => {
-                tracing::error!("[net] collect failed: {e}");
+                tracing::error!("collect failed: {e}");
                 return Err(e);
             }
         }
@@ -96,7 +96,7 @@ impl Collector {
                 Ok(Snapshot { adapters })
             }
             Err(e) => {
-                tracing::warn!("[net] unable to read /sys/class/net: {}", e);
+                tracing::warn!("unable to read /sys/class/net: {}", e);
                 Ok(Snapshot::default())
             }
         }
@@ -155,7 +155,7 @@ impl Collector {
                 .and_then(|reader| match reader.read(name) {
                     Ok(wifi_info) => Some(wifi_info),
                     Err(e) => {
-                        tracing::warn!("[net] failed to read wifi info for {}: {}", name, e);
+                        tracing::warn!("failed to read wifi info for {}: {}", name, e);
                         None
                     }
                 })
