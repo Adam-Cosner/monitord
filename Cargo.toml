@@ -25,6 +25,9 @@ path = "src/lib.rs"
 default = ["client"]
 # Whether to include metric definitions
 metrics = [
+    "prost-types",
+    "tonic-prost",
+    "tonic-prost-build",
 ]
 # Enabled for collector building
 collector = [
@@ -42,12 +45,12 @@ collector = [
 client = ["metrics"]
 # Enabled for daemon build
 daemon = [
-    "collector",
-    "prost-types",
-    "tonic-prost"
+    "collector"
 ]
 # Enabled for control utility build
-control = []
+control = [
+    "tonic-prost-build",
+]
 
 
 [dependencies]
@@ -57,6 +60,8 @@ tonic = "0.14"
 prost = "0.14"
 
 # Metrics dependencies
+prost-types = { version = "0.14", optional = true }
+tonic-prost = { version = "0.14", optional = true }
 
 # Collector dependencies
 wgpu = { version = "29.0", optional = true, default-features = false, features = ["vulkan", "gles", "std"] }
@@ -69,11 +74,9 @@ neli = { version = "0.7", optional = true }
 num = { version = "0.4", optional = true }
 
 # Daemon dependencies
-prost-types = { version = "0.14", optional = true }
-tonic-prost = { version = "0.14", optional = true }
 
 [build-dependencies]
-tonic-prost-build = "0.14"
+tonic-prost-build = { version = "0.14", optional = true }
 inline-c = { version = "0.1.8", optional = true }
 
 [dev-dependencies]
