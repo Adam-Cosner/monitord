@@ -462,7 +462,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C0 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 1 content 0");
+                tracing::trace!("reading format 1 content 0");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F1C0(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -536,7 +536,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C1 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 1 content 1");
+                tracing::trace!("reading format 1 content 1");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F1C1(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -612,7 +612,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C2 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 1 content 2");
+                tracing::trace!("reading format 1 content 2");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F1C2(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -698,7 +698,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C3 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 1 content 3");
+                tracing::trace!("reading format 1 content 3");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F1C3(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -789,7 +789,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C4 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 1 content 4");
+                tracing::trace!("reading format 1 content 4");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F1C4(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -884,7 +884,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C5 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 1 content 5");
+                tracing::trace!("reading format 1 content 5");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F1C5(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -1002,7 +1002,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C6 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 1 content 6");
+                tracing::trace!("reading format 1 content 6");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F1C6(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -1130,7 +1130,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C7 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 1 content 7");
+                tracing::trace!("reading format 1 content 7");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F1C7(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -1262,7 +1262,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C8 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 1 content 8");
+                tracing::trace!("reading format 1 content 8");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F1C8(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -1474,7 +1474,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C9 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 1 content 9");
+                tracing::trace!("reading format 1 content 9");
                 use std::io::Read;
                 let mut cursor = std::io::Cursor::new(bytes);
                 let mut header_buf = [0u8; size_of::<Header>()];
@@ -1659,7 +1659,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C0 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 2 content 0");
+                tracing::trace!("reading format 2 content 0");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F2C0(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -1723,7 +1723,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C1 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 2 content 1");
+                tracing::trace!("reading format 2 content 1");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F2C1(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -1790,7 +1790,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C2 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 2 content 2");
+                tracing::trace!("reading format 2 content 2");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F2C2(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -1863,7 +1863,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C3 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 2 content 3");
+                tracing::trace!("reading format 2 content 3");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F2C3(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -1946,7 +1946,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C4 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 2 content 4");
+                tracing::trace!("reading format 2 content 4");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F2C4(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
@@ -2051,7 +2051,7 @@ mod amdgpu {
 
         impl AmdgpuMetrics for C0 {
             fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics> {
-                tracing::debug!("reading format 3 content 0");
+                tracing::trace!("reading format 3 content 0");
                 let bytes = from_bytes::<Self>(bytes);
                 Ok(GpuMetrics::F3C0(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
