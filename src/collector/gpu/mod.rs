@@ -103,7 +103,7 @@ impl Collector {
     fn collect_gpus(&mut self) -> anyhow::Result<Snapshot> {
         let mut gpus = Vec::new();
         if self.gpus.is_empty() {
-            self.gpus = self.enumerate_devices()?;
+            self.gpus = self.collect_static_info()?;
         }
         for gpu in self.gpus.iter() {
             let snapshot = match gpu.vendor {
@@ -125,9 +125,7 @@ impl Collector {
     }
 
     /// Iterates over /sys/class/drm to find the GPU devices. This is the best way to get them in a consistent order.
-    fn enumerate_devices(&mut self) -> anyhow::Result<Vec<GpuCache>> {
-        let enumerate_bench = std::time::Instant::now();
-        tracing::debug!("enumerating GPU device paths");
+    fn collect_static_info(&mut self) -> anyhow::Result<Vec<GpuCache>> {
         let mut paths = Vec::new();
         for entry in std::fs::read_dir("/sys/class/drm")
             .with_context(|| format!("{} at {}", file!(), line!()))?
@@ -138,38 +136,33 @@ impl Collector {
 
             // Read vendor name
             let vendor_path = path.join("device/vendor");
-            // If there is no vendor file, it's likely either a connector or a render node so it's okay to skip
-            if let Some(vendor_val) = sysfs::read_string(&vendor_path) {
-                let vendor = match vendor_val.trim() {
-                    "0x8086" => GpuVendor::Intel,
-                    "0x10de" => GpuVendor::Nvidia,
-                    "0x1002" => GpuVendor::Amd,
-                    _ => continue,
-                };
+            let device_path = path.join("device/device");
+            let Some(vendor_val) = sysfs::read_string(&vendor_path) else {
+                continue;
+            };
+            let Some(device_val) = sysfs::read_hex(&device_path) else {
+                continue;
+            };
 
-                // Get OpenGL and Vulkan drivers
-                let (opengl_driver, vulkan_driver) =
-                    self.oglv_collector.get_drivers(&path, &vendor);
+            let vendor = match vendor_val.as_str() {
+                "0x8086" => GpuVendor::Intel,
+                "0x10de" => GpuVendor::Nvidia,
+                "0x1002" => GpuVendor::Amd,
+                _ => continue,
+            };
 
-                tracing::trace!(
-                    "found a {} GPU at {}, OpenGL: {}, Vulkan: {}",
-                    vendor,
-                    path.display(),
-                    opengl_driver,
-                    vulkan_driver
-                );
-                paths.push(GpuCache {
-                    path,
-                    vendor,
-                    opengl_driver,
-                    vulkan_driver,
-                });
-            }
+            // Get OpenGL and Vulkan drivers
+            let (opengl_driver, vulkan_driver) =
+                self.oglv_collector
+                    .get_drivers(&path, &vendor, device_val as u16);
+
+            paths.push(GpuCache {
+                path,
+                vendor,
+                opengl_driver,
+                vulkan_driver,
+            });
         }
-        tracing::debug!(
-            "enumerated GPU device paths in {:?}",
-            enumerate_bench.elapsed()
-        );
         Ok(paths)
     }
 }
