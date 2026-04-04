@@ -24,9 +24,8 @@ message ReportRequest {
 
 message ConnectionRequest {
   google.protobuf.Duration interval = 1;
-  bool cpu_per_core = 2;
-  bool gpu_processes = 3;
-  repeated ProcessFilter process_filters = 4;
+  bool gpu_processes = 2;
+  repeated ProcessFilter process_filters = 3;
 }
 
 message ProcessFilter {
