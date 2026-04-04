@@ -12,39 +12,112 @@ message Snapshot {
   repeated Gpu gpus = 1;
 }
 
+message Config {
+  bool drivers = 1;
+  bool engines = 2;
+  bool clocks = 3;
+  bool memory = 4;
+  bool processes = 5;
+}
+
 // Represents a single physical GPU
 message Gpu {
   string brand_name = 1; // The GPU's branding name (i.e. NVIDIA RTX 4090)
 
-  string kernel_driver = 2; // The name and version of the kernel level driver
-  string opengl_driver = 3; // The name and version of the userspace OpenGL driver
-  string vulkan_driver = 4; // The name and version of the userspace Vulkan driver
+  // The GPU drivers in use (kernel, OpenGL, Vulkan)
+  optional Drivers drivers = 2;
 
-  double graphics_utilization = 5; // Utilization of the graphics engine
-  uint32 graphics_clock = 6; // The clock of the graphics engine
-
-  uint64 memory_capacity = 7; // The total amount of VRAM on the GPU
-  uint64 memory_usage = 8; // The amount of VRAM currently in use
-  uint32 memory_clock = 9; // The clock of the VRAM
-
-  // NOTE ABOUT VIDEO ENCODE/DECODE:
-  // AMD reports clock of encode and decode engines separately and utilization is merged
-  // NVIDIA reports utilization of encode and decode engines separately and clock is merged
-
-  double encoder_utilization = 10; // Utilization of the video encode engine (if supported)
-  double decoder_utilization = 11; // Utilization of the video decode engine (if supported)
-  uint32 encoder_clock = 12; // The clock of the video encode engine(s) (if supported)
-  uint32 decoder_clock = 13; // The clock of the video decode engine(s) (if supported)
+  // The GPU engines in use (3D engine, video decode/encode, compute)
+  repeated Engine engines = 3;
+  // The GPU clocks in use (graphics, memory, video)
+  repeated Clock clocks = 4;
+  // The GPU memory usage
+  repeated MemoryUsage meminfo = 5;
 
   uint32 power_milliwatt = 14; // Power and temperatures
   int32 temperature = 15; // Temperature of the GPU in degrees Celsius
 
   repeated Process processes = 16; // Process information
 }
+
+message Drivers {
+  string kernel = 1;
+  string opengl = 2;
+  string vulkan = 3;
+}
+
+// === Clocks ===
+
+// Standardized clock domains
+enum ClockDomain {
+  CLOCK_DOMAIN_UNSPECIFIED = 0;
+  CLOCK_DOMAIN_GRAPHICS = 1; // Core/Shader clock
+  CLOCK_DOMAIN_MEMORY = 2; // VRAM clock
+  CLOCK_DOMAIN_VIDEO = 3; // Video decode/encode clock
+  CLOCK_DOMAIN_SOC = 4; // SoC/Fabric clock
+}
+
+// Identifies a clock by its domain and index
+message ClockIdentifier {
+  ClockDomain domain = 1;
+  uint32 index = 2;
+}
+
+// Represents a clock with its current and maximum frequency
+message Clock {
+  ClockIdentifier identifier = 1;
+  uint32 current_frequency_mhz = 2;
+  uint32 max_frequency_mhz = 3;
+}
+
+// === Engines ===
+
+// The type of a GPU engine (graphics, compute, or video)
+enum EngineType {
+  ENGINE_TYPE_UNSPECIFIED = 0;
+  ENGINE_TYPE_3D = 1; // Render / Graphics / 3D
+  ENGINE_TYPE_COMPUTE = 2; // Compute / Cuda Cores / Stream Processors
+  ENGINE_TYPE_COPY = 3; // DMA / Transfer / Memory Copy
+  ENGINE_TYPE_VIDEO_DECODE = 4; // VCN (AMD) / NVDEC (NVIDIA) / VDBox (Intel)
+  ENGINE_TYPE_VIDEO_ENCODE = 5; // VCN (AMD) / NVENC (NVIDIA) / VEBox (Intel)
+  ENGINE_TYPE_DISPLAY = 6; // Display controllers (if your API exposes them)
+  ENGINE_TYPE_MEDIA_CLEAR = 7; // Specialized engines (e.g., Intel SFC)
+  ENGINE_TYPE_OTHER = 15; // Catch-all for vendor-specific AI or RT accelerators
+}
+
+// Identifier for a GPU engine
+message EngineIdentifier {
+  EngineType type = 1;
+  uint32 index = 2;
+
+  ClockIdentifier clock = 3;
+}
+
+// Represents a single engine (graphics, compute, or video)
+message Engine {
+  EngineIdentifier identifier = 1;
+  uint64 utilization = 2;
+}
+
+// === Memory ===
+
+// What type of memory is being used (VRAM or GTT)
+enum MemoryType {
+  MEMORY_TYPE_UNSPECIFIED = 0;
+  MEMORY_TYPE_VRAM = 1;
+  MEMORY_TYPE_GTT = 2;
+}
+
+// Represents the usage of a specific type of memory
+message MemoryUsage {
+  MemoryType type = 1;
+  uint64 total_memory = 2;
+  uint64 used_memory = 3;
+}
+
 message Process {
   uint32 pid = 1; // Process ID
-  double graphics_utilization = 2; // Total graphics utilization
-  uint64 memory_usage = 3; // VRAM allocated to the process
-  double encode_utilization = 4; // Total video encode utilization (if supported)
-  double decode_utilization = 5; // Total video decode utilization (if supported)
+  repeated Engine engine_utilization = 2; // Utilization of each engine for this process
+  uint64 vram_usage = 3;
+  uint64 gtt_usage = 4;
 }

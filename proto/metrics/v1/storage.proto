@@ -8,3 +8,5 @@ syntax = "proto3";
 package metrics.v1.storage;
 
 message Snapshot {}
+
+message Config {}

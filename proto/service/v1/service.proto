@@ -48,5 +48,5 @@ message ClientAck {
 
 message ReportResponse {
   google.protobuf.Timestamp timestamp = 1;
-  metrics.v1.Report report = 2;
+  metrics.v1.Snapshot report = 2;
 }

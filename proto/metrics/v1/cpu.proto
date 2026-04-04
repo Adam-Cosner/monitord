@@ -13,6 +13,16 @@ message Snapshot {
   repeated Package packages = 2; // The physical topology of the CPU(s) of the system
 }
 
+// Configuration for the CPU metric report
+message Config {
+  // Whether to include the physical topology of the CPU(s)
+  bool topology = 1;
+  // Whether to include global hardware identification
+  bool hwid = 2;
+  // Whether to include microcode and cpufreq driver information
+  bool drivers = 3;
+}
+
 // The operating system's logical CPUs
 message Logical {
   uint32 os_cpu_id = 1; // The operating system's ID for this logical CPU
@@ -25,42 +35,64 @@ message Package {
   uint32 package_id = 1;
 
   // Global hardware identification
-  string vendor_id = 2; // The vendor ID of the CPU package i.e. AuthenticAMD and GenuineIntel
-  string model_name = 3; // The model name of the CPU
-  uint32 family = 4; // The family id of the CPU
-  uint32 model = 5; // The model id of the CPU
-  uint32 stepping = 6; // The stepping of the CPU
+  optional Hwid hwid = 2;
 
-  string microcode_version = 7; // Hex code for the microcode version of the CPU
-  string cpufreq_driver = 8; // The scheduling driver in use by the kernel
-  string cpufreq_governor = 9; // The scheduling governor in use by the kernel (may be ignored if cpufreq_mode is set)
-  optional string cpufreq_mode = 10; // The driver-specific scheduling mode in use by the kernel
+  // Driver information
+  optional Drivers drivers = 3;
 
-  optional float package_temperature_c = 11; // the temperature of the entire CPU package
-  optional float package_power_w = 12; // The power consumption of the entire CPU package
+  // Temperature of the entire CPU package
+  optional float package_temperature_c = 4;
 
-  repeated Cluster clusters = 13;
+  // Power consumption of the entire CPU package
+  optional float package_power_w = 5;
+
+  // Physical CPU dies
+  repeated Cluster clusters = 10;
+}
+
+message Hwid {
+  string vendor_id = 1; // The vendor ID of the CPU package i.e. AuthenticAMD and GenuineIntel
+  string model_name = 2; // The model name of the CPU
+  uint32 family = 3; // The family id of the CPU
+  uint32 model = 4; // The model id of the CPU
+  uint32 stepping = 5; // The stepping of the CPU
+}
+
+message Drivers {
+  string microcode_version = 1; // Hex code for the microcode version of the CPU
+  string cpufreq_driver = 2; // The scheduling driver in use by the kernel
+  string cpufreq_governor = 3; // The scheduling governor in use by the kernel (may be ignored if cpufreq_mode is set)
+  optional string cpufreq_mode = 4; // The driver-specific scheduling mode in use by the kernel
 }
 
 // A physical CPU cluster/die (CCDs on AMD)
 message Cluster {
   uint32 cluster_id = 1; // The ID of the cluster/die
-  optional float cluster_temperature_c = 2; // The temperature of the cluster/die
+  // Temperature of the cluster/die
+  optional float cluster_temperature_c = 2;
 
-  repeated Core cores = 3; // The cores in the cluster/die
-  repeated Cache shared_caches = 4; // The shared caches in the cluster/die (L3)
+  // The physical cores in the cluster/die
+  repeated Core cores = 3;
+  // The shared caches in the cluster/die (L3)
+  repeated Cache shared_caches = 4;
 }
 
 // A physical CPU core
 message Core {
-  uint32 core_id = 1; // The ID of the core
-  uint32 min_freq_mhz = 2; // The base frequency of the core in MHz
-  uint32 max_freq_mhz = 3; // The maximum frequency of the core in MHz
+  // The ID of the core
+  uint32 core_id = 1;
+  // The base frequency of the core in MHz
+  uint32 min_freq_mhz = 2;
+  // The maximum frequency of the core in MHz
+  uint32 max_freq_mhz = 3;
 
-  optional float core_temperature_c = 4; // The temperature of the core in Celsius (currently only Intel coretemp provides this)
+  // Temperature of the core in Celsius (currently only Intel coretemp provides this)
+  optional float core_temperature_c = 4;
 
-  repeated Thread threads = 5; // The logical threads in the core (e.g. hyperthreading)
-  repeated Cache private_caches = 6; // The private caches in the core (L1 and L2)
+  // The logical threads in the core (e.g. hyperthreading)
+  repeated Thread threads = 6;
+  // The private caches in the core (L1 and L2)
+  repeated Cache private_caches = 7;
 }
 
 // A logical CPU core

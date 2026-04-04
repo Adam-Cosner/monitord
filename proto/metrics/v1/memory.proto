@@ -13,6 +13,10 @@ message Snapshot {
   repeated Dimm dimms = 2; // Physical DIMM topology from SMBIOS/DMI (may be empty without privileges)
 }
 
+message Config {
+  bool dimms = 1;
+}
+
 message Logical {
   uint64 capacity = 1; // Total amount of memory in bytes
   uint64 in_use = 2; // Amount of memory in use

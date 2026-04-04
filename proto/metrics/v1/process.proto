@@ -8,3 +8,5 @@ syntax = "proto3";
 package metrics.v1.process;
 
 message Snapshot {}
+
+message Config {}

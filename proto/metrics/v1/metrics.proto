@@ -14,13 +14,22 @@ import "metrics/v1/network.proto";
 import "metrics/v1/process.proto";
 import "metrics/v1/storage.proto";
 
-message Report {
+message Snapshot {
   cpu.Snapshot cpu = 1;
   memory.Snapshot memory = 2;
   gpu.Snapshot gpu = 3;
   network.Snapshot network = 4;
   storage.Snapshot storage = 5;
   process.Snapshot process = 6;
+}
+
+message Config {
+  cpu.Config cpu = 1;
+  memory.Config memory = 2;
+  gpu.Config gpu = 3;
+  network.Config network = 4;
+  storage.Config storage = 5;
+  process.Config process = 6;
 }
 
 // // === Storage ===
