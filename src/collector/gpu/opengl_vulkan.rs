@@ -197,8 +197,16 @@ unsafe extern "system" fn egl_debug_callback(
         _ => "UNKNOWN",
     };
 
-    let error_message = unsafe { std::ffi::CStr::from_ptr(message) }.to_string_lossy();
-    let command_str = unsafe { std::ffi::CStr::from_ptr(command) }.to_string_lossy();
+    let error_message = if message != std::ptr::null() {
+        unsafe { std::ffi::CStr::from_ptr(message) }.to_string_lossy()
+    } else {
+        "UNKNOWN".into()
+    };
+    let command_str = if command != std::ptr::null() {
+        unsafe { std::ffi::CStr::from_ptr(command) }.to_string_lossy()
+    } else {
+        "UNKNOWN".into()
+    };
 
     match message_type {
         egl::EGL_DEBUG_MSG_CRITICAL_KHR => {
@@ -210,13 +218,13 @@ unsafe extern "system" fn egl_debug_callback(
             )
         }
         egl::EGL_DEBUG_MSG_ERROR_KHR => {
-            tracing::error!("({}): {} from {}", error_str, error_message, command_str)
-        }
-        egl::EGL_DEBUG_MSG_WARNING_KHR => {
             tracing::warn!("({}): {} from {}", error_str, error_message, command_str)
         }
-        egl::EGL_DEBUG_MSG_INFO_KHR => {
+        egl::EGL_DEBUG_MSG_WARNING_KHR => {
             tracing::info!("({}): {} from {}", error_str, error_message, command_str)
+        }
+        egl::EGL_DEBUG_MSG_INFO_KHR => {
+            tracing::debug!("({}): {} from {}", error_str, error_message, command_str)
         }
         _ => {}
     }
@@ -232,8 +240,13 @@ impl OpenglInfo {
         // set EGL debug callback function for nice error messages
         if egl_client_extensions.contains("EGL_KHR_debug") {
             #[allow(non_snake_case)]
-            let eglDebugMessageControlKHR: egl::PFNEGLDEBUGMESSAGECONTROLKHRPROC = unsafe {
-                std::mem::transmute(lib.get_proc_address("eglDebugMessageControlKHR").unwrap())
+            let Some(eglDebugMessageControlKHR) = (unsafe {
+                lib.get_proc_address("eglDebugMessageControlKHR")
+                    .map(|proc| {
+                        std::mem::transmute::<_, egl::PFNEGLDEBUGMESSAGECONTROLKHRPROC>(proc)
+                    })
+            }) else {
+                return Ok(OpenglInfo { drivers });
             };
             let attrib = [
                 egl::EGL_DEBUG_MSG_WARNING_KHR as egl::Attrib,
@@ -335,10 +348,23 @@ impl OpenglInfo {
                                 .to_string_lossy()
                                 .to_string();
 
+                                // get short names for the common opengl drivers
+                                let name = if renderer.contains("zink") {
+                                    "zink".to_string()
+                                } else if renderer.contains("radeonsi") {
+                                    "radeonsi".to_string()
+                                } else if renderer.contains("nouveau") {
+                                    "nouveau".to_string()
+                                } else if renderer.contains("nvidia") {
+                                    "nvidia".to_string()
+                                } else {
+                                    renderer
+                                };
+
                                 drivers.insert(
                                     render_node,
                                     GlDriverInfo {
-                                        name: renderer,
+                                        name,
                                         version: version
                                             .split_whitespace()
                                             .nth(0)
