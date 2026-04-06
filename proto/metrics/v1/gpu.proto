@@ -17,7 +17,9 @@ message Config {
   bool engines = 2;
   bool clocks = 3;
   bool memory = 4;
-  bool processes = 5;
+  bool power = 5;
+  bool thermals = 6;
+  bool processes = 7;
 }
 
 // Represents a single physical GPU
@@ -32,12 +34,12 @@ message Gpu {
   // The GPU clocks in use (graphics, memory, video)
   repeated Clock clocks = 4;
   // The GPU memory usage
-  repeated MemoryUsage meminfo = 5;
+  repeated Memory memory = 5;
 
-  uint32 power_milliwatt = 14; // Power and temperatures
-  int32 temperature = 15; // Temperature of the GPU in degrees Celsius
+  optional Power power = 6; // Power and temperatures
+  repeated Thermal thermals = 7; // Temperature of the GPU in degrees Celsius
 
-  repeated Process processes = 16; // Process information
+  repeated Process processes = 8; // Process information
 }
 
 message Drivers {
@@ -53,8 +55,10 @@ enum ClockDomain {
   CLOCK_DOMAIN_UNSPECIFIED = 0;
   CLOCK_DOMAIN_GRAPHICS = 1; // Core/Shader clock
   CLOCK_DOMAIN_MEMORY = 2; // VRAM clock
-  CLOCK_DOMAIN_VIDEO = 3; // Video decode/encode clock
-  CLOCK_DOMAIN_SOC = 4; // SoC/Fabric clock
+  CLOCK_DOMAIN_VIDEO_UNIFIED = 3; // Video decode/encode clock
+  CLOCK_DOMAIN_VIDEO_DECODE = 4; // Video decode clock
+  CLOCK_DOMAIN_VIDEO_ENCODE = 5; // Video encode clock
+  CLOCK_DOMAIN_SOC = 6; // SoC/Fabric clock
 }
 
 // Identifies a clock by its domain and index
@@ -78,11 +82,13 @@ enum EngineType {
   ENGINE_TYPE_3D = 1; // Render / Graphics / 3D
   ENGINE_TYPE_COMPUTE = 2; // Compute / Cuda Cores / Stream Processors
   ENGINE_TYPE_COPY = 3; // DMA / Transfer / Memory Copy
-  ENGINE_TYPE_VIDEO_DECODE = 4; // VCN (AMD) / NVDEC (NVIDIA) / VDBox (Intel)
-  ENGINE_TYPE_VIDEO_ENCODE = 5; // VCN (AMD) / NVENC (NVIDIA) / VEBox (Intel)
-  ENGINE_TYPE_DISPLAY = 6; // Display controllers (if your API exposes them)
-  ENGINE_TYPE_MEDIA_CLEAR = 7; // Specialized engines (e.g., Intel SFC)
-  ENGINE_TYPE_OTHER = 15; // Catch-all for vendor-specific AI or RT accelerators
+  ENGINE_TYPE_MEMORY_CONTROLLER = 4; // Memory controller
+  ENGINE_TYPE_VIDEO_DECODE = 5; // VCN (AMD) / NVDEC (NVIDIA) / VDBox (Intel)
+  ENGINE_TYPE_VIDEO_ENCODE = 6; // VCN (AMD) / NVENC (NVIDIA) / VEBox (Intel)
+  ENGINE_TYPE_VIDEO_UNIFIED = 7; // Unified video decode/encode engine
+  ENGINE_TYPE_JPEG = 8; // JPEG decode/encode engine
+  ENGINE_TYPE_MEDIA_CLEAR = 9; // Specialized engines (e.g., Intel SFC)
+  ENGINE_TYPE_OTHER = 10; // Catch-all for vendor-specific AI or RT accelerators
 }
 
 // Identifier for a GPU engine
@@ -109,10 +115,38 @@ enum MemoryType {
 }
 
 // Represents the usage of a specific type of memory
-message MemoryUsage {
+message Memory {
   MemoryType type = 1;
   uint64 total_memory = 2;
   uint64 used_memory = 3;
+}
+
+// === Power ===
+
+// Represents the power usage of the GPU
+message Power {
+  uint32 current_power_mw = 1;
+  uint32 max_power_mw = 2;
+  bool is_power_throttled = 3;
+  bool is_thermal_throttled = 4;
+}
+
+// === Thermal ===
+
+enum ThermalLocation {
+  THERMAL_LOCATION_UNSPECIFIED = 0;
+  THERMAL_LOCATION_EDGE = 1;
+  THERMAL_LOCATION_HOTSPOT = 2;
+  THERMAL_LOCATION_MEMORY = 3;
+  THERMAL_LOCATION_VRGFX = 4; // voltage regulator for graphics
+  THERMAL_LOCATION_VRSOC = 5; // voltage regulator for SoC
+  THERMAL_LOCATION_VRMEM = 6; // voltage regulator for memory
+}
+
+message Thermal {
+  ThermalLocation location = 1;
+  uint32 current_celsius = 2;
+  uint32 max_celsius = 3;
 }
 
 message Process {

@@ -4,8 +4,26 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 //! Translated metrics from the gpu_metrics file in a Rust-friendly format.
+//! Let the record show I absolutely despise amdgpu and everything about it
+//! I actually hate this file with a burning passion but what can ya do
 use num::traits::AsPrimitive;
 use std::path::Path;
+
+use crate::metrics::gpu::*;
+
+// Throttling masks for indep_throttle_status values
+pub const INDEP_POWER_THROTTLE_MASK: u64 =
+    0b0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_1111_1111;
+pub const INDEP_THERMAL_THROTTLE_MASK: u64 =
+    0b0000_0000_0000_0000_1111_1111_1111_1111_0000_0000_0000_0000_0000_0000_0000_0000;
+
+pub struct PowerCounters {
+    pub prochot_residency_acc: u32,
+    pub ppt_residency_acc: u32,
+    pub socket_thm_residency_acc: u32,
+    pub vr_thm_residency_acc: u32,
+    pub hbm_thm_residency_acc: u32,
+}
 
 /// Handler for the gpu_metrics file.
 pub enum GpuMetrics {
@@ -58,323 +76,89 @@ impl GpuMetrics {
         }
     }
 
-    pub fn graphics_utilization(&self) -> f64 {
-        use amdgpu::f1::AttrId;
+    pub fn engines(&self) -> Vec<Engine> {
         match self {
-            GpuMetrics::F1C0(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F1C1(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F1C2(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F1C3(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F1C4(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F1C5(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F1C6(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F1C7(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F1C8(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F1C9(metrics) => average_without_sentinel(
-                &metrics
-                    .attributes
-                    .iter()
-                    .find(|attr| attr.id == AttrId::AverageGfxActivity)
-                    .map(|gfx_activity| gfx_activity.get_as::<u16>())
-                    .unwrap_or_default(),
-            ) as f64,
-            GpuMetrics::F2C0(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F2C1(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F2C2(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F2C3(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F2C4(metrics) => metrics.average_gfx_activity as f64,
-            GpuMetrics::F3C0(metrics) => metrics.average_gfx_activity as f64,
+            GpuMetrics::F1C0(metrics) => metrics.engines(),
+            GpuMetrics::F1C1(metrics) => metrics.engines(),
+            GpuMetrics::F1C2(metrics) => metrics.engines(),
+            GpuMetrics::F1C3(metrics) => metrics.engines(),
+            GpuMetrics::F1C4(metrics) => metrics.engines(),
+            GpuMetrics::F1C5(metrics) => metrics.engines(),
+            GpuMetrics::F1C6(metrics) => metrics.engines(),
+            GpuMetrics::F1C7(metrics) => metrics.engines(),
+            GpuMetrics::F1C8(metrics) => metrics.engines(),
+            GpuMetrics::F1C9(metrics) => metrics.engines(),
+            GpuMetrics::F2C0(metrics) => metrics.engines(),
+            GpuMetrics::F2C1(metrics) => metrics.engines(),
+            GpuMetrics::F2C2(metrics) => metrics.engines(),
+            GpuMetrics::F2C3(metrics) => metrics.engines(),
+            GpuMetrics::F2C4(metrics) => metrics.engines(),
+            GpuMetrics::F3C0(metrics) => metrics.engines(),
         }
     }
 
-    pub fn graphics_clock(&self) -> u32 {
-        use amdgpu::f1::AttrId;
+    pub fn clocks(&self) -> Vec<Clock> {
         match self {
-            GpuMetrics::F1C0(metrics) => metrics.average_gfxclk_frequency as u32,
-            GpuMetrics::F1C1(metrics) => metrics.average_gfxclk_frequency as u32,
-            GpuMetrics::F1C2(metrics) => metrics.average_gfxclk_frequency as u32,
-            GpuMetrics::F1C3(metrics) => metrics.average_gfxclk_frequency as u32,
-            GpuMetrics::F1C4(metrics) => metrics
-                .current_gfxclk
-                .iter()
-                .cloned()
-                .filter(|clk| *clk != 0xFFFF)
-                .sum::<u16>() as u32,
-            GpuMetrics::F1C5(metrics) => metrics
-                .current_gfxclk
-                .iter()
-                .cloned()
-                .filter(|clk| *clk != 0xFFFF)
-                .sum::<u16>() as u32,
-            GpuMetrics::F1C6(metrics) => metrics
-                .current_gfxclk
-                .iter()
-                .cloned()
-                .filter(|clk| *clk != 0xFFFF)
-                .sum::<u16>() as u32,
-            GpuMetrics::F1C7(metrics) => metrics
-                .current_gfxclk
-                .iter()
-                .cloned()
-                .filter(|clk| *clk != 0xFFFF)
-                .sum::<u16>() as u32,
-            GpuMetrics::F1C8(metrics) => metrics
-                .current_gfxclk
-                .iter()
-                .cloned()
-                .filter(|clk| *clk != 0xFFFF)
-                .sum::<u16>() as u32,
-            GpuMetrics::F1C9(metrics) => average_without_sentinel(
-                &metrics
-                    .attributes
-                    .iter()
-                    .find(|attr| attr.id == AttrId::CurrentGfxclk)
-                    .map(|gfx_activity| gfx_activity.get_as::<u16>())
-                    .unwrap_or_default(),
-            ) as u32,
-            GpuMetrics::F2C0(metrics) => metrics.average_gfxclk_frequency as u32,
-            GpuMetrics::F2C1(metrics) => metrics.average_gfxclk_frequency as u32,
-            GpuMetrics::F2C2(metrics) => metrics.average_gfxclk_frequency as u32,
-            GpuMetrics::F2C3(metrics) => metrics.average_gfxclk_frequency as u32,
-            GpuMetrics::F2C4(metrics) => metrics.average_gfxclk_frequency as u32,
-            GpuMetrics::F3C0(metrics) => metrics.average_gfxclk_frequency as u32,
+            GpuMetrics::F1C0(metrics) => metrics.clocks(),
+            GpuMetrics::F1C1(metrics) => metrics.clocks(),
+            GpuMetrics::F1C2(metrics) => metrics.clocks(),
+            GpuMetrics::F1C3(metrics) => metrics.clocks(),
+            GpuMetrics::F1C4(metrics) => metrics.clocks(),
+            GpuMetrics::F1C5(metrics) => metrics.clocks(),
+            GpuMetrics::F1C6(metrics) => metrics.clocks(),
+            GpuMetrics::F1C7(metrics) => metrics.clocks(),
+            GpuMetrics::F1C8(metrics) => metrics.clocks(),
+            GpuMetrics::F1C9(metrics) => metrics.clocks(),
+            GpuMetrics::F2C0(metrics) => metrics.clocks(),
+            GpuMetrics::F2C1(metrics) => metrics.clocks(),
+            GpuMetrics::F2C2(metrics) => metrics.clocks(),
+            GpuMetrics::F2C3(metrics) => metrics.clocks(),
+            GpuMetrics::F2C4(metrics) => metrics.clocks(),
+            GpuMetrics::F3C0(metrics) => metrics.clocks(),
         }
     }
 
-    pub fn memory_clock(&self) -> u32 {
-        use amdgpu::f1::AttrId;
+    pub fn power(&self, last: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
         match self {
-            GpuMetrics::F1C0(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F1C1(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F1C2(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F1C3(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F1C4(metrics) => metrics.current_uclk as u32,
-            GpuMetrics::F1C5(metrics) => metrics.current_uclk as u32,
-            GpuMetrics::F1C6(metrics) => metrics.current_uclk as u32,
-            GpuMetrics::F1C7(metrics) => metrics.current_uclk as u32,
-            GpuMetrics::F1C8(metrics) => metrics.current_uclk as u32,
-            GpuMetrics::F1C9(metrics) => average_without_sentinel(
-                &metrics
-                    .attributes
-                    .iter()
-                    .find(|attr| attr.id == AttrId::CurrentUclk)
-                    .map(|val| val.get_as::<u16>())
-                    .unwrap_or_default(),
-            ) as u32,
-            GpuMetrics::F2C0(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F2C1(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F2C2(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F2C3(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F2C4(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F3C0(metrics) => metrics.average_uclk_frequency as u32,
+            GpuMetrics::F1C0(metrics) => metrics.power(last),
+            GpuMetrics::F1C1(metrics) => metrics.power(last),
+            GpuMetrics::F1C2(metrics) => metrics.power(last),
+            GpuMetrics::F1C3(metrics) => metrics.power(last),
+            GpuMetrics::F1C4(metrics) => metrics.power(last),
+            GpuMetrics::F1C5(metrics) => metrics.power(last),
+            GpuMetrics::F1C6(metrics) => metrics.power(last),
+            GpuMetrics::F1C7(metrics) => metrics.power(last),
+            GpuMetrics::F1C8(metrics) => metrics.power(last),
+            GpuMetrics::F1C9(metrics) => metrics.power(last),
+            GpuMetrics::F2C0(metrics) => metrics.power(last),
+            GpuMetrics::F2C1(metrics) => metrics.power(last),
+            GpuMetrics::F2C2(metrics) => metrics.power(last),
+            GpuMetrics::F2C3(metrics) => metrics.power(last),
+            GpuMetrics::F2C4(metrics) => metrics.power(last),
+            GpuMetrics::F3C0(metrics) => metrics.power(last),
         }
     }
 
-    // This one's fun cause they kept freakin CHANGING WHERE THEY STORED IT
-    pub fn video_enc_dec_util(&self) -> f64 {
-        use amdgpu::f1::AttrId;
+    pub fn thermals(&self) -> Vec<Thermal> {
         match self {
-            GpuMetrics::F1C0(metrics) => metrics.average_mm_activity as f64,
-            GpuMetrics::F1C1(metrics) => metrics.average_mm_activity as f64,
-            GpuMetrics::F1C2(metrics) => metrics.average_mm_activity as f64,
-            GpuMetrics::F1C3(metrics) => metrics.average_mm_activity as f64,
-            GpuMetrics::F1C4(metrics) => average_without_sentinel(&metrics.vcn_activity) as f64,
-            GpuMetrics::F1C5(metrics) => average_without_sentinel(&metrics.vcn_activity) as f64,
-            GpuMetrics::F1C6(metrics) => average_without_sentinel(
-                &metrics
-                    .xcp_stats
-                    .iter()
-                    .map(|xcp| xcp.vcn_busy)
-                    .flatten()
-                    .collect::<Vec<u16>>(),
-            ) as f64,
-            GpuMetrics::F1C7(metrics) => average_without_sentinel(
-                &metrics
-                    .xcp_stats
-                    .iter()
-                    .map(|xcp| xcp.vcn_busy)
-                    .flatten()
-                    .collect::<Vec<u16>>(),
-            ) as f64,
-            GpuMetrics::F1C8(metrics) => average_without_sentinel(
-                &metrics
-                    .xcp_stats
-                    .iter()
-                    .map(|xcp| xcp.vcn_busy)
-                    .flatten()
-                    .collect::<Vec<u16>>(),
-            ) as f64,
-            GpuMetrics::F1C9(metrics) => average_without_sentinel(
-                &metrics
-                    .attributes
-                    .iter()
-                    .find(|attr| attr.id == AttrId::VcnBusy)
-                    .map(|val| val.get_as::<u16>())
-                    .unwrap_or_default(),
-            ) as f64,
-            GpuMetrics::F2C0(metrics) => metrics.average_mm_activity as f64,
-            GpuMetrics::F2C1(metrics) => metrics.average_mm_activity as f64,
-            GpuMetrics::F2C2(metrics) => metrics.average_mm_activity as f64,
-            GpuMetrics::F2C3(metrics) => metrics.average_mm_activity as f64,
-            GpuMetrics::F2C4(metrics) => metrics.average_mm_activity as f64,
-            GpuMetrics::F3C0(metrics) => metrics.average_vcn_activity as f64,
+            GpuMetrics::F1C0(metrics) => metrics.thermals(),
+            GpuMetrics::F1C1(metrics) => metrics.thermals(),
+            GpuMetrics::F1C2(metrics) => metrics.thermals(),
+            GpuMetrics::F1C3(metrics) => metrics.thermals(),
+            GpuMetrics::F1C4(metrics) => metrics.thermals(),
+            GpuMetrics::F1C5(metrics) => metrics.thermals(),
+            GpuMetrics::F1C6(metrics) => metrics.thermals(),
+            GpuMetrics::F1C7(metrics) => metrics.thermals(),
+            GpuMetrics::F1C8(metrics) => metrics.thermals(),
+            GpuMetrics::F1C9(metrics) => metrics.thermals(),
+            GpuMetrics::F2C0(metrics) => metrics.thermals(),
+            GpuMetrics::F2C1(metrics) => metrics.thermals(),
+            GpuMetrics::F2C2(metrics) => metrics.thermals(),
+            GpuMetrics::F2C3(metrics) => metrics.thermals(),
+            GpuMetrics::F2C4(metrics) => metrics.thermals(),
+            GpuMetrics::F3C0(metrics) => metrics.thermals(),
         }
     }
-
-    pub fn encoder_clock(&self) -> u32 {
-        use amdgpu::f1::AttrId;
-        match self {
-            GpuMetrics::F1C0(metrics) => average_without_sentinel(&[
-                metrics.average_vclk0_frequency,
-                metrics.average_vclk1_frequency,
-            ]) as u32,
-            GpuMetrics::F1C1(metrics) => average_without_sentinel(&[
-                metrics.average_vclk0_frequency,
-                metrics.average_vclk1_frequency,
-            ]) as u32,
-            GpuMetrics::F1C2(metrics) => average_without_sentinel(&[
-                metrics.average_vclk0_frequency,
-                metrics.average_vclk1_frequency,
-            ]) as u32,
-            GpuMetrics::F1C3(metrics) => average_without_sentinel(&[
-                metrics.average_vclk0_frequency,
-                metrics.average_vclk1_frequency,
-            ]) as u32,
-            GpuMetrics::F1C4(metrics) => average_without_sentinel(&metrics.current_vclk0) as u32,
-            GpuMetrics::F1C5(metrics) => average_without_sentinel(&metrics.current_vclk0) as u32,
-            GpuMetrics::F1C6(metrics) => average_without_sentinel(&metrics.current_vclk0) as u32,
-            GpuMetrics::F1C7(metrics) => average_without_sentinel(&metrics.current_vclk0) as u32,
-            GpuMetrics::F1C8(metrics) => average_without_sentinel(&metrics.current_vclk0) as u32,
-            GpuMetrics::F1C9(metrics) => average_without_sentinel(
-                &metrics
-                    .attributes
-                    .iter()
-                    .find(|attr| attr.id == AttrId::CurrentVclk0)
-                    .map(|val| val.get_as::<u16>())
-                    .unwrap_or_default(),
-            ) as u32,
-            GpuMetrics::F2C0(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F2C1(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F2C2(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F2C3(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F2C4(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F3C0(metrics) => metrics.average_uclk_frequency as u32,
-        }
-    }
-
-    pub fn decoder_clock(&self) -> u32 {
-        use amdgpu::f1::AttrId;
-        match self {
-            GpuMetrics::F1C0(metrics) => average_without_sentinel(&[
-                metrics.average_dclk0_frequency,
-                metrics.average_dclk1_frequency,
-            ]) as u32,
-            GpuMetrics::F1C1(metrics) => average_without_sentinel(&[
-                metrics.average_dclk0_frequency,
-                metrics.average_dclk1_frequency,
-            ]) as u32,
-            GpuMetrics::F1C2(metrics) => average_without_sentinel(&[
-                metrics.average_dclk0_frequency,
-                metrics.average_dclk1_frequency,
-            ]) as u32,
-            GpuMetrics::F1C3(metrics) => average_without_sentinel(&[
-                metrics.average_dclk0_frequency,
-                metrics.average_dclk1_frequency,
-            ]) as u32,
-            GpuMetrics::F1C4(metrics) => average_without_sentinel(&metrics.current_dclk0) as u32,
-            GpuMetrics::F1C5(metrics) => average_without_sentinel(&metrics.current_dclk0) as u32,
-            GpuMetrics::F1C6(metrics) => average_without_sentinel(&metrics.current_dclk0) as u32,
-            GpuMetrics::F1C7(metrics) => average_without_sentinel(&metrics.current_dclk0) as u32,
-            GpuMetrics::F1C8(metrics) => average_without_sentinel(&metrics.current_dclk0) as u32,
-            GpuMetrics::F1C9(metrics) => average_without_sentinel(
-                &metrics
-                    .attributes
-                    .iter()
-                    .find(|attr| attr.id == AttrId::CurrentDclk0)
-                    .map(|val| val.get_as::<u16>())
-                    .unwrap_or_default(),
-            ) as u32,
-            GpuMetrics::F2C0(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F2C1(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F2C2(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F2C3(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F2C4(metrics) => metrics.average_uclk_frequency as u32,
-            GpuMetrics::F3C0(metrics) => metrics.average_uclk_frequency as u32,
-        }
-    }
-
-    pub fn power_milliwatt(&self) -> u32 {
-        use amdgpu::f1::AttrId;
-        match self {
-            GpuMetrics::F1C0(metrics) => metrics.average_socket_power as u32 * 1000,
-            GpuMetrics::F1C1(metrics) => metrics.average_socket_power as u32 * 1000,
-            GpuMetrics::F1C2(metrics) => metrics.average_socket_power as u32 * 1000,
-            GpuMetrics::F1C3(metrics) => metrics.average_socket_power as u32 * 1000,
-            GpuMetrics::F1C4(metrics) => metrics.curr_socket_power as u32 * 1000,
-            GpuMetrics::F1C5(metrics) => metrics.curr_socket_power as u32 * 1000,
-            GpuMetrics::F1C6(metrics) => metrics.curr_socket_power as u32 * 1000,
-            GpuMetrics::F1C7(metrics) => metrics.curr_socket_power as u32 * 1000,
-            GpuMetrics::F1C8(metrics) => metrics.curr_socket_power as u32 * 1000,
-            GpuMetrics::F1C9(metrics) => {
-                average_without_sentinel(
-                    &metrics
-                        .attributes
-                        .iter()
-                        .find(|attr| attr.id == AttrId::CurrSocPower)
-                        .map(|val| val.get_as::<u16>())
-                        .unwrap_or_default(),
-                ) as u32
-                    * 1000
-            }
-            GpuMetrics::F2C0(metrics) => metrics.average_socket_power as u32 * 1000,
-            GpuMetrics::F2C1(metrics) => metrics.average_socket_power as u32 * 1000,
-            GpuMetrics::F2C2(metrics) => metrics.average_socket_power as u32 * 1000,
-            GpuMetrics::F2C3(metrics) => metrics.average_socket_power as u32 * 1000,
-            GpuMetrics::F2C4(metrics) => metrics.average_socket_power as u32 * 1000,
-            GpuMetrics::F3C0(metrics) => metrics.average_socket_power as u32 * 1000,
-        }
-    }
-
-    pub fn temperature(&self) -> i32 {
-        use amdgpu::f1::AttrId;
-        match self {
-            GpuMetrics::F1C0(metrics) => metrics.temperature_hotspot as i32,
-            GpuMetrics::F1C1(metrics) => metrics.temperature_hotspot as i32,
-            GpuMetrics::F1C2(metrics) => metrics.temperature_hotspot as i32,
-            GpuMetrics::F1C3(metrics) => metrics.temperature_hotspot as i32,
-            GpuMetrics::F1C4(metrics) => metrics.temperature_hotspot as i32,
-            GpuMetrics::F1C5(metrics) => metrics.temperature_hotspot as i32,
-            GpuMetrics::F1C6(metrics) => metrics.temperature_hotspot as i32,
-            GpuMetrics::F1C7(metrics) => metrics.temperature_hotspot as i32,
-            GpuMetrics::F1C8(metrics) => metrics.temperature_hotspot as i32,
-            GpuMetrics::F1C9(metrics) => average_without_sentinel(
-                &metrics
-                    .attributes
-                    .iter()
-                    .find(|attr| attr.id == AttrId::TemperatureHotspot)
-                    .map(|val| val.get_as::<u16>())
-                    .unwrap_or_default(),
-            ) as i32,
-            GpuMetrics::F2C0(metrics) => metrics.temperature_gfx as i32 / 100,
-            GpuMetrics::F2C1(metrics) => metrics.temperature_gfx as i32 / 100,
-            GpuMetrics::F2C2(metrics) => metrics.temperature_gfx as i32 / 100,
-            GpuMetrics::F2C3(metrics) => metrics.temperature_gfx as i32 / 100,
-            GpuMetrics::F2C4(metrics) => metrics.temperature_gfx as i32 / 100,
-            GpuMetrics::F3C0(metrics) => metrics.temperature_gfx as i32 / 100,
-        }
-    }
-}
-
-fn average_without_sentinel(values: &[u16]) -> u16 {
-    let mut accum = 0;
-    let mut num = 0;
-    for value in values.iter() {
-        if *value != 0xFFFF {
-            accum += value;
-            num += 1;
-        }
-    }
-    if num != 0 { accum / num } else { 0 }
 }
 
 fn from_bytes<T>(bytes: &[u8]) -> Option<T> {
@@ -387,6 +171,10 @@ fn from_bytes<T>(bytes: &[u8]) -> Option<T> {
 
 trait AmdgpuMetrics {
     fn from_bytes(bytes: &[u8]) -> anyhow::Result<GpuMetrics>;
+    fn engines(&self) -> Vec<Engine>;
+    fn clocks(&self) -> Vec<Clock>;
+    fn power(&self, last: Option<&PowerCounters>) -> Option<(Power, PowerCounters)>;
+    fn thermals(&self) -> Vec<Thermal>;
 }
 
 /// Contains the struct definitions from the amdgpu driver.
@@ -468,6 +256,196 @@ mod amdgpu {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
             }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+                if self.average_gfx_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::EngineType3d as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_gfx_activity as u64,
+                    });
+                }
+                if self.average_umc_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::MemoryController as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Memory as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_umc_activity as u64,
+                    });
+                }
+                if self.average_mm_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::VideoUnified as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: 0, // just use vclk0 since this value is an average across engines
+                            }),
+                        }),
+                        utilization: self.average_mm_activity as u64,
+                    });
+                }
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+                if self.average_gfxclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Graphics as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_gfxclk_frequency as u32,
+                        max_frequency_mhz: 0, // this needs to be populated from pp_dpm_sclk later
+                    });
+                }
+                if self.average_socclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Soc as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_socclk_frequency as u32,
+                        max_frequency_mhz: 0, // this needs to be populated from pp_dpm_socclk later
+                    });
+                }
+                if self.average_uclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_uclk_frequency as u32,
+                        max_frequency_mhz: 0, // this needs to be populated from pp_dpm_uclk later
+                    });
+                }
+                if self.average_vclk0_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_vclk0_frequency as u32,
+                        max_frequency_mhz: 0, // this needs to be populated from pp_dpm_vclk0 later
+                    });
+                }
+                if self.average_dclk0_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoDecode as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_dclk0_frequency as u32,
+                        max_frequency_mhz: 0, // this needs to be populated from pp_dpm_dclk later
+                    });
+                }
+                if self.average_vclk1_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 1,
+                        }),
+                        current_frequency_mhz: self.average_vclk1_frequency as u32,
+                        max_frequency_mhz: 0, // this needs to be populated from pp_dpm_vclk later
+                    });
+                }
+                if self.average_dclk1_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoDecode as i32,
+                            index: 1,
+                        }),
+                        current_frequency_mhz: self.average_dclk1_frequency as u32,
+                        max_frequency_mhz: 0, // this needs to be populated from pp_dpm_dclk later
+                    });
+                }
+                clocks
+            }
+
+            fn power(&self, _: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.average_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.average_socket_power as u32,
+                            max_power_mw: 0, // needs to be populated from hwmon (if it exists)
+                            is_power_throttled: false, // unrealistic due to the value reported being different depending on gpu
+                            is_thermal_throttled: false, // same as above
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: 0,
+                            ppt_residency_acc: 0,
+                            socket_thm_residency_acc: 0,
+                            vr_thm_residency_acc: 0,
+                            hbm_thm_residency_acc: 0,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.temperature_edge != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: 1,
+                        current_celsius: self.temperature_edge as u32,
+                        max_celsius: 0, // needs to be populated from hwmon (if it exists)
+                    });
+                }
+                if self.temperature_hotspot != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.temperature_hotspot as u32,
+                        max_celsius: 0, // needs to be populated from hwmon (if it exists)
+                    });
+                }
+                if self.temperature_mem != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Memory as i32,
+                        current_celsius: self.temperature_mem as u32,
+                        max_celsius: 0, // needs to be populated from hwmon (if it exists)
+                    });
+                }
+                if self.temperature_vrgfx != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrgfx as i32,
+                        current_celsius: self.temperature_vrgfx as u32,
+                        max_celsius: 0, // needs to be populated from hwmon (if it exists)
+                    });
+                }
+                if self.temperature_vrsoc != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrsoc as i32,
+                        current_celsius: self.temperature_vrsoc as u32,
+                        max_celsius: 0, // needs to be populated from hwmon (if it exists)
+                    });
+                }
+                if self.temperature_vrmem != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrmem as i32,
+                        current_celsius: self.temperature_vrmem as u32,
+                        max_celsius: 0, // needs to be populated from hwmon (if it exists)
+                    });
+                }
+
+                thermals
+            }
         }
 
         // === gpu_metrics_v1_1 ===
@@ -541,6 +519,207 @@ mod amdgpu {
                 Ok(GpuMetrics::F1C1(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
+            }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+                if self.average_gfx_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::EngineType3d as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_gfx_activity as u64,
+                    });
+                }
+
+                if self.average_umc_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::MemoryController as i32,
+                            index: 1,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Memory as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_umc_activity as u64,
+                    });
+                }
+
+                if self.average_mm_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::VideoUnified as i32,
+                            index: 2,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_mm_activity as u64,
+                    });
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                if self.average_gfxclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Graphics as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_gfxclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                if self.average_socclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Soc as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_socclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                if self.average_uclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_uclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                if self.average_vclk0_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_vclk0_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                if self.average_dclk0_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoDecode as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_dclk0_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                if self.average_vclk1_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 1,
+                        }),
+                        current_frequency_mhz: self.average_vclk1_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                if self.average_dclk1_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoDecode as i32,
+                            index: 1,
+                        }),
+                        current_frequency_mhz: self.average_dclk1_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                clocks
+            }
+
+            fn power(&self, _: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.average_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.average_socket_power as u32,
+                            max_power_mw: 0, // needs to be populated from hwmon (if it exists)
+                            is_power_throttled: false, // read v1_0's comment
+                            is_thermal_throttled: false,
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: 0,
+                            ppt_residency_acc: 0,
+                            socket_thm_residency_acc: 0,
+                            vr_thm_residency_acc: 0,
+                            hbm_thm_residency_acc: 0,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.temperature_edge != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Edge as i32,
+                        current_celsius: self.temperature_edge as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_hotspot != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.temperature_hotspot as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_mem != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Memory as i32,
+                        current_celsius: self.temperature_mem as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_vrgfx != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrgfx as i32,
+                        current_celsius: self.temperature_vrgfx as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_vrmem != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrmem as i32,
+                        current_celsius: self.temperature_vrmem as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_vrsoc != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrsoc as i32,
+                        current_celsius: self.temperature_vrsoc as u32,
+                        max_celsius: 0,
+                    });
+                }
+
+                thermals
             }
         }
 
@@ -617,6 +796,200 @@ mod amdgpu {
                 Ok(GpuMetrics::F1C2(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
+            }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+
+                if self.average_gfx_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::EngineType3d as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_gfx_activity as u64,
+                    });
+                }
+                if self.average_umc_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::MemoryController as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Memory as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_umc_activity as u64,
+                    });
+                }
+                if self.average_mm_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::VideoUnified as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_mm_activity as u64,
+                    });
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                if self.average_gfxclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Graphics as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_gfxclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_socclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Soc as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_socclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_uclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_uclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_vclk0_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_vclk0_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_dclk0_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoDecode as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_dclk0_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_vclk1_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 1,
+                        }),
+                        current_frequency_mhz: self.average_vclk1_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_dclk1_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoDecode as i32,
+                            index: 1,
+                        }),
+                        current_frequency_mhz: self.average_dclk1_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                clocks
+            }
+
+            fn power(&self, _: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.average_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.average_socket_power as u32,
+                            max_power_mw: 0, // needs to be populated from hwmon (if it exists)
+                            is_power_throttled: false, // read v1_0's comment
+                            is_thermal_throttled: false,
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: 0,
+                            ppt_residency_acc: 0,
+                            socket_thm_residency_acc: 0,
+                            vr_thm_residency_acc: 0,
+                            hbm_thm_residency_acc: 0,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.temperature_edge != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Edge as i32,
+                        current_celsius: self.temperature_edge as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_hotspot != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.temperature_hotspot as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_mem != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Memory as i32,
+                        current_celsius: self.temperature_mem as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_vrgfx != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrgfx as i32,
+                        current_celsius: self.temperature_vrgfx as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_vrsoc != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrsoc as i32,
+                        current_celsius: self.temperature_vrsoc as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_vrmem != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrmem as i32,
+                        current_celsius: self.temperature_vrmem as u32,
+                        max_celsius: 0,
+                    });
+                }
+
+                thermals
             }
         }
 
@@ -703,6 +1076,211 @@ mod amdgpu {
                 Ok(GpuMetrics::F1C3(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
+            }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+                if self.average_gfx_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::EngineType3d as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_gfx_activity as u64,
+                    });
+                }
+
+                if self.average_umc_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::MemoryController as i32,
+                            index: 1,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Memory as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_umc_activity as u64,
+                    });
+                }
+
+                if self.average_mm_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::VideoUnified as i32,
+                            index: 2,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_mm_activity as u64,
+                    });
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                if self.average_gfxclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Graphics as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_gfxclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                if self.average_socclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Soc as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_socclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                if self.average_uclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_uclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                if self.average_vclk0_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_vclk0_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                if self.average_dclk0_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoDecode as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_dclk0_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                if self.average_vclk1_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 1,
+                        }),
+                        current_frequency_mhz: self.average_vclk1_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                if self.average_dclk1_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoDecode as i32,
+                            index: 1,
+                        }),
+                        current_frequency_mhz: self.average_dclk1_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                clocks
+            }
+
+            fn power(&self, _: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.average_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.average_socket_power as u32,
+                            max_power_mw: 0, // needs to be populated from hwmon (if it exists)
+                            is_power_throttled: (self.indep_throttle_status
+                                & INDEP_POWER_THROTTLE_MASK)
+                                != 0,
+                            is_thermal_throttled: (self.indep_throttle_status
+                                & INDEP_THERMAL_THROTTLE_MASK)
+                                != 0,
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: 0,
+                            ppt_residency_acc: 0,
+                            socket_thm_residency_acc: 0,
+                            vr_thm_residency_acc: 0,
+                            hbm_thm_residency_acc: 0,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.temperature_edge != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Edge as i32,
+                        current_celsius: self.temperature_edge as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_hotspot != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.temperature_hotspot as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_mem != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Memory as i32,
+                        current_celsius: self.temperature_mem as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_vrgfx != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrgfx as i32,
+                        current_celsius: self.temperature_vrgfx as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_vrmem != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrmem as i32,
+                        current_celsius: self.temperature_vrmem as u32,
+                        max_celsius: 0,
+                    });
+                }
+                if self.temperature_vrsoc != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrsoc as i32,
+                        current_celsius: self.temperature_vrsoc as u32,
+                        max_celsius: 0,
+                    });
+                }
+
+                thermals
             }
         }
 
@@ -794,6 +1372,170 @@ mod amdgpu {
                 Ok(GpuMetrics::F1C4(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
+            }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+
+                if self.average_gfx_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::EngineType3d as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_gfx_activity as u64,
+                    });
+                }
+                if self.average_umc_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::MemoryController as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Memory as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_umc_activity as u64,
+                    });
+                }
+
+                for (i, vcn) in self.vcn_activity.iter().enumerate() {
+                    if *vcn != 0xFFFF {
+                        engines.push(Engine {
+                            identifier: Some(EngineIdentifier {
+                                r#type: EngineType::VideoUnified as i32,
+                                index: i as u32,
+                                clock: Some(ClockIdentifier {
+                                    domain: ClockDomain::VideoUnified as i32,
+                                    index: 0,
+                                }),
+                            }),
+                            utilization: *vcn as u64,
+                        });
+                    }
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                for (i, clk) in self.current_gfxclk.iter().enumerate() {
+                    if *clk != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: i as u32,
+                            }),
+                            current_frequency_mhz: *clk as u32,
+                            max_frequency_mhz: *clk as u32,
+                        });
+                    }
+                }
+                if self.current_uclk != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: self.current_uclk as u32,
+                        }),
+                        current_frequency_mhz: self.current_uclk as u32,
+                        max_frequency_mhz: self.current_uclk as u32,
+                    });
+                }
+                for (i, clk) in self.current_socclk.iter().enumerate() {
+                    if *clk != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::Soc as i32,
+                                index: i as u32,
+                            }),
+                            current_frequency_mhz: *clk as u32,
+                            max_frequency_mhz: *clk as u32,
+                        });
+                    }
+                }
+                for (i, clk) in self.current_vclk0.iter().enumerate() {
+                    if *clk != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: i as u32,
+                            }),
+                            current_frequency_mhz: *clk as u32,
+                            max_frequency_mhz: *clk as u32,
+                        });
+                    }
+                }
+                for (i, clk) in self.current_dclk0.iter().enumerate() {
+                    if *clk != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoDecode as i32,
+                                index: i as u32,
+                            }),
+                            current_frequency_mhz: *clk as u32,
+                            max_frequency_mhz: *clk as u32,
+                        });
+                    }
+                }
+
+                clocks
+            }
+
+            fn power(&self, _: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.curr_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.curr_socket_power as u32,
+                            max_power_mw: 0, // needs to be populated from hwmon (if it exists)
+                            is_power_throttled: false, // read v1_0's comment
+                            is_thermal_throttled: false,
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: 0,
+                            ppt_residency_acc: 0,
+                            socket_thm_residency_acc: 0,
+                            vr_thm_residency_acc: 0,
+                            hbm_thm_residency_acc: 0,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.temperature_hotspot != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.temperature_hotspot as u32,
+                        max_celsius: 0, // needs to be populated from hwmon (if it exists)
+                    });
+                }
+                if self.temperature_mem != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Memory as i32,
+                        current_celsius: self.temperature_mem as u32,
+                        max_celsius: 0, // needs to be populated from hwmon (if it exists)
+                    });
+                }
+                if self.temperature_vrsoc != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrsoc as i32,
+                        current_celsius: self.temperature_vrsoc as u32,
+                        max_celsius: 0, // needs to be populated from hwmon (if it exists)
+                    });
+                }
+
+                thermals
             }
         }
 
@@ -890,10 +1632,197 @@ mod amdgpu {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
             }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+
+                if self.average_gfx_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::EngineType3d as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_gfx_activity as u64,
+                    });
+                }
+                if self.average_umc_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::MemoryController as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Memory as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_umc_activity as u64,
+                    });
+                }
+
+                for (i, vcn) in self.vcn_activity.iter().enumerate() {
+                    if *vcn != 0xFFFF {
+                        engines.push(Engine {
+                            identifier: Some(EngineIdentifier {
+                                r#type: EngineType::VideoUnified as i32,
+                                index: i as u32,
+                                clock: Some(ClockIdentifier {
+                                    domain: ClockDomain::VideoUnified as i32,
+                                    index: 0,
+                                }),
+                            }),
+                            utilization: *vcn as u64,
+                        });
+                    }
+                }
+
+                for (i, jpeg) in self.jpeg_activity.iter().enumerate() {
+                    if *jpeg != 0xFFFF {
+                        engines.push(Engine {
+                            identifier: Some(EngineIdentifier {
+                                r#type: EngineType::Jpeg as i32,
+                                index: i as u32,
+                                clock: Some(ClockIdentifier {
+                                    domain: ClockDomain::VideoUnified as i32,
+                                    index: 0,
+                                }),
+                            }),
+                            utilization: *jpeg as u64,
+                        });
+                    }
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                for (i, clk) in self.current_gfxclk.iter().enumerate() {
+                    if *clk != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: i as u32,
+                            }),
+                            current_frequency_mhz: *clk as u32,
+                            max_frequency_mhz: *clk as u32,
+                        });
+                    }
+                }
+                if self.current_uclk != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: self.current_uclk as u32,
+                        }),
+                        current_frequency_mhz: self.current_uclk as u32,
+                        max_frequency_mhz: self.current_uclk as u32,
+                    });
+                }
+                for (i, clk) in self.current_socclk.iter().enumerate() {
+                    if *clk != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::Soc as i32,
+                                index: i as u32,
+                            }),
+                            current_frequency_mhz: *clk as u32,
+                            max_frequency_mhz: *clk as u32,
+                        });
+                    }
+                }
+                for (i, clk) in self.current_vclk0.iter().enumerate() {
+                    if *clk != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: i as u32,
+                            }),
+                            current_frequency_mhz: *clk as u32,
+                            max_frequency_mhz: *clk as u32,
+                        });
+                    }
+                }
+                for (i, clk) in self.current_dclk0.iter().enumerate() {
+                    if *clk != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoDecode as i32,
+                                index: i as u32,
+                            }),
+                            current_frequency_mhz: *clk as u32,
+                            max_frequency_mhz: *clk as u32,
+                        });
+                    }
+                }
+
+                clocks
+            }
+
+            fn power(&self, _: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.curr_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.curr_socket_power as u32,
+                            max_power_mw: 0, // needs to be populated from hwmon (if it exists)
+                            is_power_throttled: false, // read v1_0's comment
+                            is_thermal_throttled: false,
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: 0,
+                            ppt_residency_acc: 0,
+                            socket_thm_residency_acc: 0,
+                            vr_thm_residency_acc: 0,
+                            hbm_thm_residency_acc: 0,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.temperature_hotspot != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.temperature_hotspot as u32,
+                        max_celsius: 0, // needs to be populated from hwmon (if it exists)
+                    });
+                }
+                if self.temperature_mem != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Memory as i32,
+                        current_celsius: self.temperature_mem as u32,
+                        max_celsius: 0, // needs to be populated from hwmon (if it exists)
+                    });
+                }
+                if self.temperature_vrsoc != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrsoc as i32,
+                        current_celsius: self.temperature_vrsoc as u32,
+                        max_celsius: 0, // needs to be populated from hwmon (if it exists)
+                    });
+                }
+
+                thermals
+            }
         }
 
         // === gpu_metrics_v1_6 ===
+        // Versions starting here are mainly targeted towards enterprise AI accelerators, so I don't have any way
+        // to figure out if this actually works or not. I'm making assumptions about how XCPs report their metrics.
 
+        // XCP (Accelerated Compute Partition) is a way of partitioning a GPU into multiple
+        // compute partitions, each with its own set of resources. There are three modes:
+        // - SPX (Single Partition X-celerator): one compute partition with shared resources
+        // - CPX (Core Partitioned X-celerator): each compute die is a separate compute partition
+        // - DPX (Dual Partitioned X-celerator): compute dies are split between two virtual compute partitions
         const MAX_XCC: usize = 8;
         const NUM_XCP: usize = 8;
         #[repr(C)]
@@ -1007,6 +1936,199 @@ mod amdgpu {
                 Ok(GpuMetrics::F1C6(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
+            }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+
+                for xcp in self.xcp_stats.iter() {
+                    for (idx, gfx) in xcp.gfx_busy_inst.iter().enumerate() {
+                        if *gfx != 0xFFFF {
+                            engines.push(Engine {
+                                identifier: Some(EngineIdentifier {
+                                    r#type: EngineType::EngineType3d as i32,
+                                    index: idx as u32,
+                                    clock: Some(ClockIdentifier {
+                                        domain: ClockDomain::Graphics as i32,
+                                        index: idx as u32,
+                                    }),
+                                }),
+                                utilization: *gfx as u64,
+                            })
+                        }
+                    }
+                }
+                if self.average_umc_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::MemoryController as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Memory as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_umc_activity as u64,
+                    })
+                }
+                for xcp in self.xcp_stats.iter() {
+                    for (idx, jpeg) in xcp.jpeg_busy.iter().enumerate() {
+                        if *jpeg != 0xFFFF {
+                            engines.push(Engine {
+                                identifier: Some(EngineIdentifier {
+                                    r#type: EngineType::Jpeg as i32,
+                                    index: idx as u32,
+                                    clock: Some(ClockIdentifier {
+                                        domain: ClockDomain::VideoUnified as i32,
+                                        index: (idx / (NUM_JPEG_ENG / NUM_XCP)) as u32,
+                                    }),
+                                }),
+                                utilization: *jpeg as u64,
+                            })
+                        }
+                    }
+                }
+                for xcp in self.xcp_stats.iter() {
+                    for (idx, vcn) in xcp.vcn_busy.iter().enumerate() {
+                        if *vcn != 0xFFFF {
+                            engines.push(Engine {
+                                identifier: Some(EngineIdentifier {
+                                    r#type: EngineType::VideoUnified as i32,
+                                    index: idx as u32,
+                                    clock: Some(ClockIdentifier {
+                                        domain: ClockDomain::VideoUnified as i32,
+                                        index: idx as u32,
+                                    }),
+                                }),
+                                utilization: *vcn as u64,
+                            })
+                        }
+                    }
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                for (idx, clock) in self.current_gfxclk.iter().enumerate() {
+                    if *clock != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: idx as u32,
+                            }),
+                            current_frequency_mhz: *clock as u32,
+                            max_frequency_mhz: 0, // populate later
+                        })
+                    }
+                }
+                for (idx, clock) in self.current_socclk.iter().enumerate() {
+                    if *clock != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::Soc as i32,
+                                index: idx as u32,
+                            }),
+                            current_frequency_mhz: *clock as u32,
+                            max_frequency_mhz: 0, // populate later
+                        })
+                    }
+                }
+                for (idx, clock) in self.current_vclk0.iter().enumerate() {
+                    if *clock != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: idx as u32,
+                            }),
+                            current_frequency_mhz: *clock as u32,
+                            max_frequency_mhz: 0, // populate later
+                        })
+                    }
+                }
+                for (idx, clock) in self.current_dclk0.iter().enumerate() {
+                    if *clock != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoDecode as i32,
+                                index: idx as u32,
+                            }),
+                            current_frequency_mhz: *clock as u32,
+                            max_frequency_mhz: 0, // populate later
+                        })
+                    }
+                }
+                if self.current_uclk != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.current_uclk as u32,
+                        max_frequency_mhz: 0, // populate later
+                    })
+                }
+
+                clocks
+            }
+
+            fn power(&self, last: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.curr_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.curr_socket_power as u32,
+                            max_power_mw: 0, // populated later
+                            is_power_throttled: last.is_some_and(|last| {
+                                last.ppt_residency_acc < self.ppt_residency_acc
+                            }),
+                            is_thermal_throttled: last.is_some_and(|last| {
+                                last.socket_thm_residency_acc < self.socket_thm_residency_acc
+                                    || last.vr_thm_residency_acc < self.vr_thm_residency_acc
+                                    || last.hbm_thm_residency_acc < self.hbm_thm_residency_acc
+                                    || last.prochot_residency_acc < self.prochot_residency_acc
+                            }),
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: self.prochot_residency_acc,
+                            ppt_residency_acc: self.ppt_residency_acc,
+                            socket_thm_residency_acc: self.socket_thm_residency_acc,
+                            vr_thm_residency_acc: self.vr_thm_residency_acc,
+                            hbm_thm_residency_acc: self.hbm_thm_residency_acc,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.temperature_hotspot != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.temperature_hotspot as u32,
+                        max_celsius: 0, // populated later
+                    });
+                }
+                if self.temperature_mem != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Memory as i32,
+                        current_celsius: self.temperature_mem as u32,
+                        max_celsius: 0, // populated later
+                    });
+                }
+                if self.temperature_vrsoc != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrsoc as i32,
+                        current_celsius: self.temperature_vrsoc as u32,
+                        max_celsius: 0, // populated later
+                    });
+                }
+
+                thermals
             }
         }
 
@@ -1135,6 +2257,199 @@ mod amdgpu {
                 Ok(GpuMetrics::F1C7(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
+            }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+
+                for xcp in self.xcp_stats.iter() {
+                    for (idx, gfx) in xcp.gfx_busy_inst.iter().enumerate() {
+                        if *gfx != 0xFFFF {
+                            engines.push(Engine {
+                                identifier: Some(EngineIdentifier {
+                                    r#type: EngineType::EngineType3d as i32,
+                                    index: idx as u32,
+                                    clock: Some(ClockIdentifier {
+                                        domain: ClockDomain::Graphics as i32,
+                                        index: idx as u32,
+                                    }),
+                                }),
+                                utilization: *gfx as u64,
+                            })
+                        }
+                    }
+                }
+                if self.average_umc_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::MemoryController as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Memory as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_umc_activity as u64,
+                    })
+                }
+                for xcp in self.xcp_stats.iter() {
+                    for (idx, jpeg) in xcp.jpeg_busy.iter().enumerate() {
+                        if *jpeg != 0xFFFF {
+                            engines.push(Engine {
+                                identifier: Some(EngineIdentifier {
+                                    r#type: EngineType::Jpeg as i32,
+                                    index: idx as u32,
+                                    clock: Some(ClockIdentifier {
+                                        domain: ClockDomain::VideoUnified as i32,
+                                        index: (idx / (NUM_JPEG_ENG / NUM_XCP)) as u32,
+                                    }),
+                                }),
+                                utilization: *jpeg as u64,
+                            })
+                        }
+                    }
+                }
+                for xcp in self.xcp_stats.iter() {
+                    for (idx, vcn) in xcp.vcn_busy.iter().enumerate() {
+                        if *vcn != 0xFFFF {
+                            engines.push(Engine {
+                                identifier: Some(EngineIdentifier {
+                                    r#type: EngineType::VideoUnified as i32,
+                                    index: idx as u32,
+                                    clock: Some(ClockIdentifier {
+                                        domain: ClockDomain::VideoUnified as i32,
+                                        index: idx as u32,
+                                    }),
+                                }),
+                                utilization: *vcn as u64,
+                            })
+                        }
+                    }
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                for (idx, clock) in self.current_gfxclk.iter().enumerate() {
+                    if *clock != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: idx as u32,
+                            }),
+                            current_frequency_mhz: *clock as u32,
+                            max_frequency_mhz: 0, // populate later
+                        })
+                    }
+                }
+                for (idx, clock) in self.current_socclk.iter().enumerate() {
+                    if *clock != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::Soc as i32,
+                                index: idx as u32,
+                            }),
+                            current_frequency_mhz: *clock as u32,
+                            max_frequency_mhz: 0, // populate later
+                        })
+                    }
+                }
+                for (idx, clock) in self.current_vclk0.iter().enumerate() {
+                    if *clock != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: idx as u32,
+                            }),
+                            current_frequency_mhz: *clock as u32,
+                            max_frequency_mhz: 0, // populate later
+                        })
+                    }
+                }
+                for (idx, clock) in self.current_dclk0.iter().enumerate() {
+                    if *clock != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoDecode as i32,
+                                index: idx as u32,
+                            }),
+                            current_frequency_mhz: *clock as u32,
+                            max_frequency_mhz: 0, // populate later
+                        })
+                    }
+                }
+                if self.current_uclk != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.current_uclk as u32,
+                        max_frequency_mhz: 0, // populate later
+                    })
+                }
+
+                clocks
+            }
+
+            fn power(&self, last: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.curr_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.curr_socket_power as u32,
+                            max_power_mw: 0, // populated later
+                            is_power_throttled: last.is_some_and(|last| {
+                                last.ppt_residency_acc < self.ppt_residency_acc
+                            }),
+                            is_thermal_throttled: last.is_some_and(|last| {
+                                last.socket_thm_residency_acc < self.socket_thm_residency_acc
+                                    || last.vr_thm_residency_acc < self.vr_thm_residency_acc
+                                    || last.hbm_thm_residency_acc < self.hbm_thm_residency_acc
+                                    || last.prochot_residency_acc < self.prochot_residency_acc
+                            }),
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: self.prochot_residency_acc,
+                            ppt_residency_acc: self.ppt_residency_acc,
+                            socket_thm_residency_acc: self.socket_thm_residency_acc,
+                            vr_thm_residency_acc: self.vr_thm_residency_acc,
+                            hbm_thm_residency_acc: self.hbm_thm_residency_acc,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.temperature_hotspot != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.temperature_hotspot as u32,
+                        max_celsius: 0, // populated later
+                    });
+                }
+                if self.temperature_mem != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Memory as i32,
+                        current_celsius: self.temperature_mem as u32,
+                        max_celsius: 0, // populated later
+                    });
+                }
+                if self.temperature_vrsoc != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrsoc as i32,
+                        current_celsius: self.temperature_vrsoc as u32,
+                        max_celsius: 0, // populated later
+                    });
+                }
+
+                thermals
             }
         }
 
@@ -1267,6 +2582,199 @@ mod amdgpu {
                 Ok(GpuMetrics::F1C8(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
+            }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+
+                for xcp in self.xcp_stats.iter() {
+                    for (idx, gfx) in xcp.gfx_busy_inst.iter().enumerate() {
+                        if *gfx != 0xFFFF {
+                            engines.push(Engine {
+                                identifier: Some(EngineIdentifier {
+                                    r#type: EngineType::EngineType3d as i32,
+                                    index: idx as u32,
+                                    clock: Some(ClockIdentifier {
+                                        domain: ClockDomain::Graphics as i32,
+                                        index: idx as u32,
+                                    }),
+                                }),
+                                utilization: *gfx as u64,
+                            })
+                        }
+                    }
+                }
+                if self.average_umc_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::MemoryController as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Memory as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_umc_activity as u64,
+                    })
+                }
+                for xcp in self.xcp_stats.iter() {
+                    for (idx, jpeg) in xcp.jpeg_busy.iter().enumerate() {
+                        if *jpeg != 0xFFFF {
+                            engines.push(Engine {
+                                identifier: Some(EngineIdentifier {
+                                    r#type: EngineType::Jpeg as i32,
+                                    index: idx as u32,
+                                    clock: Some(ClockIdentifier {
+                                        domain: ClockDomain::VideoUnified as i32,
+                                        index: (idx / (NUM_JPEG_ENG / NUM_XCP)) as u32,
+                                    }),
+                                }),
+                                utilization: *jpeg as u64,
+                            })
+                        }
+                    }
+                }
+                for xcp in self.xcp_stats.iter() {
+                    for (idx, vcn) in xcp.vcn_busy.iter().enumerate() {
+                        if *vcn != 0xFFFF {
+                            engines.push(Engine {
+                                identifier: Some(EngineIdentifier {
+                                    r#type: EngineType::VideoUnified as i32,
+                                    index: idx as u32,
+                                    clock: Some(ClockIdentifier {
+                                        domain: ClockDomain::VideoUnified as i32,
+                                        index: idx as u32,
+                                    }),
+                                }),
+                                utilization: *vcn as u64,
+                            })
+                        }
+                    }
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                for (idx, clock) in self.current_gfxclk.iter().enumerate() {
+                    if *clock != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: idx as u32,
+                            }),
+                            current_frequency_mhz: *clock as u32,
+                            max_frequency_mhz: 0, // populate later
+                        })
+                    }
+                }
+                for (idx, clock) in self.current_socclk.iter().enumerate() {
+                    if *clock != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::Soc as i32,
+                                index: idx as u32,
+                            }),
+                            current_frequency_mhz: *clock as u32,
+                            max_frequency_mhz: 0, // populate later
+                        })
+                    }
+                }
+                for (idx, clock) in self.current_vclk0.iter().enumerate() {
+                    if *clock != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: idx as u32,
+                            }),
+                            current_frequency_mhz: *clock as u32,
+                            max_frequency_mhz: 0, // populate later
+                        })
+                    }
+                }
+                for (idx, clock) in self.current_dclk0.iter().enumerate() {
+                    if *clock != 0xFFFF {
+                        clocks.push(Clock {
+                            identifier: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoDecode as i32,
+                                index: idx as u32,
+                            }),
+                            current_frequency_mhz: *clock as u32,
+                            max_frequency_mhz: 0, // populate later
+                        })
+                    }
+                }
+                if self.current_uclk != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.current_uclk as u32,
+                        max_frequency_mhz: 0, // populate later
+                    })
+                }
+
+                clocks
+            }
+
+            fn power(&self, last: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.curr_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.curr_socket_power as u32,
+                            max_power_mw: 0, // populated later
+                            is_power_throttled: last.is_some_and(|last| {
+                                last.ppt_residency_acc < self.ppt_residency_acc
+                            }),
+                            is_thermal_throttled: last.is_some_and(|last| {
+                                last.socket_thm_residency_acc < self.socket_thm_residency_acc
+                                    || last.vr_thm_residency_acc < self.vr_thm_residency_acc
+                                    || last.hbm_thm_residency_acc < self.hbm_thm_residency_acc
+                                    || last.prochot_residency_acc < self.prochot_residency_acc
+                            }),
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: self.prochot_residency_acc,
+                            ppt_residency_acc: self.ppt_residency_acc,
+                            socket_thm_residency_acc: self.socket_thm_residency_acc,
+                            vr_thm_residency_acc: self.vr_thm_residency_acc,
+                            hbm_thm_residency_acc: self.hbm_thm_residency_acc,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.temperature_hotspot != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.temperature_hotspot as u32,
+                        max_celsius: 0, // populated later
+                    });
+                }
+                if self.temperature_mem != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Memory as i32,
+                        current_celsius: self.temperature_mem as u32,
+                        max_celsius: 0, // populated later
+                    });
+                }
+                if self.temperature_vrsoc != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Vrsoc as i32,
+                        current_celsius: self.temperature_vrsoc as u32,
+                        max_celsius: 0, // populated later
+                    });
+                }
+
+                thermals
             }
         }
 
@@ -1597,6 +3105,290 @@ mod amdgpu {
                 }
                 Ok(GpuMetrics::F1C9(C9 { attributes }))
             }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+
+                // Try to find gfx_busy_inst first, then fallback to average_gfx_activity
+                if let Some(gfx_busy_inst) =
+                    self.attributes.iter().find(|a| a.id == AttrId::GfxBusyInst)
+                {
+                    if let AttrValue::U16 { values } = &gfx_busy_inst.val {
+                        for (idx, value) in values.iter().enumerate() {
+                            engines.push(Engine {
+                                identifier: Some(EngineIdentifier {
+                                    r#type: EngineType::EngineType3d as i32,
+                                    index: idx as u32,
+                                    clock: Some(ClockIdentifier {
+                                        domain: ClockDomain::Graphics as i32,
+                                        index: idx as u32,
+                                    }),
+                                }),
+                                utilization: *value as u64,
+                            });
+                        }
+                    }
+                } else if let Some(average_gfx_activity) = self
+                    .attributes
+                    .iter()
+                    .find(|a| a.id == AttrId::AverageGfxActivity)
+                {
+                    if let AttrValue::U16 { values } = &average_gfx_activity.val {
+                        for (idx, value) in values.iter().enumerate() {
+                            engines.push(Engine {
+                                identifier: Some(EngineIdentifier {
+                                    r#type: EngineType::EngineType3d as i32,
+                                    index: idx as u32,
+                                    clock: Some(ClockIdentifier {
+                                        domain: ClockDomain::Graphics as i32,
+                                        index: idx as u32,
+                                    }),
+                                }),
+                                utilization: *value as u64,
+                            });
+                        }
+                    }
+                }
+
+                for attr in self.attributes.iter() {
+                    match attr.id {
+                        AttrId::AverageUmcActivity => {
+                            if let AttrValue::U16 { values } = &attr.val {
+                                for (idx, value) in values.iter().enumerate() {
+                                    engines.push(Engine {
+                                        identifier: Some(EngineIdentifier {
+                                            r#type: EngineType::MemoryController as i32,
+                                            index: idx as u32,
+                                            clock: Some(ClockIdentifier {
+                                                domain: ClockDomain::Memory as i32,
+                                                index: idx as u32,
+                                            }),
+                                        }),
+                                        utilization: *value as u64,
+                                    });
+                                }
+                            }
+                        }
+                        AttrId::JpegBusy => {
+                            if let AttrValue::U16 { values } = &attr.val {
+                                for (idx, value) in values.iter().enumerate() {
+                                    engines.push(Engine {
+                                        identifier: Some(EngineIdentifier {
+                                            r#type: EngineType::Jpeg as i32,
+                                            index: idx as u32,
+                                            clock: Some(ClockIdentifier {
+                                                domain: ClockDomain::VideoUnified as i32,
+                                                index: idx as u32,
+                                            }),
+                                        }),
+                                        utilization: *value as u64,
+                                    });
+                                }
+                            }
+                        }
+                        AttrId::VcnBusy => {
+                            if let AttrValue::U16 { values } = &attr.val {
+                                for (idx, value) in values.iter().enumerate() {
+                                    engines.push(Engine {
+                                        identifier: Some(EngineIdentifier {
+                                            r#type: EngineType::VideoUnified as i32,
+                                            index: idx as u32,
+                                            clock: Some(ClockIdentifier {
+                                                domain: ClockDomain::VideoUnified as i32,
+                                                index: idx as u32,
+                                            }),
+                                        }),
+                                        utilization: *value as u64,
+                                    });
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                for attr in &self.attributes {
+                    match attr.id {
+                        AttrId::CurrentGfxclk => {
+                            if let AttrValue::U16 { values } = &attr.val {
+                                for (idx, value) in values.iter().enumerate() {
+                                    clocks.push(Clock {
+                                        identifier: Some(ClockIdentifier {
+                                            domain: ClockDomain::Graphics as i32,
+                                            index: idx as u32,
+                                        }),
+                                        current_frequency_mhz: *value as u32,
+                                        max_frequency_mhz: 0, // populate later
+                                    });
+                                }
+                            }
+                        }
+                        AttrId::CurrentSocclk => {
+                            if let AttrValue::U16 { values } = &attr.val {
+                                for (idx, value) in values.iter().enumerate() {
+                                    clocks.push(Clock {
+                                        identifier: Some(ClockIdentifier {
+                                            domain: ClockDomain::Soc as i32,
+                                            index: idx as u32,
+                                        }),
+                                        current_frequency_mhz: *value as u32,
+                                        max_frequency_mhz: 0, // populate later
+                                    });
+                                }
+                            }
+                        }
+                        AttrId::CurrentVclk0 => {
+                            if let AttrValue::U16 { values } = &attr.val {
+                                for (idx, value) in values.iter().enumerate() {
+                                    clocks.push(Clock {
+                                        identifier: Some(ClockIdentifier {
+                                            domain: ClockDomain::VideoUnified as i32,
+                                            index: idx as u32,
+                                        }),
+                                        current_frequency_mhz: *value as u32,
+                                        max_frequency_mhz: 0, // populate later
+                                    });
+                                }
+                            }
+                        }
+                        AttrId::CurrentDclk0 => {
+                            if let AttrValue::U16 { values } = &attr.val {
+                                for (idx, value) in values.iter().enumerate() {
+                                    clocks.push(Clock {
+                                        identifier: Some(ClockIdentifier {
+                                            domain: ClockDomain::VideoDecode as i32,
+                                            index: idx as u32,
+                                        }),
+                                        current_frequency_mhz: *value as u32,
+                                        max_frequency_mhz: 0, // populate later
+                                    });
+                                }
+                            }
+                        }
+                        AttrId::CurrentUclk => {
+                            if let AttrValue::U16 { values } = &attr.val {
+                                for (idx, value) in values.iter().enumerate() {
+                                    clocks.push(Clock {
+                                        identifier: Some(ClockIdentifier {
+                                            domain: ClockDomain::Memory as i32,
+                                            index: idx as u32,
+                                        }),
+                                        current_frequency_mhz: *value as u32,
+                                        max_frequency_mhz: 0, // populate later
+                                    });
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                clocks
+            }
+
+            fn power(&self, last: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if let Some(last) = last {
+                    let mut current_power_mw = 0;
+                    let mut counters = PowerCounters {
+                        prochot_residency_acc: 0,
+                        ppt_residency_acc: 0,
+                        socket_thm_residency_acc: 0,
+                        vr_thm_residency_acc: 0,
+                        hbm_thm_residency_acc: 0,
+                    };
+                    for attr in self.attributes.iter() {
+                        match attr.id {
+                            AttrId::CurrSocPower => {
+                                current_power_mw = attr.get_as::<u32>().iter().sum();
+                            }
+                            AttrId::ProchotResidencyAcc => {
+                                counters.prochot_residency_acc = attr.get_as::<u32>().iter().sum();
+                            }
+                            AttrId::PptResidencyAcc => {
+                                counters.ppt_residency_acc = attr.get_as::<u32>().iter().sum();
+                            }
+                            AttrId::SocketThmResidencyAcc => {
+                                counters.socket_thm_residency_acc =
+                                    attr.get_as::<u32>().iter().sum();
+                            }
+                            AttrId::VrThmResidencyAcc => {
+                                counters.vr_thm_residency_acc = attr.get_as::<u32>().iter().sum();
+                            }
+                            AttrId::HbmThmResidencyAcc => {
+                                counters.hbm_thm_residency_acc = attr.get_as::<u32>().iter().sum();
+                            }
+                            _ => {}
+                        }
+                    }
+                    Some((
+                        Power {
+                            current_power_mw,
+                            max_power_mw: 0,
+                            is_power_throttled: last.ppt_residency_acc < counters.ppt_residency_acc,
+                            is_thermal_throttled: last.prochot_residency_acc
+                                < counters.prochot_residency_acc
+                                || last.socket_thm_residency_acc
+                                    < counters.socket_thm_residency_acc
+                                || last.vr_thm_residency_acc < counters.vr_thm_residency_acc
+                                || last.hbm_thm_residency_acc < counters.hbm_thm_residency_acc,
+                        },
+                        counters,
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                for attr in self.attributes.iter() {
+                    match attr.id {
+                        AttrId::TemperatureHotspot => {
+                            if let AttrValue::U16 { values } = &attr.val {
+                                for value in values.iter() {
+                                    thermals.push(Thermal {
+                                        location: ThermalLocation::Hotspot as i32,
+                                        current_celsius: *value as u32,
+                                        max_celsius: 0, // populate later
+                                    });
+                                }
+                            }
+                        }
+                        AttrId::TemperatureMem => {
+                            if let AttrValue::U16 { values } = &attr.val {
+                                for value in values.iter() {
+                                    thermals.push(Thermal {
+                                        location: ThermalLocation::Memory as i32,
+                                        current_celsius: *value as u32,
+                                        max_celsius: 0, // populate later
+                                    });
+                                }
+                            }
+                        }
+                        AttrId::TemperatureVrsoc => {
+                            if let AttrValue::U16 { values } = &attr.val {
+                                for value in values.iter() {
+                                    thermals.push(Thermal {
+                                        location: ThermalLocation::Vrsoc as i32,
+                                        current_celsius: *value as u32,
+                                        max_celsius: 0, // populate later
+                                    });
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                thermals
+            }
         }
     }
 
@@ -1665,6 +3457,132 @@ mod amdgpu {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
             }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+
+                if self.average_gfx_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::EngineType3d as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_gfx_activity as u64,
+                    });
+                }
+                if self.average_mm_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::VideoUnified as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_mm_activity as u64,
+                    });
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                if self.average_gfxclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Graphics as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_gfxclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_socclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Soc as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_socclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_uclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_uclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_vclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_vclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_dclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoDecode as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_dclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                clocks
+            }
+
+            fn power(&self, _: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.average_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.average_socket_power as u32,
+                            max_power_mw: 0,
+                            is_power_throttled: false, // read v1_0's comment
+                            is_thermal_throttled: false,
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: 0,
+                            ppt_residency_acc: 0,
+                            socket_thm_residency_acc: 0,
+                            vr_thm_residency_acc: 0,
+                            hbm_thm_residency_acc: 0,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.temperature_gfx != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.temperature_gfx as u32,
+                        max_celsius: 0,
+                    });
+                }
+
+                thermals
+            }
         }
 
         // === gpu_metrics_v2_1 ===
@@ -1728,6 +3646,132 @@ mod amdgpu {
                 Ok(GpuMetrics::F2C1(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
+            }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+
+                if self.average_gfx_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::EngineType3d as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_gfx_activity as u64,
+                    });
+                }
+                if self.average_mm_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::VideoUnified as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_mm_activity as u64,
+                    });
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                if self.average_gfxclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Graphics as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_gfxclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_socclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Soc as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_socclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_uclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_uclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_vclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_vclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_dclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoDecode as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_dclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                clocks
+            }
+
+            fn power(&self, _: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.average_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.average_socket_power as u32,
+                            max_power_mw: 0,
+                            is_power_throttled: false, // read v1_0's comment
+                            is_thermal_throttled: false,
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: 0,
+                            ppt_residency_acc: 0,
+                            socket_thm_residency_acc: 0,
+                            vr_thm_residency_acc: 0,
+                            hbm_thm_residency_acc: 0,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.temperature_gfx != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.temperature_gfx as u32,
+                        max_celsius: 0,
+                    });
+                }
+
+                thermals
             }
         }
 
@@ -1795,6 +3839,136 @@ mod amdgpu {
                 Ok(GpuMetrics::F2C2(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
+            }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+
+                if self.average_gfx_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::EngineType3d as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_gfx_activity as u64,
+                    });
+                }
+                if self.average_mm_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::VideoUnified as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_mm_activity as u64,
+                    });
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                if self.average_gfxclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Graphics as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_gfxclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_socclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Soc as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_socclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_uclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_uclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_vclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_vclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_dclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoDecode as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_dclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                clocks
+            }
+
+            fn power(&self, _: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.average_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.average_socket_power as u32,
+                            max_power_mw: 0,
+                            is_power_throttled: self.indep_throttle_status
+                                & INDEP_POWER_THROTTLE_MASK
+                                != 0,
+                            is_thermal_throttled: self.indep_throttle_status
+                                & INDEP_THERMAL_THROTTLE_MASK
+                                != 0,
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: 0,
+                            ppt_residency_acc: 0,
+                            socket_thm_residency_acc: 0,
+                            vr_thm_residency_acc: 0,
+                            hbm_thm_residency_acc: 0,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.temperature_gfx != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.temperature_gfx as u32,
+                        max_celsius: 0,
+                    });
+                }
+
+                thermals
             }
         }
 
@@ -1868,6 +4042,136 @@ mod amdgpu {
                 Ok(GpuMetrics::F2C3(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
+            }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+
+                if self.average_gfx_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::EngineType3d as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_gfx_activity as u64,
+                    });
+                }
+                if self.average_mm_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::VideoUnified as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_mm_activity as u64,
+                    });
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                if self.average_gfxclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Graphics as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_gfxclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_socclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Soc as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_socclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_uclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_uclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_vclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_vclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_dclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoDecode as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_dclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                clocks
+            }
+
+            fn power(&self, _: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.average_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.average_socket_power as u32,
+                            max_power_mw: 0,
+                            is_power_throttled: self.indep_throttle_status
+                                & INDEP_POWER_THROTTLE_MASK
+                                != 0,
+                            is_thermal_throttled: self.indep_throttle_status
+                                & INDEP_POWER_THROTTLE_MASK
+                                != 0,
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: 0,
+                            ppt_residency_acc: 0,
+                            socket_thm_residency_acc: 0,
+                            vr_thm_residency_acc: 0,
+                            hbm_thm_residency_acc: 0,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.average_temperature_gfx != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.average_temperature_gfx as u32,
+                        max_celsius: 0,
+                    });
+                }
+
+                thermals
             }
         }
 
@@ -1951,6 +4255,136 @@ mod amdgpu {
                 Ok(GpuMetrics::F2C4(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
+            }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+
+                if self.average_gfx_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::EngineType3d as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_gfx_activity as u64,
+                    });
+                }
+                if self.average_mm_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::VideoUnified as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_mm_activity as u64,
+                    });
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                if self.average_gfxclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Graphics as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_gfxclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_socclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Soc as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_socclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_uclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_uclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_vclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_vclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_dclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoDecode as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_dclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                clocks
+            }
+
+            fn power(&self, _: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.average_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.average_socket_power as u32,
+                            max_power_mw: 0,
+                            is_power_throttled: self.indep_throttle_status
+                                & INDEP_POWER_THROTTLE_MASK
+                                != 0,
+                            is_thermal_throttled: self.indep_throttle_status
+                                & INDEP_POWER_THROTTLE_MASK
+                                != 0,
+                        },
+                        PowerCounters {
+                            prochot_residency_acc: 0,
+                            ppt_residency_acc: 0,
+                            socket_thm_residency_acc: 0,
+                            vr_thm_residency_acc: 0,
+                            hbm_thm_residency_acc: 0,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.average_temperature_gfx != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.average_temperature_gfx as u32,
+                        max_celsius: 0,
+                    });
+                }
+
+                thermals
             }
         }
     }
@@ -2056,6 +4490,135 @@ mod amdgpu {
                 Ok(GpuMetrics::F3C0(bytes.ok_or_else(|| {
                     anyhow::anyhow!("gpu_metrics file struct malformed")
                 })?))
+            }
+
+            fn engines(&self) -> Vec<Engine> {
+                let mut engines = Vec::new();
+
+                if self.average_gfx_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::EngineType3d as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_gfx_activity as u64,
+                    });
+                }
+                if self.average_vcn_activity != 0xFFFF {
+                    engines.push(Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::VideoUnified as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: self.average_vcn_activity as u64,
+                    });
+                }
+
+                engines
+            }
+
+            fn clocks(&self) -> Vec<Clock> {
+                let mut clocks = Vec::new();
+
+                if self.average_gfxclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Graphics as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_gfxclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_socclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Soc as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_socclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_uclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::Memory as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_uclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+                if self.average_vclk_frequency != 0xFFFF {
+                    clocks.push(Clock {
+                        identifier: Some(ClockIdentifier {
+                            domain: ClockDomain::VideoUnified as i32,
+                            index: 0,
+                        }),
+                        current_frequency_mhz: self.average_vclk_frequency as u32,
+                        max_frequency_mhz: 0,
+                    });
+                }
+
+                clocks
+            }
+
+            fn power(&self, last: Option<&PowerCounters>) -> Option<(Power, PowerCounters)> {
+                if self.average_socket_power != 0xFFFF {
+                    Some((
+                        Power {
+                            current_power_mw: self.average_socket_power as u32,
+                            max_power_mw: 0,
+                            is_power_throttled: if let Some(last) = last {
+                                self.throttle_residency_sppt > last.ppt_residency_acc
+                                    || self.throttle_residency_fppt > last.hbm_thm_residency_acc
+                            } else {
+                                false
+                            },
+                            is_thermal_throttled: if let Some(last) = last {
+                                self.throttle_residency_prochot > last.prochot_residency_acc
+                                    || self.throttle_residency_thm_soc
+                                        > last.socket_thm_residency_acc
+                                    || self.throttle_residency_thm_gfx > last.vr_thm_residency_acc
+                            } else {
+                                false
+                            },
+                        },
+                        // i know the names don't match up but shhh
+                        PowerCounters {
+                            prochot_residency_acc: self.throttle_residency_prochot,
+                            ppt_residency_acc: self.throttle_residency_sppt,
+                            hbm_thm_residency_acc: self.throttle_residency_fppt,
+                            socket_thm_residency_acc: self.throttle_residency_thm_soc,
+                            vr_thm_residency_acc: self.throttle_residency_thm_gfx,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            fn thermals(&self) -> Vec<Thermal> {
+                let mut thermals = Vec::new();
+
+                if self.temperature_gfx != 0xFFFF {
+                    thermals.push(Thermal {
+                        location: ThermalLocation::Hotspot as i32,
+                        current_celsius: self.temperature_gfx as u32,
+                        max_celsius: 0,
+                    });
+                }
+
+                thermals
             }
         }
     }

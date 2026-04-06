@@ -13,6 +13,7 @@ use std::{
 
 pub(super) struct Collector {
     device_names: HashMap<String, String>,
+    last_counters: HashMap<String, gpu_metrics::PowerCounters>,
 }
 
 impl Default for Collector {
@@ -27,41 +28,134 @@ impl Collector {
         tracing::debug!("initializing AMD GPU collector");
         Collector {
             device_names: HashMap::new(),
+            last_counters: HashMap::new(),
         }
     }
 
-    pub fn collect(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
+    pub fn collect(&mut self, path: &Path, config: &super::Config) -> anyhow::Result<super::Gpu> {
         let gpu_metrics_path = path.join("device/gpu_metrics");
         let metrics = gpu_metrics::GpuMetrics::read(&gpu_metrics_path)?;
 
         let brand_name = self.get_brand_name(path);
-        let kernel_driver = String::from("amdgpu");
-        let opengl_driver = String::new();
-        let vulkan_driver = String::new();
+        let drivers = if config.drivers {
+            Some(super::Drivers {
+                kernel: String::from("amdgpu"),
+                opengl: String::new(),
+                vulkan: String::new(),
+            })
+        } else {
+            None
+        };
 
-        let graphics_utilization = metrics.graphics_utilization();
-        let graphics_clock = metrics.graphics_clock();
-        let memory_capacity = match get_memory_capacity(path) {
-            Ok(mem) => mem,
-            Err(e) => {
-                tracing::warn!("{e}");
-                0u64
-            }
+        let engines = if config.engines {
+            metrics.engines()
+        } else {
+            Vec::new()
         };
-        let memory_usage = match get_memory_usage(path) {
-            Ok(mem) => mem,
-            Err(e) => {
-                tracing::warn!("{e}");
-                0u64
-            }
+
+        let mut clocks = if config.clocks {
+            metrics.clocks()
+        } else {
+            Vec::new()
         };
-        let memory_clock = metrics.memory_clock();
-        let encoder_utilization = metrics.video_enc_dec_util();
-        let decoder_utilization = metrics.video_enc_dec_util();
-        let encoder_clock = metrics.encoder_clock();
-        let decoder_clock = metrics.decoder_clock();
-        let power_milliwatt = metrics.power_milliwatt();
-        let temperature = metrics.temperature();
+
+        let memory = if config.memory {
+            let mut memory = Vec::new();
+            match (get_memory_usage(path), get_memory_capacity(path)) {
+                (Err(e1), Err(e2)) => {
+                    tracing::warn!("failed to read vram usage: {e1}");
+                    tracing::warn!("failed to read vram capacity: {e2}");
+                }
+                (Err(e), _) => {
+                    tracing::warn!("failed to read vram usage: {e}")
+                }
+                (_, Err(e)) => {
+                    tracing::warn!("failed to read vram capacity: {e}")
+                }
+                (Ok(used_memory), Ok(total_memory)) => {
+                    memory.push(super::Memory {
+                        r#type: super::MemoryType::Vram as i32,
+                        total_memory,
+                        used_memory,
+                    });
+                }
+            }
+            match (get_gtt_usage(path), get_gtt_capacity(path)) {
+                (Err(e1), Err(e2)) => {
+                    tracing::warn!("failed to read gtt usage: {e1}");
+                    tracing::warn!("failed to read gtt capacity: {e2}");
+                }
+                (Err(e), _) => {
+                    tracing::warn!("failed to read gtt usage: {e}")
+                }
+                (_, Err(e)) => {
+                    tracing::warn!("failed to read gtt capacity: {e}")
+                }
+                (Ok(used_memory), Ok(total_memory)) => {
+                    memory.push(super::Memory {
+                        r#type: super::MemoryType::Gtt as i32,
+                        total_memory,
+                        used_memory,
+                    });
+                }
+            }
+            memory
+        } else {
+            Vec::new()
+        };
+
+        let mut power = if config.power {
+            if let Some((pwr, counters)) = metrics.power(
+                self.last_counters.get(
+                    &path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                ),
+            ) {
+                self.last_counters.insert(
+                    path.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                    counters,
+                );
+                Some(pwr)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let mut thermals = if config.thermals {
+            metrics.thermals()
+        } else {
+            Vec::new()
+        };
+
+        // Read max frequencies
+        match populate_clocks(&mut clocks, path) {
+            Ok(()) => {}
+            Err(e) => {
+                tracing::warn!("could not read amdgpu clock frequencies: {e}");
+            }
+        }
+
+        // read max power
+        match populate_power(power.as_mut(), path) {
+            Ok(()) => {}
+            Err(e) => {
+                tracing::warn!("could not read amdgpu power: {e}");
+            }
+        }
+
+        // read max thermal
+        match populate_thermal(&mut thermals, path) {
+            Ok(()) => {}
+            Err(e) => {
+                tracing::warn!("could not read amdgpu thermal: {e}");
+            }
+        }
 
         // Read processes from fdinfo
         let processes = match self.get_fdinfo(/* params */) {
@@ -74,25 +168,18 @@ impl Collector {
 
         Ok(super::Gpu {
             brand_name,
-            kernel_driver,
-            opengl_driver,
-            vulkan_driver,
-            graphics_utilization,
-            graphics_clock,
-            memory_capacity,
-            memory_usage,
-            memory_clock,
-            encoder_utilization,
-            decoder_utilization,
-            encoder_clock,
-            decoder_clock,
-            power_milliwatt,
-            temperature,
+            drivers,
+            engines,
+            clocks,
+            memory,
+            power,
+            thermals,
             processes,
         })
     }
 
     fn get_fdinfo(&mut self) -> anyhow::Result<Vec<super::Process>> {
+        tracing::warn!("amdgpu get_fdinfo is unimplemented! returning no data");
         Ok(vec![])
     }
 
@@ -167,4 +254,148 @@ fn get_memory_capacity(path: &Path) -> anyhow::Result<u64> {
 fn get_memory_usage(path: &Path) -> anyhow::Result<u64> {
     let memory_path = path.join("device/mem_info_vram_used");
     sysfs::read_u64(&memory_path).ok_or_else(|| anyhow::anyhow!("could not read current vram"))
+}
+
+fn get_gtt_capacity(path: &Path) -> anyhow::Result<u64> {
+    let gtt_path = path.join("device/mem_info_gtt_total");
+    sysfs::read_u64(&gtt_path).ok_or_else(|| anyhow::anyhow!("could not read total gtt"))
+}
+
+fn get_gtt_usage(path: &Path) -> anyhow::Result<u64> {
+    let gtt_path = path.join("device/mem_info_gtt_used");
+    sysfs::read_u64(&gtt_path).ok_or_else(|| anyhow::anyhow!("could not read current gtt"))
+}
+
+fn populate_clocks(clocks: &mut Vec<super::Clock>, path: &Path) -> anyhow::Result<()> {
+    for clock in clocks.iter_mut() {
+        let Some(identifier) = clock.identifier.as_ref() else {
+            continue;
+        };
+        let max_freq = match identifier.domain() {
+            super::ClockDomain::Graphics => {
+                let Some(gfxclk) = sysfs::read_string(&path.join("device/pp_dpm_sclk")) else {
+                    continue;
+                };
+                let mut max_freq = 0u32;
+                for line in gfxclk.lines() {
+                    let Some(freq) = line
+                        .split_whitespace()
+                        .nth(1)
+                        .and_then(|f| f.strip_suffix("Mhz"))
+                        .and_then(|f| f.parse::<u32>().ok())
+                    else {
+                        continue;
+                    };
+                    max_freq = max_freq.max(freq);
+                }
+                max_freq
+            }
+            super::ClockDomain::VideoUnified => {
+                let Some(vclk) = sysfs::read_string(&path.join("device/pp_dpm_vclk")) else {
+                    continue;
+                };
+                let mut max_freq = 0u32;
+                for line in vclk.lines() {
+                    let Some(freq) = line
+                        .split_whitespace()
+                        .nth(1)
+                        .and_then(|f| f.strip_suffix("Mhz"))
+                        .and_then(|f| f.parse::<u32>().ok())
+                    else {
+                        continue;
+                    };
+                    max_freq = max_freq.max(freq);
+                }
+                max_freq
+            }
+            super::ClockDomain::VideoDecode => {
+                let Some(dclk) = sysfs::read_string(&path.join("device/pp_dpm_dclk")) else {
+                    continue;
+                };
+                let mut max_freq = 0u32;
+                for line in dclk.lines() {
+                    let Some(freq) = line
+                        .split_whitespace()
+                        .nth(1)
+                        .and_then(|f| f.strip_suffix("Mhz"))
+                        .and_then(|f| f.parse::<u32>().ok())
+                    else {
+                        continue;
+                    };
+                    max_freq = max_freq.max(freq);
+                }
+                max_freq
+            }
+            super::ClockDomain::Soc => {
+                let Some(socclk) = sysfs::read_string(&path.join("device/pp_dpm_socclk")) else {
+                    continue;
+                };
+                let mut max_freq = 0u32;
+                for line in socclk.lines() {
+                    let Some(freq) = line
+                        .split_whitespace()
+                        .nth(1)
+                        .and_then(|f| f.strip_suffix("Mhz"))
+                        .and_then(|f| f.parse::<u32>().ok())
+                    else {
+                        continue;
+                    };
+                    max_freq = max_freq.max(freq);
+                }
+                max_freq
+            }
+            super::ClockDomain::Memory => {
+                let Some(mclk) = sysfs::read_string(&path.join("device/pp_dpm_mclk")) else {
+                    continue;
+                };
+                let mut max_freq = 0u32;
+                for line in mclk.lines() {
+                    let Some(freq) = line
+                        .split_whitespace()
+                        .nth(1)
+                        .and_then(|f| f.strip_suffix("Mhz"))
+                        .and_then(|f| f.parse::<u32>().ok())
+                    else {
+                        continue;
+                    };
+                    max_freq = max_freq.max(freq);
+                }
+                max_freq
+            }
+            _ => continue,
+        };
+        clock.max_frequency_mhz = max_freq;
+    }
+    Ok(())
+}
+
+fn populate_power(power: Option<&mut super::Power>, path: &Path) -> anyhow::Result<()> {
+    let Some(power) = power else {
+        return Ok(());
+    };
+    let Some(power1_cap) = sysfs::first_hwmon_subdir(&path.join("device/hwmon"))
+        .and_then(|p| sysfs::read_u32(&p.join("power1_cap")))
+    else {
+        return Ok(());
+    };
+    power.max_power_mw = power1_cap;
+    Ok(())
+}
+
+fn populate_thermal(thermals: &mut Vec<super::Thermal>, path: &Path) -> anyhow::Result<()> {
+    let Some(hwmon) = sysfs::first_hwmon_subdir(&path.join("device/hwmon")) else {
+        return Ok(());
+    };
+    for thermal in thermals.iter_mut() {
+        let Some(temp) = (match thermal.location() {
+            super::ThermalLocation::Edge => sysfs::read_u32(&hwmon.join("temp1_crit")),
+            super::ThermalLocation::Hotspot => sysfs::read_u32(&hwmon.join("temp2_crit")),
+            super::ThermalLocation::Memory => sysfs::read_u32(&hwmon.join("temp3_crit")),
+            _ => continue,
+        }) else {
+            continue;
+        };
+        thermal.max_celsius = temp / 1000;
+    }
+    Ok(())
 }

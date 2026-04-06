@@ -47,7 +47,11 @@ impl super::Collector for Collector {
         &[]
     }
 
-    fn collect(&mut self, store: &store::Store) -> anyhow::Result<()> {
+    fn collect(
+        &mut self,
+        _config: &crate::metrics::Config,
+        store: &store::Store,
+    ) -> anyhow::Result<()> {
         match self.collect_memory() {
             Ok(snapshot) => store
                 .mem
@@ -284,11 +288,10 @@ mod tests {
     fn memory() -> anyhow::Result<()> {
         let _ = tracing_subscriber::fmt::try_init();
         let mut collector = super::Collector::new();
-        let mut store = store::Store::new();
-        collector.collect(&store)?;
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        store = store::Store::new();
-        collector.collect(&store)?;
+        let store = store::Store::new();
+        let mut config = crate::metrics::Config::default();
+        config.memory = Some(crate::metrics::memory::Config { dimms: true });
+        collector.collect(&config, &store)?;
         assert!(
             store
                 .mem

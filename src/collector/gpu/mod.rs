@@ -31,11 +31,7 @@ use std::path::PathBuf;
 use crate::collector::helpers::*;
 use crate::collector::store;
 #[doc(inline)]
-pub use crate::metrics::gpu::Gpu;
-#[doc(inline)]
-pub use crate::metrics::gpu::Process;
-#[doc(inline)]
-pub use crate::metrics::gpu::Snapshot;
+pub use crate::metrics::gpu::*;
 
 pub struct Collector {
     gpus: Vec<GpuCache>,
@@ -72,8 +68,12 @@ impl super::Collector for Collector {
         &[]
     }
 
-    fn collect(&mut self, store: &store::Store) -> anyhow::Result<()> {
-        match self.collect_gpus() {
+    fn collect(
+        &mut self,
+        config: &crate::metrics::Config,
+        store: &store::Store,
+    ) -> anyhow::Result<()> {
+        match self.collect_gpus(config) {
             Ok(gpus) => store
                 .gpu
                 .set(gpus)
@@ -100,22 +100,30 @@ impl Collector {
     }
 
     /// Collects the GPU metrics and returns a snapshot.
-    fn collect_gpus(&mut self) -> anyhow::Result<Snapshot> {
+    fn collect_gpus(&mut self, config: &crate::metrics::Config) -> anyhow::Result<Snapshot> {
         let mut gpus = Vec::new();
+        let Some(config) = config.gpu else {
+            anyhow::bail!("gpu collector did not receive a config");
+        };
+
         if self.gpus.is_empty() {
             self.gpus = self.collect_static_info()?;
         }
         for gpu in self.gpus.iter() {
             let snapshot = match gpu.vendor {
-                GpuVendor::Intel => self.intel.collect(&gpu.path),
-                GpuVendor::Nvidia => self.nvidia.collect(&gpu.path),
-                GpuVendor::Amd => self.amd.collect(&gpu.path),
+                GpuVendor::Intel => self.intel.collect(&gpu.path, &config),
+                GpuVendor::Nvidia => self.nvidia.collect(&gpu.path, &config),
+                GpuVendor::Amd => self.amd.collect(&gpu.path, &config),
             };
 
             match snapshot {
                 Ok(mut snapshot) => {
-                    snapshot.opengl_driver = gpu.opengl_driver.clone();
-                    snapshot.vulkan_driver = gpu.vulkan_driver.clone();
+                    if config.drivers {
+                        snapshot.drivers.as_mut().map(|drivers| {
+                            drivers.opengl = gpu.opengl_driver.clone();
+                            drivers.vulkan = gpu.vulkan_driver.clone();
+                        });
+                    }
                     gpus.push(snapshot)
                 }
                 Err(e) => tracing::warn!("failed to collect a GPU's metrics: {}", e),
@@ -193,10 +201,20 @@ mod tests {
         let _ = tracing_subscriber::fmt::try_init();
         let mut collector = super::Collector::new();
         let mut store = store::Store::new();
-        collector.collect(&store)?;
+        let mut config = crate::metrics::Config::default();
+        config.gpu = Some(crate::metrics::gpu::Config {
+            drivers: true,
+            engines: true,
+            clocks: true,
+            memory: true,
+            power: true,
+            thermals: true,
+            processes: true,
+        });
+        collector.collect(&config, &store)?;
         std::thread::sleep(std::time::Duration::from_secs(1));
         store = store::Store::new();
-        collector.collect(&store)?;
+        collector.collect(&config, &store)?;
         println!("{:#?}", store.gpu.get());
         Ok(())
     }

@@ -59,7 +59,11 @@ impl super::Collector for Collector {
     /// Collects one full snapshot of network adapters and emplaces it into the associated Store slot.
     /// If collection fails critically, the store slot is not modified and an error is returned.
     /// On non-critical errors, the store slot is emplaced with empty data and a warning is logged.
-    fn collect(&mut self, store: &store::Store) -> anyhow::Result<()> {
+    fn collect(
+        &mut self,
+        _config: &crate::metrics::Config,
+        store: &store::Store,
+    ) -> anyhow::Result<()> {
         match self.collect_adapters() {
             Ok(adapters) => store
                 .net
@@ -307,10 +311,15 @@ mod tests {
         let _ = tracing_subscriber::fmt::try_init();
         let mut collector = super::Collector::new();
         let mut store = store::Store::new();
-        collector.collect(&store)?;
+        let mut config = crate::metrics::Config::default();
+        config.network = Some(crate::metrics::network::Config {
+            addresses: true,
+            wifi_info: true,
+        });
+        collector.collect(&config, &store)?;
         std::thread::sleep(std::time::Duration::from_secs(1));
         store = store::Store::new();
-        collector.collect(&store)?;
+        collector.collect(&config, &store)?;
         println!("{:#?}", store.net.get());
         Ok(())
     }

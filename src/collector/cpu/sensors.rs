@@ -24,14 +24,14 @@ pub struct Tracker {
 }
 
 /// A single sample of CPU sensor data.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Sample {
     pub temperatures: Temperatures,
     pub power: Power,
 }
 
 /// A sample of CPU temperature sensor data.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Temperatures {
     pub package: BTreeMap<u32, Option<f32>>,
     pub cluster: BTreeMap<(u32, u32), Option<f32>>,
@@ -39,7 +39,7 @@ pub struct Temperatures {
 }
 
 /// A sample of CPU power sensor data.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Power {
     pub package: BTreeMap<u32, Option<f32>>,
 }
@@ -141,7 +141,11 @@ impl Sources {
         let mut power = BTreeMap::new();
 
         for (&package_id, package) in topology.packages.iter() {
-            let vendor = package.vendor_id.as_str();
+            let vendor = package
+                .hwid
+                .as_ref()
+                .map(|h| h.vendor_id.as_str())
+                .unwrap_or_default();
             thermal.insert(package_id, detect_thermal(package_id, vendor));
             power.insert(package_id, detect_power(package_id, vendor));
         }

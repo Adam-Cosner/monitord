@@ -32,7 +32,11 @@ pub trait Collector: Send {
     /// # Panics
     ///
     /// Panics if the associated snapshot is already set in the store.
-    fn collect(&mut self, store: &store::Store) -> anyhow::Result<()>;
+    fn collect(
+        &mut self,
+        config: &crate::metrics::Config,
+        store: &store::Store,
+    ) -> anyhow::Result<()>;
 }
 
 #[cfg(feature = "collector")]

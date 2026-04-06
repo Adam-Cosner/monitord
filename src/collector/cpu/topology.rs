@@ -35,15 +35,8 @@ impl Default for Topology {
 /// Represents the cached topology of a CPU package.
 #[derive(Default, Debug, Clone)]
 pub struct Package {
-    pub vendor_id: String,
-    pub model_name: String,
-    pub family: u32,
-    pub model: u32,
-    pub stepping: u32,
-    pub microcode_version: String,
-    pub cpufreq_driver: String,
-    pub cpufreq_governor: String,
-    pub cpufreq_mode: Option<String>,
+    pub hwid: Option<super::Hwid>,
+    pub drivers: Option<super::Drivers>,
     pub clusters: BTreeMap<u32, Cluster>,
 }
 
@@ -106,12 +99,12 @@ impl From<CacheType> for i32 {
 
 impl Topology {
     /// Discovers the topology of the CPUs in the system.
-    pub fn discover() -> anyhow::Result<Self> {
+    pub fn discover(config: Option<&super::Config>) -> anyhow::Result<Self> {
         let cpuinfo = procfs::CpuInfo::current()?;
         let mut topo = Self::default();
 
         for cpu_idx in 0..cpuinfo.num_cores() {
-            topo.insert_cpu(&cpuinfo, cpu_idx as u32);
+            topo.insert_cpu(config.clone(), &cpuinfo, cpu_idx as u32);
         }
 
         // Second pass: attach caches (thread counts need to be calculated first)
@@ -123,7 +116,12 @@ impl Topology {
     }
 
     /// Inserts a CPU into the topology cache and reads its information.
-    fn insert_cpu(&mut self, cpuinfo: &procfs::CpuInfo, cpu_idx: u32) {
+    fn insert_cpu(
+        &mut self,
+        config: Option<&super::Config>,
+        cpuinfo: &procfs::CpuInfo,
+        cpu_idx: u32,
+    ) {
         let package_id = cpuinfo.physical_id(cpu_idx as usize).unwrap_or(0);
         let cluster_id = read_cluster_id(cpu_idx);
         let core_id = cpuinfo
@@ -138,7 +136,7 @@ impl Topology {
         let pkg = self
             .packages
             .entry(package_id)
-            .or_insert_with(|| Package::from_cpuinfo(cpuinfo, cpu_idx));
+            .or_insert_with(|| Package::from_cpuinfo(config, cpuinfo, cpu_idx));
 
         let cluster = pkg.clusters.entry(cluster_id).or_default();
 
@@ -239,44 +237,69 @@ impl Topology {
 
 impl Package {
     /// Creates a [`Package`] from the CPU information for a given CPU index.
-    fn from_cpuinfo(cpuinfo: &procfs::CpuInfo, cpu_idx: u32) -> Self {
+    fn from_cpuinfo(
+        config: Option<&super::Config>,
+        cpuinfo: &procfs::CpuInfo,
+        cpu_idx: u32,
+    ) -> Self {
         let cpu_idx = cpu_idx as usize;
-        let vendor_id = cpuinfo
-            .vendor_id(cpu_idx)
-            .map(|v| v.to_string())
-            .unwrap_or_default();
-        let model_name = cpuinfo
-            .model_name(cpu_idx)
-            .map(|v| v.to_string())
-            .unwrap_or_default();
-        let family = cpuinfo
-            .get_field(cpu_idx, "cpu family")
-            .and_then(|v| v.parse::<u32>().ok())
-            .unwrap_or(0);
-        let model = cpuinfo
-            .get_field(cpu_idx, "model")
-            .and_then(|v| v.parse::<u32>().ok())
-            .unwrap_or(0);
-        let stepping = cpuinfo
-            .get_field(cpu_idx, "stepping")
-            .and_then(|v| v.parse::<u32>().ok())
-            .unwrap_or(0);
-        let microcode_version = cpuinfo
-            .get_field(cpu_idx, "microcode")
-            .map(|v| v.to_string())
-            .unwrap_or_default();
-        let (cpufreq_driver, cpufreq_governor, cpufreq_mode) = get_cpufreq_info(cpu_idx as u32);
+        let hwid = config.and_then(|c| {
+            if c.hwid {
+                let vendor_id = cpuinfo
+                    .vendor_id(cpu_idx)
+                    .map(|v| v.to_string())
+                    .unwrap_or_default();
+                let model_name = cpuinfo
+                    .model_name(cpu_idx)
+                    .map(|v| v.to_string())
+                    .unwrap_or_default();
+                let family = cpuinfo
+                    .get_field(cpu_idx, "cpu family")
+                    .and_then(|v| v.parse::<u32>().ok())
+                    .unwrap_or(0);
+                let model = cpuinfo
+                    .get_field(cpu_idx, "model")
+                    .and_then(|v| v.parse::<u32>().ok())
+                    .unwrap_or(0);
+                let stepping = cpuinfo
+                    .get_field(cpu_idx, "stepping")
+                    .and_then(|v| v.parse::<u32>().ok())
+                    .unwrap_or(0);
+                Some(super::Hwid {
+                    vendor_id,
+                    model_name,
+                    family,
+                    model,
+                    stepping,
+                })
+            } else {
+                None
+            }
+        });
+
+        let drivers = config.and_then(|c| {
+            if c.drivers {
+                let microcode_version = cpuinfo
+                    .get_field(cpu_idx, "microcode")
+                    .map(|v| v.to_string())
+                    .unwrap_or_default();
+                let (cpufreq_driver, cpufreq_governor, cpufreq_mode) =
+                    get_cpufreq_info(cpu_idx as u32);
+
+                Some(super::Drivers {
+                    microcode_version,
+                    cpufreq_driver,
+                    cpufreq_governor,
+                    cpufreq_mode,
+                })
+            } else {
+                None
+            }
+        });
 
         Self {
-            vendor_id,
-            model_name,
-            family,
-            model,
-            stepping,
-            microcode_version,
-            cpufreq_driver,
-            cpufreq_governor,
-            cpufreq_mode,
+            hwid,
+            drivers,
             clusters: BTreeMap::new(),
         }
     }

@@ -58,8 +58,12 @@ impl super::Collector for Collector {
     /// Collects one full snapshot of the CPU and emplaces it into the associated Store slot.
     /// If collection fails critically, the store slot is not modified and an error is returned.
     /// On non-critical errors, the store slot is emplaced with empty data and a warning is logged.
-    fn collect(&mut self, store: &store::Store) -> anyhow::Result<()> {
-        match self.collect_cpu() {
+    fn collect(
+        &mut self,
+        config: &crate::metrics::Config,
+        store: &store::Store,
+    ) -> anyhow::Result<()> {
+        match self.collect_cpus(config.cpu.as_ref()) {
             Ok(cpu) => store
                 .cpu
                 .set(cpu)
@@ -83,21 +87,32 @@ impl Collector {
         }
     }
 
-    fn collect_cpu(&mut self) -> anyhow::Result<Snapshot> {
-        let topo = self.topology.require(topology::Topology::discover)?;
+    fn collect_cpus(&mut self, config: Option<&Config>) -> anyhow::Result<Snapshot> {
+        let Some(config) = config else {
+            anyhow::bail!("cpu collector did not receive a config");
+        };
+
+        let topo = if config.topology {
+            Some(
+                self.topology
+                    .require(|| topology::Topology::discover(Some(config)))?,
+            )
+        } else {
+            None
+        };
 
         let utilization = self.utilization.sample()?;
-        let sensors = self.sensors.read(topo)?;
+        let sensors = topo.and_then(|topo| self.sensors.read(topo).ok());
 
-        Ok(assemble(topo, &utilization, &sensors))
+        Ok(assemble(topo, &utilization, sensors.as_ref()))
     }
 }
 
 /// Assembles a [`Snapshot`] from the given topology, utilization, and sensor data.
 fn assemble(
-    topo: &topology::Topology,
+    topo: Option<&topology::Topology>,
     utilization: &[utilization::Utilization],
-    sensors: &sensors::Sample,
+    sensors: Option<&sensors::Sample>,
 ) -> Snapshot {
     let mut snapshot = Snapshot {
         logical: utilization
@@ -112,6 +127,9 @@ fn assemble(
         packages: Vec::new(),
     };
     // Assemble the physical part
+    let Some(topo) = topo else {
+        return snapshot;
+    };
     for (&package_id, package) in topo.packages.iter() {
         let mut clusters = Vec::new();
         for (&cluster_id, cluster) in package.clusters.iter() {
@@ -138,7 +156,8 @@ fn assemble(
                     core_id,
                     min_freq_mhz: core.min_freq_mhz,
                     max_freq_mhz: core.max_freq_mhz,
-                    core_temperature_c: sensors.core_temp((package_id, cluster_id, core_id)),
+                    core_temperature_c: sensors
+                        .and_then(|sensors| sensors.core_temp((package_id, cluster_id, core_id))),
                     threads,
                     private_caches,
                 });
@@ -155,24 +174,18 @@ fn assemble(
             }
             clusters.push(Cluster {
                 cluster_id,
-                cluster_temperature_c: sensors.cluster_temp((package_id, cluster_id)),
+                cluster_temperature_c: sensors
+                    .and_then(|sensors| sensors.cluster_temp((package_id, cluster_id))),
                 cores,
                 shared_caches,
             });
         }
         snapshot.packages.push(Package {
             package_id,
-            vendor_id: package.vendor_id.clone(),
-            model_name: package.model_name.clone(),
-            family: package.family,
-            model: package.model,
-            stepping: package.stepping,
-            microcode_version: package.microcode_version.clone(),
-            cpufreq_driver: package.cpufreq_driver.clone(),
-            cpufreq_governor: package.cpufreq_governor.clone(),
-            cpufreq_mode: package.cpufreq_mode.clone(),
-            package_temperature_c: sensors.package_temp(package_id),
-            package_power_w: sensors.package_power(package_id),
+            hwid: package.hwid.clone(),
+            drivers: package.drivers.clone(),
+            package_temperature_c: sensors.and_then(|sensors| sensors.package_temp(package_id)),
+            package_power_w: sensors.and_then(|sensors| sensors.package_power(package_id)),
             clusters,
         });
     }
@@ -189,10 +202,17 @@ mod tests {
         let _ = tracing_subscriber::fmt::try_init();
         let mut collector = super::Collector::new();
         let mut store = store::Store::new();
-        collector.collect(&store)?;
+        let mut config = crate::metrics::Config::default();
+        config.cpu = Some(crate::metrics::cpu::Config {
+            topology: true,
+            hwid: true,
+            drivers: true,
+        });
+
+        collector.collect(&config, &store)?;
         std::thread::sleep(std::time::Duration::from_secs(1));
         store = store::Store::new();
-        collector.collect(&store)?;
+        collector.collect(&config, &store)?;
         assert!(
             store
                 .cpu
