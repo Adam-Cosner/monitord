@@ -20,6 +20,7 @@ required-features = ["control"]
 [lib]
 name = "monitord"
 path = "src/lib.rs"
+required-features = ["metrics"]
 
 [features]
 default = ["client"]
@@ -81,7 +82,6 @@ num = { version = "0.4", optional = true }
 
 [build-dependencies]
 tonic-prost-build = { version = "0.14", optional = true }
-inline-c = { version = "0.1.8", optional = true }
 
 [dev-dependencies]
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
