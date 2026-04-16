@@ -9,15 +9,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use monitord::collector::Collector;
-//! let mut collector = monitord::collector::gpu::Collector::new();
-//! let store = monitord::collector::store::Store::new();
-//! // The first collect call will only return NVIDIA GPUs due to it being the only driver that stores metrics
-//! collector.collect(&store).unwrap();
-//! std::thread::sleep(std::time::Duration::from_secs(1));
-//! // Subsequent collect calls will return all supported GPUs
-//! collector.collect(&store).unwrap();
-//! assert!(store.gpu.get().is_some_and(|g| g.gpus.len() > 0));
+//!
 //! ```
 
 mod amd;
@@ -29,7 +21,7 @@ use anyhow::Context;
 use std::path::PathBuf;
 
 use crate::collector::helpers::*;
-use crate::collector::store;
+use crate::collector::staging;
 #[doc(inline)]
 pub use crate::metrics::gpu::*;
 
@@ -64,26 +56,9 @@ impl super::Collector for Collector {
         "gpu"
     }
 
-    fn dependencies(&self) -> &[&'static str] {
-        &[]
-    }
-
-    fn collect(
-        &mut self,
-        config: &crate::metrics::Config,
-        store: &store::Store,
-    ) -> anyhow::Result<()> {
-        match self.collect_gpus(config) {
-            Ok(gpus) => store
-                .gpu
-                .set(gpus)
-                .expect("gpu snapshot was already set previously, do not reuse Store instances!"),
-            Err(e) => {
-                tracing::error!("collector failed: {e}");
-                return Err(e);
-            }
-        }
-        Ok(())
+    fn collect(&mut self, config: &crate::metrics::Config) -> anyhow::Result<Self::Output> {
+        self.collect_gpus(config.gpu.as_ref())
+            .inspect_err(|e| tracing::error!("collector failed: {e}"))
     }
 }
 
@@ -100,9 +75,9 @@ impl Collector {
     }
 
     /// Collects the GPU metrics and returns a snapshot.
-    fn collect_gpus(&mut self, config: &crate::metrics::Config) -> anyhow::Result<Snapshot> {
+    fn collect_gpus(&mut self, config: Option<&Config>) -> anyhow::Result<Snapshot> {
         let mut gpus = Vec::new();
-        let Some(config) = config.gpu else {
+        let Some(config) = config else {
             anyhow::bail!("gpu collector did not receive a config");
         };
 
@@ -196,13 +171,12 @@ mod tests {
     use super::*;
     use crate::collector::Collector;
 
+    #[tracing_test::traced_test]
     #[test]
     fn gpu() -> Result<(), Box<dyn std::error::Error>> {
-        let _ = tracing_subscriber::fmt::try_init();
         let mut collector = super::Collector::new();
-        let mut store = store::Store::new();
         let mut config = crate::metrics::Config::default();
-        config.gpu = Some(crate::metrics::gpu::Config {
+        config.gpu = Some(Config {
             drivers: true,
             engines: true,
             clocks: true,
@@ -211,11 +185,11 @@ mod tests {
             thermals: true,
             processes: true,
         });
-        collector.collect(&config, &store)?;
+        let _ = collector.collect(&config)?;
         std::thread::sleep(std::time::Duration::from_secs(1));
-        store = store::Store::new();
-        collector.collect(&config, &store)?;
-        println!("{:#?}", store.gpu.get());
+        let snapshot = collector.collect(&config)?;
+        assert!(!snapshot.gpus.is_empty());
+        println!("{:#?}", snapshot);
         Ok(())
     }
 }

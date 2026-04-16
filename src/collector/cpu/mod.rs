@@ -11,22 +11,13 @@
 //! # Example
 //!
 //! ```no_run
-//! use monitord::collector::Collector;
-//! let mut collector = monitord::collector::cpu::Collector::new();
-//! let store = monitord::collector::store::Store::new();
-//! // The first collect call will return nothing as collection requires a current and last sample to calculate usages
-//! collector.collect(&store).unwrap();
-//! assert!(store.cpu.get().is_some_and(|c| !c.logical.is_empty()));
-//! std::thread::sleep(std::time::Duration::from_secs(1));
-//! let store = monitord::collector::store::Store::new();
-//! collector.collect(&store).unwrap();
-//! assert!(store.cpu.get().is_some_and(|c| !c.logical.is_empty()));
+//!
 //! ```
 mod sensors;
 mod topology;
 mod utilization;
 
-use crate::collector::store;
+use crate::collector::staging;
 #[doc(inline)]
 pub use crate::metrics::cpu::*;
 
@@ -51,29 +42,12 @@ impl super::Collector for Collector {
         "cpu"
     }
 
-    fn dependencies(&self) -> &[&'static str] {
-        &[]
-    }
-
     /// Collects one full snapshot of the CPU and emplaces it into the associated Store slot.
     /// If collection fails critically, the store slot is not modified and an error is returned.
     /// On non-critical errors, the store slot is emplaced with empty data and a warning is logged.
-    fn collect(
-        &mut self,
-        config: &crate::metrics::Config,
-        store: &store::Store,
-    ) -> anyhow::Result<()> {
-        match self.collect_cpus(config.cpu.as_ref()) {
-            Ok(cpu) => store
-                .cpu
-                .set(cpu)
-                .expect("cpu snapshot was already set previously, do not reuse Store instances!"),
-            Err(e) => {
-                tracing::error!("collect failed: {e}");
-                return Err(e);
-            }
-        }
-        Ok(())
+    fn collect(&mut self, config: &crate::metrics::Config) -> anyhow::Result<Self::Output> {
+        self.collect_cpus(config.cpu.as_ref())
+            .inspect_err(|e| tracing::error!("collector failed: {e}"))
     }
 }
 
@@ -197,29 +171,22 @@ mod tests {
     use super::*;
     use crate::collector::Collector;
 
+    #[tracing_test::traced_test]
     #[test]
-    fn cpu() -> anyhow::Result<()> {
-        let _ = tracing_subscriber::fmt::try_init();
+    fn collect() -> anyhow::Result<()> {
         let mut collector = super::Collector::new();
-        let mut store = store::Store::new();
         let mut config = crate::metrics::Config::default();
-        config.cpu = Some(crate::metrics::cpu::Config {
+        config.cpu = Some(Config {
             topology: true,
             hwid: true,
             drivers: true,
         });
 
-        collector.collect(&config, &store)?;
+        let _ = collector.collect(&config)?;
         std::thread::sleep(std::time::Duration::from_secs(1));
-        store = store::Store::new();
-        collector.collect(&config, &store)?;
-        assert!(
-            store
-                .cpu
-                .get()
-                .is_some_and(|c| !c.logical.is_empty() && !c.packages.is_empty())
-        );
-        println!("{:#?}", store.cpu.get());
+        let snapshot = collector.collect(&config)?;
+        assert!(!snapshot.logical.is_empty() && !snapshot.packages.is_empty(),);
+        println!("{:#?}", snapshot);
         Ok(())
     }
 }

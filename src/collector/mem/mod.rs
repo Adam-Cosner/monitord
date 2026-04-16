@@ -9,11 +9,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use monitord::collector::Collector;
-//! let mut collector = monitord::collector::mem::Collector::new();
-//! let store = monitord::collector::store::Store::new();
-//! collector.collect(&store).unwrap();
-//! assert!(store.mem.get().is_some());
+//!
 //! ```
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -21,7 +17,7 @@ use super::helpers::discovery::Discovery;
 use anyhow::Context;
 use procfs::Current;
 
-use crate::collector::store;
+use crate::collector::staging;
 #[doc(inline)]
 pub use crate::metrics::memory::*;
 
@@ -43,26 +39,9 @@ impl super::Collector for Collector {
         "mem"
     }
 
-    fn dependencies(&self) -> &[&'static str] {
-        &[]
-    }
-
-    fn collect(
-        &mut self,
-        _config: &crate::metrics::Config,
-        store: &store::Store,
-    ) -> anyhow::Result<()> {
-        match self.collect_memory() {
-            Ok(snapshot) => store
-                .mem
-                .set(snapshot)
-                .expect("mem snapshot was already set previously, do not reuse Store instances!"),
-            Err(e) => {
-                tracing::error!("collect failed: {e}");
-                return Err(e);
-            }
-        }
-        Ok(())
+    fn collect(&mut self, config: &crate::metrics::Config) -> anyhow::Result<Self::Output> {
+        self.collect_memory(config.memory.as_ref())
+            .inspect_err(|e| tracing::error!("collector failed: {e}"))
     }
 }
 
@@ -76,7 +55,11 @@ impl Collector {
     }
 
     /// Collects a `memory::Snapshot`
-    pub fn collect_memory(&mut self) -> anyhow::Result<Snapshot> {
+    pub fn collect_memory(&mut self, config: Option<&Config>) -> anyhow::Result<Snapshot> {
+        let Some(config) = config else {
+            anyhow::bail!("no config supplied to collector")
+        };
+
         tracing::debug!("collecting metrics");
         let meminfo =
             procfs::Meminfo::current().with_context(|| format!("{} on {}", file!(), line!()))?;
@@ -99,10 +82,10 @@ impl Collector {
             swap_in_use,
         });
 
-        let dimms = self
-            .cached_dimms
-            .probe(collect_dimms)
-            .cloned()
+        let dimms = config
+            .dimms
+            .then(|| self.cached_dimms.probe(collect_dimms).cloned())
+            .flatten()
             .unwrap_or_default();
 
         Ok(Snapshot { logical, dimms })
@@ -284,21 +267,15 @@ mod tests {
     use super::*;
     use crate::collector::Collector;
 
+    #[tracing_test::traced_test]
     #[test]
     fn memory() -> anyhow::Result<()> {
-        let _ = tracing_subscriber::fmt::try_init();
         let mut collector = super::Collector::new();
-        let store = store::Store::new();
         let mut config = crate::metrics::Config::default();
-        config.memory = Some(crate::metrics::memory::Config { dimms: true });
-        collector.collect(&config, &store)?;
-        assert!(
-            store
-                .mem
-                .get()
-                .is_some_and(|m| !m.dimms.is_empty() && m.logical.is_some())
-        );
-        println!("{:#?}", store.mem.get());
+        config.memory = Some(Config { dimms: true });
+        let snapshot = collector.collect(&config)?;
+        assert!(snapshot.logical.is_some() && !snapshot.dimms.is_empty());
+        println!("{:#?}", snapshot);
         Ok(())
     }
 }

@@ -3,40 +3,33 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-#[cfg(feature = "collector")]
 pub mod cpu;
-#[cfg(feature = "collector")]
 pub mod gpu;
-#[cfg(feature = "collector")]
 pub mod mem;
-#[cfg(feature = "collector")]
 pub mod net;
-#[cfg(feature = "collector")]
-pub mod store;
+pub mod staging;
 
-#[cfg(feature = "collector")]
-pub trait Collector: Send {
-    /// The data type produced by this collector.
+/// Trait for independent data collection
+pub trait Collector {
+    /// The data type produced by this collector
     type Output: Send;
 
-    /// The name of the collector, for use in dependency ordering.
+    /// The name of the collector
     fn name(&self) -> &'static str;
 
-    /// The names of the collectors that this collector depends on.
-    fn dependencies(&self) -> &[&'static str];
+    /// Collect any independent data and return it
+    fn collect(&mut self, config: &crate::metrics::Config) -> anyhow::Result<Self::Output>;
+}
 
-    /// Collect the data, using the store as a shared data source that dependent collectors can read from.
-    /// Value is placed into the store slot associated with this collector.
-    /// The reason it's emplaced into the parameter instead of return type is so that dependent collectors have access to the data without needing special function signatures.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the associated snapshot is already set in the store.
-    fn collect(
+/// Trait for dependent data resolution after collection
+pub trait Resolver: Collector {
+    /// Resolves the snapshot using any data that another collector generated.
+    /// Current usage is for sharing GPU Snapshot processes and Process Snapshot GPU statistics
+    fn resolve(
         &mut self,
-        config: &crate::metrics::Config,
-        store: &store::Store,
-    ) -> anyhow::Result<()>;
+        staging: &staging::Staging,
+        ouptut: Self::Output,
+    ) -> anyhow::Result<Self::Output>;
 }
 
 #[cfg(feature = "collector")]

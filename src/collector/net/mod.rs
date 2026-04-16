@@ -10,11 +10,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use monitord::collector::Collector;
-//! let mut collector = monitord::collector::net::Collector::new();
-//! let store = monitord::collector::store::Store::new();
-//! collector.collect(&store).unwrap();
-//! assert!(store.net.get().is_some());
+//!
 //! ```
 mod wifi;
 
@@ -24,7 +20,7 @@ use super::{
         sampler::{Differential, Sampler},
         *,
     },
-    store,
+    staging,
 };
 use std::{net::IpAddr, path::Path};
 
@@ -52,29 +48,12 @@ impl super::Collector for Collector {
         "net"
     }
 
-    fn dependencies(&self) -> &[&'static str] {
-        &[]
-    }
-
     /// Collects one full snapshot of network adapters and emplaces it into the associated Store slot.
     /// If collection fails critically, the store slot is not modified and an error is returned.
     /// On non-critical errors, the store slot is emplaced with empty data and a warning is logged.
-    fn collect(
-        &mut self,
-        _config: &crate::metrics::Config,
-        store: &store::Store,
-    ) -> anyhow::Result<()> {
-        match self.collect_adapters() {
-            Ok(adapters) => store
-                .net
-                .set(adapters)
-                .expect("net snapshot was already set previously, do not reuse Store instances!"),
-            Err(e) => {
-                tracing::error!("collect failed: {e}");
-                return Err(e);
-            }
-        }
-        Ok(())
+    fn collect(&mut self, config: &crate::metrics::Config) -> anyhow::Result<Self::Output> {
+        self.collect_adapters(config.network.as_ref())
+            .inspect_err(|e| tracing::error!("collector failed: {e}"))
     }
 }
 
@@ -86,7 +65,10 @@ impl Collector {
         }
     }
 
-    fn collect_adapters(&mut self) -> anyhow::Result<Snapshot> {
+    fn collect_adapters(&mut self, config: Option<&Config>) -> anyhow::Result<Snapshot> {
+        let Some(config) = config else {
+            anyhow::bail!("no config supplied to collector")
+        };
         let addresses = get_addresses()?;
         match std::fs::read_dir("/sys/class/net") {
             Ok(dir) => {
@@ -95,7 +77,12 @@ impl Collector {
                 for interface in dir.flatten() {
                     let interface_name = interface.file_name().to_string_lossy().into_owned();
                     let interface_path = interface.path();
-                    adapters.push(self.build_adapter(&interface_name, &interface_path, &addresses));
+                    adapters.push(self.build_adapter(
+                        config,
+                        &interface_name,
+                        &interface_path,
+                        &addresses,
+                    ));
                 }
 
                 Ok(Snapshot { adapters })
@@ -107,9 +94,21 @@ impl Collector {
         }
     }
 
-    fn build_adapter(&mut self, name: &str, path: &Path, addresses: &[IfAddr]) -> Adapter {
-        let ipv4_addresses = get_ipv4_addresses(addresses, name);
-        let ipv6_addresses = get_ipv6_addresses(addresses, name);
+    fn build_adapter(
+        &mut self,
+        config: &Config,
+        name: &str,
+        path: &Path,
+        addresses: &[IfAddr],
+    ) -> Adapter {
+        let ipv4_addresses = config
+            .addresses
+            .then(|| get_ipv4_addresses(addresses, name))
+            .unwrap_or_default();
+        let ipv6_addresses = config
+            .addresses
+            .then(|| get_ipv6_addresses(addresses, name))
+            .unwrap_or_default();
         let adapter_type = classify_adapter(path);
         let is_up = sysfs::read_string(&path.join("operstate"))
             .map(|s| s == "up")
@@ -120,7 +119,10 @@ impl Collector {
             .entry(name.to_string())
             .or_insert_with(Sampler::new)
             .push(packet_counters.clone());
-        let wifi = self.read_wifi(adapter_type, is_up, name);
+        let wifi = config
+            .wifi_info
+            .then(|| self.read_wifi(adapter_type, is_up, name))
+            .flatten();
         Adapter {
             interface_name: name.to_string(),
             mac_address: sysfs::read_string(&path.join("address")).unwrap_or_default(),
@@ -310,17 +312,15 @@ mod tests {
     fn network() -> anyhow::Result<()> {
         let _ = tracing_subscriber::fmt::try_init();
         let mut collector = super::Collector::new();
-        let mut store = store::Store::new();
         let mut config = crate::metrics::Config::default();
-        config.network = Some(crate::metrics::network::Config {
+        config.network = Some(Config {
             addresses: true,
             wifi_info: true,
         });
-        collector.collect(&config, &store)?;
+        let _ = collector.collect(&config)?;
         std::thread::sleep(std::time::Duration::from_secs(1));
-        store = store::Store::new();
-        collector.collect(&config, &store)?;
-        println!("{:#?}", store.net.get());
+        let snapshot = collector.collect(&config)?;
+        println!("{:#?}", snapshot);
         Ok(())
     }
 }
