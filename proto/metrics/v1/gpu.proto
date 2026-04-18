@@ -59,6 +59,7 @@ enum ClockDomain {
   CLOCK_DOMAIN_VIDEO_DECODE = 4; // Video decode clock
   CLOCK_DOMAIN_VIDEO_ENCODE = 5; // Video encode clock
   CLOCK_DOMAIN_SOC = 6; // SoC/Fabric clock
+  CLOCK_DOMAIN_GT = 7; // Graphics Tile clock for i915
 }
 
 // Identifies a clock by its domain and index
