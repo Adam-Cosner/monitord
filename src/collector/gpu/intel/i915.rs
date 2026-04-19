@@ -6,6 +6,7 @@
 use crate::collector::helpers::sysfs;
 use crate::metrics::gpu::*;
 use rustix::ioctl::{IoctlOutput, Opcode};
+use std::marker::PhantomData;
 use std::os::fd::BorrowedFd;
 use std::os::raw::c_void;
 use std::path::Path;
@@ -63,70 +64,162 @@ fn clocks(path: &Path) -> Vec<Clock> {
     }]
 }
 
+#[repr(C)]
+struct DrmI915QueryItem {
+    query_id: u64,
+    length: i32,
+    flags: u32,
+    data_ptr: u64,
+}
+
+#[repr(C)]
+struct DrmI915Query {
+    num_items: u32,
+    flags: u32,
+    items_ptr: u64,
+}
+
+const DRM_IOCTL_BASE: u32 = 'd' as u32;
+const _IOC_NRBITS: u32 = 8;
+const _IOC_TYPEBITS: u32 = 8;
+const _IOC_SIZEBITS: u32 = 14;
+const _IOC_DIRBITS: u32 = 2;
+
+const _IOC_NRMASK: u32 = (1 << _IOC_NRBITS) - 1;
+const _IOC_TYPEMASK: u32 = (1 << _IOC_TYPEBITS) - 1;
+const _IOC_SIZEMASK: u32 = (1 << _IOC_SIZEBITS) - 1;
+const _IOC_DIRMASK: u32 = (1 << _IOC_DIRBITS) - 1;
+
+const _IOC_NRSHIFT: u32 = 0;
+const _IOC_TYPESHIFT: u32 = _IOC_NRSHIFT + _IOC_NRBITS;
+const _IOC_SIZESHIFT: u32 = _IOC_TYPESHIFT + _IOC_TYPEBITS;
+const _IOC_DIRSHIFT: u32 = _IOC_SIZESHIFT + _IOC_SIZEBITS;
+
+const _IOC_NONE: u32 = 0;
+const _IOC_WRITE: u32 = 1;
+const _IOC_READ: u32 = 2;
+
+macro_rules! _IOC {
+    ($dir:expr, $ty:expr, $nr:expr, $size:expr) => {
+        ((($dir) << _IOC_DIRSHIFT)
+            | (($ty) << _IOC_TYPESHIFT)
+            | (($nr) << _IOC_NRSHIFT)
+            | (($size) << _IOC_SIZESHIFT))
+    };
+}
+
+macro_rules! _IOWR {
+    ($ty:expr, $nr:expr, $argtype:ty) => {
+        _IOC!(
+            _IOC_READ | _IOC_WRITE,
+            $ty,
+            $nr,
+            size_of::<$argtype>() as u32
+        )
+    };
+}
+
+macro_rules! DRM_IOWR {
+    ($nr:expr, $ty:ty) => {
+        _IOWR!(DRM_IOCTL_BASE, $nr, $ty)
+    };
+}
+
+const DRM_COMMAND_BASE: u32 = 0x40;
+const DRM_I915_QUERY: u32 = 0x39;
+
+const DRM_IOCTL_I915_QUERY: u32 = DRM_IOWR!(DRM_COMMAND_BASE + DRM_I915_QUERY, DrmI915Query);
+
+unsafe impl rustix::ioctl::Ioctl for DrmI915Query {
+    type Output = ();
+    const IS_MUTATING: bool = true;
+
+    fn opcode(&self) -> Opcode {
+        DRM_IOCTL_I915_QUERY
+    }
+
+    fn as_ptr(&mut self) -> *mut c_void {
+        self as *mut _ as *mut c_void
+    }
+
+    unsafe fn output_from_ptr(
+        out: IoctlOutput,
+        extract_output: *mut c_void,
+    ) -> rustix::io::Result<Self::Output> {
+        tracing::info!("ioctl output: {}", out);
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+struct DrmI915MemoryRegionInfo {
+    pub region: MemoryRegion,
+    pub rsvd0: u32,
+    pub probed_size: u64,
+    pub unallocated_size: u64,
+    pub union_data: UnionData,
+}
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+struct FAM<T>(PhantomData<T>, [T; 0]);
+
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+struct DrmI915QueryMemoryRegions {
+    num_regions: u32,
+    rsvd: [u32; 3],
+    regions: FAM<DrmI915MemoryRegionInfo>,
+}
+
+impl<T> FAM<T> {
+    #[inline]
+    const fn as_ptr(&self) -> *const T {
+        self as *const _ as *const T
+    }
+
+    #[inline]
+    unsafe fn flex_ref(&self, len: usize) -> &[T] {
+        unsafe { core::slice::from_raw_parts(self.as_ptr(), len) }
+    }
+}
+
+impl<T> core::fmt::Debug for FAM<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        f.debug_struct("FlexibleArrayMember").finish()
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+struct MemoryRegion {
+    pub memory_class: u16,
+    pub memory_instance: u16,
+}
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+union UnionData {
+    pub rsvd1: [u64; 8],
+    pub visible_sizes: VisibleSizes,
+}
+
+impl core::fmt::Debug for UnionData {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        f.debug_struct("UnionData").finish()
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+struct VisibleSizes {
+    pub probed_cpu_visible_size: u64,
+    pub unallocated_cpu_visible_size: u64,
+}
+
+#[allow(unused_assignments)]
 fn memory(path: &Path, fd: BorrowedFd) -> Vec<Memory> {
-    #[repr(C)]
-    struct DrmI915QueryItem {
-        query_id: u64,
-        length: i32,
-        flags: u32,
-        data_ptr: u64,
-    }
-
-    #[repr(C)]
-    struct DrmI915Query {
-        num_items: u32,
-        flags: u32,
-        items_ptr: u64,
-    }
-
-    unsafe impl rustix::ioctl::Ioctl for DrmI915Query {
-        type Output = ();
-        const IS_MUTATING: bool = true;
-
-        fn opcode(&self) -> Opcode {
-            4 // DRM_I915_QUERY_MEMORY_REGIONS
-        }
-
-        fn as_ptr(&mut self) -> *mut c_void {
-            self as *mut _ as *mut c_void
-        }
-
-        unsafe fn output_from_ptr(
-            out: IoctlOutput,
-            extract_output: *mut c_void,
-        ) -> rustix::io::Result<Self::Output> {
-            Ok(())
-        }
-    }
-
-    #[repr(C)]
-    pub struct DrmI915MemoryRegionInfo {
-        pub region: MemoryRegion,
-        pub rsvd0: u32,
-        pub probed_size: u64,
-        pub unallocated_size: u64,
-        pub union_data: UnionData,
-    }
-
-    #[repr(C)]
-    pub struct MemoryRegion {
-        pub memory_class: u16,
-        pub memory_instance: u16,
-    }
-
-    #[repr(C)]
-    pub union UnionData {
-        pub rsvd1: [u64; 8],
-        pub visible_sizes: VisibleSizes,
-    }
-
-    #[repr(C)]
-    #[derive(Copy, Clone)]
-    pub struct VisibleSizes {
-        pub probed_cpu_visible_size: u64,
-        pub unallocated_cpu_visible_size: u64,
-    }
-
     let mut item = DrmI915QueryItem {
         query_id: 4, // DRM_I915_QUERY_MEMORY_REGIONS
         length: 0,
@@ -139,31 +232,59 @@ fn memory(path: &Path, fd: BorrowedFd) -> Vec<Memory> {
         items_ptr: &mut item as *mut _ as u64,
     };
 
-    // Get the size
-    let Ok(()) = (unsafe { rustix::ioctl::ioctl(fd, q) }) else {
+    // Get the length of the MemoryRegionInfo
+    let Ok(()) = (unsafe { rustix::ioctl::ioctl(fd, q).inspect_err(|e| tracing::error!("{e}")) })
+    else {
         return Vec::new();
     };
     let mut bytes = Vec::new();
     bytes.resize(item.length as usize, 0u8);
 
+    // Query the MemoryRegionInfo into bytes
     let q = DrmI915Query {
         num_items: 1,
         flags: 0,
         items_ptr: &mut item as *mut _ as u64,
     };
-
     item.data_ptr = bytes.as_mut_ptr() as u64;
+
     let Ok(()) = (unsafe { rustix::ioctl::ioctl(fd, q) }) else {
         return Vec::new();
     };
 
-    todo!()
+    let region_info = unsafe {
+        std::mem::transmute::<*const u8, *const DrmI915QueryMemoryRegions>(bytes.as_ptr())
+    };
+
+    if region_info.is_null() {
+        return Vec::new();
+    }
+
+    let region_info = unsafe { &*region_info };
+
+    let regions = unsafe {
+        region_info
+            .regions
+            .flex_ref(region_info.num_regions as usize)
+    };
+
+    regions
+        .iter()
+        .map(|region| {
+            Memory {
+                // TODO: I think region might say whether it's Gtt or VRAM?
+                r#type: MemoryType::Gtt as i32,
+                total_memory: region.probed_size,
+                used_memory: region.probed_size - region.unallocated_size,
+            }
+        })
+        .collect()
 }
 
 fn power(path: &Path) -> Option<Power> {
-    todo!()
+    None
 }
 
 fn thermals(path: &Path) -> Vec<Thermal> {
-    todo!()
+    Vec::new()
 }
