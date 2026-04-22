@@ -7,5 +7,7 @@
 //! Helper modules for the collectors.
 
 pub(crate) mod discovery;
+pub(crate) mod fam;
+pub(crate) mod ioctl;
 pub(crate) mod sampler;
 pub(crate) mod sysfs;
