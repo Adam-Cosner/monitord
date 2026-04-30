@@ -11,15 +11,107 @@
 //! ```no_run
 //!
 //! ```
+mod amdgpu;
+mod i915;
+mod nouveau;
+mod nvidia;
+mod xe;
+
+use crate::collector::helpers::*;
+use crate::collector::staging;
 
 #[doc(inline)]
 pub use crate::metrics::gpu::*;
 
-pub struct Collector {}
+/// Collects GPU metrics
+pub struct Collector {
+    cards: discovery::Discovery<Vec<Box<dyn Card>>>,
+    nvml: discovery::Discovery<nvml_wrapper::Nvml>,
+}
 
 impl Default for Collector {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Collector {
+    pub fn new() -> Self {
+        Self {
+            cards: discovery::Discovery::default(),
+            nvml: discovery::Discovery::default(),
+        }
+    }
+
+    fn enumerate_cards(&mut self) -> anyhow::Result<&mut [Box<dyn Card>]> {
+        self.cards
+            .probe_mut(|| {
+                let mut cards = Vec::new();
+                for entry in std::fs::read_dir("/sys/class/drm")? {
+                    let entry = entry?;
+                    let Ok(name) = entry.file_name().into_string() else {
+                        continue;
+                    };
+                    if name.starts_with("card") && !name.contains('-') {
+                        // check the symlink of device/driver
+                        let Ok(driver) = std::fs::read_link(entry.path().join("device/driver"))
+                            .map_err(|e| anyhow::anyhow!(e))
+                            .and_then(|driver_path| {
+                                driver_path
+                                    .file_name()
+                                    .map(|file_name| file_name.to_string_lossy().to_string())
+                                    .ok_or(anyhow::anyhow!("invalid driver symlink"))
+                            })
+                        else {
+                            continue;
+                        };
+                        match driver.as_str() {
+                            "amdgpu" => {
+                                let Ok(gpu) = amdgpu::Card::new(entry.path()) else {
+                                    continue;
+                                };
+                                cards.push(Box::new(gpu) as Box<dyn Card>)
+                            }
+                            "i915" => {
+                                let Ok(gpu) = i915::Card::new(entry.path()) else {
+                                    continue;
+                                };
+                                cards.push(Box::new(gpu) as Box<dyn Card>)
+                            }
+                            "xe" => {
+                                let Ok(gpu) = xe::Card::new(entry.path()) else {
+                                    continue;
+                                };
+                                cards.push(Box::new(gpu) as Box<dyn Card>)
+                            }
+                            "nvidia" => {
+                                let Some(nvml) = self.nvml.probe(|| {
+                                    nvml_wrapper::Nvml::init().map_err(|e| anyhow::anyhow!(e))
+                                }) else {
+                                    continue;
+                                };
+                                let Ok(gpu) = nvidia::Card::new(entry.path(), nvml) else {
+                                    continue;
+                                };
+                                cards.push(Box::new(gpu) as Box<dyn Card>)
+                            }
+                            "nouveau" => {
+                                let Ok(gpu) = nouveau::Card::new(entry.path()) else {
+                                    continue;
+                                };
+                                cards.push(Box::new(gpu) as Box<dyn Card>)
+                            }
+                            _ => {
+                                tracing::warn!("unsupported GPU driver: {}", driver);
+                                continue;
+                            }
+                        }
+                    }
+                }
+                Ok(cards)
+            })
+            .map(|cards| cards.as_mut_slice())
+            .ok_or_else(|| anyhow::anyhow!("GPU Collector failed to enumerate cards"))
     }
 }
 
@@ -31,8 +123,23 @@ impl super::Collector for Collector {
     }
 
     fn collect(&mut self, config: &crate::metrics::Config) -> anyhow::Result<Self::Output> {
-        todo!()
+        let Some(config) = &config.gpu else {
+            anyhow::bail!("GPU Collector did not receive a config");
+        };
+        let mut gpus = Vec::new();
+        let cards = self.enumerate_cards()?;
+        for gpu in cards.iter_mut() {
+            gpus.push(gpu.collect(config)?);
+        }
+        Ok(Snapshot { gpus })
     }
+}
+
+trait Card {
+    // Collects a single snapshot of the GPU
+    fn collect(&mut self, config: &Config) -> anyhow::Result<Gpu>;
+    // Resolves a snapshot based on the staging
+    fn resolve(&mut self, staging: &staging::Staging, output: Gpu) -> anyhow::Result<Gpu>;
 }
 
 /*
