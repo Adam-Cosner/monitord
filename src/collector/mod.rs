@@ -28,7 +28,7 @@ pub trait Resolver: Collector {
     fn resolve(
         &mut self,
         staging: &staging::Staging,
-        ouptut: Self::Output,
+        output: Self::Output,
     ) -> anyhow::Result<Self::Output>;
 }
 
