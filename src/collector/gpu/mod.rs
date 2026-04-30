@@ -12,6 +12,30 @@
 //!
 //! ```
 
+#[doc(inline)]
+pub use crate::metrics::gpu::*;
+
+pub struct Collector {}
+
+impl Default for Collector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl super::Collector for Collector {
+    type Output = Snapshot;
+
+    fn name(&self) -> &'static str {
+        "gpu"
+    }
+
+    fn collect(&mut self, config: &crate::metrics::Config) -> anyhow::Result<Self::Output> {
+        todo!()
+    }
+}
+
+/*
 mod amd;
 mod intel;
 mod nvidia;
@@ -193,3 +217,4 @@ mod tests {
         Ok(())
     }
 }
+ */
