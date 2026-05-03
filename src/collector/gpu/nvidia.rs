@@ -4,196 +4,365 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+use crate::metrics::gpu::*;
+use std::{os::fd::OwnedFd, path::PathBuf, rc::Rc};
+
 pub struct Card {
+    nvml: Rc<nvml_wrapper::Nvml>,
+    pci: String,
+    primary_node: PathBuf,
+    render_node: PathBuf,
     // todo
 }
 
 impl Card {
-    pub fn new(path: std::path::PathBuf, nvml: &nvml_wrapper::Nvml) -> anyhow::Result<Self> {
-        Ok(Self {})
+    pub fn new(fd: OwnedFd, nvml: &Rc<nvml_wrapper::Nvml>) -> anyhow::Result<Self> {
+        let pci = PathBuf::from(
+            rustix::fs::readlinkat(&fd, "device", Vec::new())?
+                .to_string_lossy()
+                .to_string(),
+        )
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("could not read NVIDIA PCI address"))?
+        .to_string_lossy()
+        .to_string();
+        let mut primary_node = PathBuf::new();
+        let mut render_node = PathBuf::new();
+        let drm_root = rustix::fs::openat(
+            &fd,
+            "device/drm",
+            rustix::fs::OFlags::DIRECTORY
+                | rustix::fs::OFlags::RDONLY
+                | rustix::fs::OFlags::CLOEXEC,
+            rustix::fs::Mode::empty(),
+        )?;
+        for entry in rustix::fs::Dir::read_from(&drm_root)? {
+            let entry = entry?;
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with("card") {
+                primary_node = PathBuf::from(format!("/dev/dri/{}", name));
+            } else if name.starts_with("renderD") {
+                render_node = PathBuf::from(format!("/dev/dri/{}", name));
+            }
+        }
+        Ok(Self {
+            nvml: nvml.clone(),
+            pci,
+            primary_node,
+            render_node,
+        })
+    }
+
+    fn engines<'a>(&self, device: &nvml_wrapper::Device<'a>) -> Vec<Engine> {
+        vec![
+            Engine {
+                identifier: Some(EngineIdentifier {
+                    r#type: EngineType::EngineType3d as i32,
+                    index: 0,
+                    clock: Some(ClockIdentifier {
+                        domain: ClockDomain::Graphics as i32,
+                        index: 0,
+                    }),
+                }),
+                utilization: match device.utilization_rates() {
+                    Ok(rates) => rates.gpu as u64,
+                    Err(err) => {
+                        tracing::warn!("could not get gpu utilization rates: {}", err);
+                        return Vec::new();
+                    }
+                },
+            },
+            Engine {
+                identifier: Some(EngineIdentifier {
+                    r#type: EngineType::MemoryController as i32,
+                    index: 0,
+                    clock: Some(ClockIdentifier {
+                        domain: ClockDomain::Memory as i32,
+                        index: 0,
+                    }),
+                }),
+                utilization: match device.utilization_rates() {
+                    Ok(rates) => rates.memory as u64,
+                    Err(err) => {
+                        tracing::warn!("could not get memory utilization rates: {}", err);
+                        return Vec::new();
+                    }
+                },
+            },
+            Engine {
+                identifier: Some(EngineIdentifier {
+                    r#type: EngineType::VideoEncode as i32,
+                    index: 0,
+                    clock: Some(ClockIdentifier {
+                        domain: ClockDomain::VideoUnified as i32,
+                        index: 0,
+                    }),
+                }),
+                utilization: match device.encoder_utilization() {
+                    Ok(utilization) => utilization.utilization as u64,
+                    Err(err) => {
+                        tracing::warn!("could not get encoder utilization: {}", err);
+                        return Vec::new();
+                    }
+                },
+            },
+            Engine {
+                identifier: Some(EngineIdentifier {
+                    r#type: EngineType::VideoDecode as i32,
+                    index: 0,
+                    clock: Some(ClockIdentifier {
+                        domain: ClockDomain::VideoUnified as i32,
+                        index: 0,
+                    }),
+                }),
+                utilization: match device.decoder_utilization() {
+                    Ok(utilization) => utilization.utilization as u64,
+                    Err(err) => {
+                        tracing::warn!("could not get encoder utilization: {}", err);
+                        return Vec::new();
+                    }
+                },
+            },
+        ]
+    }
+
+    fn clocks<'a>(&self, device: &nvml_wrapper::Device<'a>) -> Vec<Clock> {
+        vec![
+            Clock {
+                identifier: Some(ClockIdentifier {
+                    domain: ClockDomain::Graphics as i32,
+                    index: 0,
+                }),
+                current_frequency_mhz: device
+                    .clock(
+                        nvml_wrapper::enum_wrappers::device::Clock::Graphics,
+                        nvml_wrapper::enum_wrappers::device::ClockId::Current,
+                    )
+                    .unwrap_or_default(),
+                max_frequency_mhz: device
+                    .max_clock_info(nvml_wrapper::enum_wrappers::device::Clock::Graphics)
+                    .unwrap_or_default(),
+            },
+            Clock {
+                identifier: Some(ClockIdentifier {
+                    domain: ClockDomain::Compute as i32,
+                    index: 0,
+                }),
+                current_frequency_mhz: device
+                    .clock(
+                        nvml_wrapper::enum_wrappers::device::Clock::SM,
+                        nvml_wrapper::enum_wrappers::device::ClockId::Current,
+                    )
+                    .unwrap_or_default(),
+                max_frequency_mhz: device
+                    .max_clock_info(nvml_wrapper::enum_wrappers::device::Clock::SM)
+                    .unwrap_or_default(),
+            },
+            Clock {
+                identifier: Some(ClockIdentifier {
+                    domain: ClockDomain::Memory as i32,
+                    index: 0,
+                }),
+                current_frequency_mhz: device
+                    .clock(
+                        nvml_wrapper::enum_wrappers::device::Clock::Memory,
+                        nvml_wrapper::enum_wrappers::device::ClockId::Current,
+                    )
+                    .unwrap_or_default(),
+                max_frequency_mhz: device
+                    .max_clock_info(nvml_wrapper::enum_wrappers::device::Clock::Memory)
+                    .unwrap_or_default(),
+            },
+            Clock {
+                identifier: Some(ClockIdentifier {
+                    domain: ClockDomain::VideoUnified as i32,
+                    index: 0,
+                }),
+                current_frequency_mhz: device
+                    .clock(
+                        nvml_wrapper::enum_wrappers::device::Clock::Video,
+                        nvml_wrapper::enum_wrappers::device::ClockId::Current,
+                    )
+                    .unwrap_or_default(),
+                max_frequency_mhz: device
+                    .max_clock_info(nvml_wrapper::enum_wrappers::device::Clock::Video)
+                    .unwrap_or_default(),
+            },
+        ]
+    }
+
+    // NVML doesn't expose unified values for system memory mapped to the GPU, only ReBAR which is the opposite
+    fn memory<'a>(&self, device: &nvml_wrapper::Device<'a>) -> Vec<Memory> {
+        vec![Memory {
+            r#type: MemoryType::Vram as i32,
+            total_memory: match device.memory_info() {
+                Ok(info) => info.total,
+                Err(_) => return Vec::new(),
+            },
+            used_memory: match device.memory_info() {
+                Ok(info) => info.used,
+                Err(_) => return Vec::new(),
+            },
+        }]
+    }
+
+    fn power<'a>(&self, device: &nvml_wrapper::Device<'a>) -> Option<Power> {
+        Some(Power {
+            current_power_mw: device.power_usage().ok()?,
+            max_power_mw: device.power_management_limit().ok()?,
+            is_power_throttled: device.current_throttle_reasons().is_ok_and(|reasons| {
+                reasons
+                    .contains(nvml_wrapper::bitmasks::device::ThrottleReasons::SW_THERMAL_SLOWDOWN)
+            }),
+            is_thermal_throttled: device.current_throttle_reasons().is_ok_and(|reasons| {
+                reasons.contains(nvml_wrapper::bitmasks::device::ThrottleReasons::SW_POWER_CAP)
+            }),
+        })
+    }
+
+    // I have to use the raw bindings since nvml_wrapper doesn't expose the newer thermal settings
+    fn thermal<'a>(&self, device: &nvml_wrapper::Device<'a>) -> Vec<Thermal> {
+        let mut thermal_settings: nvml_wrapper_sys::bindings::nvmlGpuThermalSettings_t =
+            unsafe { std::mem::zeroed() };
+        unsafe {
+            self.nvml.lib().nvmlDeviceGetThermalSettings(
+                device.handle(),
+                15,
+                &mut thermal_settings as *mut _,
+            )
+        };
+
+        let mut thermals = Vec::new();
+
+        for i in 0..thermal_settings.count {
+            let thermal = &thermal_settings.sensor[i as usize];
+            thermals.push(Thermal {
+                location: match thermal.target {
+                    nvml_wrapper_sys::bindings::nvmlThermalTarget_t_NVML_THERMAL_TARGET_GPU => {
+                        ThermalLocation::Edge as i32
+                    }
+                    nvml_wrapper_sys::bindings::nvmlThermalTarget_t_NVML_THERMAL_TARGET_MEMORY => {
+                        ThermalLocation::Memory as i32
+                    }
+                    nvml_wrapper_sys::bindings::nvmlThermalTarget_t_NVML_THERMAL_TARGET_POWER_SUPPLY => {
+                        ThermalLocation::Vrsoc as i32
+                    }
+                    _ => continue,
+                },
+                current_celsius: thermal.currentTemp as u32,
+                max_celsius: thermal.defaultMaxTemp as u32,
+            })
+        }
+
+        thermals
+    }
+
+    fn processes<'a>(&self, device: &nvml_wrapper::Device<'a>) -> Vec<Process> {
+        let mut processes = Vec::new();
+        let utilization_stats = match device.process_utilization_stats(None) {
+            Ok(stats) => stats,
+            Err(_) => return Vec::new(),
+        };
+        for process in utilization_stats.iter() {
+            processes.push(Process {
+                pid: process.pid,
+                engine_utilization: vec![
+                    Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::EngineType3d as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::Graphics as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: process.sm_util as u64,
+                    },
+                    Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::VideoEncode as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: process.enc_util as u64,
+                    },
+                    Engine {
+                        identifier: Some(EngineIdentifier {
+                            r#type: EngineType::VideoDecode as i32,
+                            index: 0,
+                            clock: Some(ClockIdentifier {
+                                domain: ClockDomain::VideoUnified as i32,
+                                index: 0,
+                            }),
+                        }),
+                        utilization: process.dec_util as u64,
+                    },
+                ],
+                vram_usage: process.mem_util as u64,
+                gtt_usage: 0,
+            });
+        }
+        processes
     }
 }
 
 impl super::Card for Card {
-    fn collect(&mut self, config: &super::Config) -> anyhow::Result<super::Gpu> {
-        todo!()
-    }
-    fn resolve(
-        &mut self,
-        staging: &crate::collector::staging::Staging,
-        output: super::Gpu,
-    ) -> anyhow::Result<super::Gpu> {
-        todo!()
-    }
-}
+    fn collect(&mut self, config: &Config) -> anyhow::Result<super::Gpu> {
+        let mut gpu = Gpu::default();
 
-/*
-use anyhow::Context;
-use std::path::Path;
+        let device = self.nvml.device_by_pci_bus_id(self.pci.clone())?;
 
-use crate::collector::helpers::discovery::Discovery;
+        gpu.brand_name = device.name().unwrap_or_default();
+        gpu.primary_node = self.primary_node.to_string_lossy().to_string();
+        gpu.render_node = self.render_node.to_string_lossy().to_string();
 
-pub(super) struct Collector {
-    nvml: Discovery<nvml_wrapper::Nvml>,
-}
+        gpu.drivers = config.drivers.then(|| Drivers {
+            kernel: "nvidia".to_string(),
+            opengl: String::new(),
+            vulkan: String::new(),
+        });
 
-impl Default for Collector {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Collector {
-    pub fn new() -> Self {
-        tracing::debug!("initializing NVIDIA GPU collector");
-        Collector {
-            nvml: Discovery::default(),
-        }
-    }
-
-    pub fn collect(&mut self, path: &Path, config: &super::Config) -> anyhow::Result<super::Gpu> {
-        let driver_path = path.join("device/driver");
-        if let Ok(driver_link) = std::fs::read_link(driver_path) {
-            if driver_link.file_name().is_some_and(|name| name == "nvidia") {
-                self.collect_nvidia(config, path)
-            } else {
-                self.collect_nouveau(path)
-            }
-        } else {
-            Err(anyhow::anyhow!(
-                "Failed to determine NVIDIA GPU driver, this is a bug"
-            ))
-        }
-    }
-
-    /// On nvml error, logs the error and returns a partial snapshot.
-    /// If there's no nvml, an error is returned.
-    fn collect_nvidia(
-        &mut self,
-        config: &super::Config,
-        path: &Path,
-    ) -> anyhow::Result<super::Gpu> {
-        tracing::trace!("collecting metrics for nvidia device {}", path.display());
-
-        let mut gpu = super::Gpu::default();
-        let nvml = self
-            .nvml
-            .require(|| nvml_wrapper::Nvml::init().with_context(|| "failed to initialize nvml"))?;
-
-        let Ok(kernel_driver) = nvml.sys_driver_version() else {
-            return Ok(gpu);
-        };
-
-        gpu.drivers = if config.drivers {
-            Some(super::Drivers {
-                kernel: kernel_driver,
-                opengl: String::new(),
-                vulkan: String::new(),
-            })
-        } else {
-            None
-        };
-
-        let device_path = path.join("device");
-        let pci_bus_id = std::fs::read_link(device_path)
-            .map(|device_link| {
-                device_link
-                    .file_name()
-                    .map(|filename| filename.to_string_lossy().to_string())
-                    .unwrap_or_default()
-            })
+        gpu.engines = config
+            .engines
+            .then(|| self.engines(&device))
             .unwrap_or_default();
-        tracing::debug!("getting device from pci bus id: {:?}", pci_bus_id);
-        let _nvml_device = nvml.device_by_pci_bus_id(pci_bus_id)?;
-
-        gpu.engines = if config.engines {
-            unimplemented!()
-        } else {
-            Vec::new()
-        };
-
-        gpu.clocks = if config.clocks {
-            unimplemented!()
-        } else {
-            Vec::new()
-        };
-
-        gpu.memory = if config.memory {
-            unimplemented!()
-        } else {
-            Vec::new()
-        };
-
-        gpu.power = if config.power { unimplemented!() } else { None };
-
-        gpu.thermals = if config.thermals {
-            unimplemented!()
-        } else {
-            Vec::new()
-        };
-
-        gpu.processes = if config.processes {
-            unimplemented!()
-        } else {
-            Vec::new()
-        };
-
-        // let graphics_utilization = device
-        //     .utilization_rates()
-        //     .map(|util| util.gpu as f64)
-        //     .unwrap_or_default();
-        // let graphics_clock = device.clock_info(Clock::Graphics).unwrap_or_default();
-
-        // let (memory_capacity, memory_usage) = device
-        //     .memory_info()
-        //     .map(|info| (info.total, info.used))
-        //     .unwrap_or_default();
-        // let memory_clock = device.clock_info(Clock::Memory).unwrap_or_default();
-
-        // let encoder_utilization = device
-        //     .encoder_utilization()
-        //     .map(|enc_util| enc_util.utilization as f64)
-        //     .unwrap_or_default();
-
-        // let decoder_utilization = device
-        //     .decoder_utilization()
-        //     .map(|dec_util| dec_util.utilization as f64)
-        //     .unwrap_or_default();
-        // let video_clock = device.clock_info(Clock::Video).unwrap_or_default();
-
-        // let power_milliwatt = device.power_usage().unwrap_or_default();
-
-        // let temperature = device
-        //     .temperature(TemperatureSensor::Gpu)
-        //     .unwrap_or_default() as i32;
-
-        // tracing::trace!(
-        //     "collected metrics for nvidia device {} in {:?}",
-        //     path.display(),
-        //     nvml_bench.elapsed()
-        // );
+        gpu.clocks = config
+            .clocks
+            .then(|| self.clocks(&device))
+            .unwrap_or_default();
+        gpu.memory = config
+            .memory
+            .then(|| self.memory(&device))
+            .unwrap_or_default();
+        gpu.power = config
+            .power
+            .then(|| self.power(&device))
+            .unwrap_or_default();
+        gpu.thermals = config
+            .thermals
+            .then(|| self.thermal(&device))
+            .unwrap_or_default();
+        gpu.processes = config
+            .processes
+            .then(|| self.processes(&device))
+            .unwrap_or_default();
 
         Ok(gpu)
     }
 
-    /// Currently does nothing as I haven't read up on nouveau's metric reporting if there even is any
-    fn collect_nouveau(&mut self, path: &Path) -> anyhow::Result<super::Gpu> {
-        tracing::trace!("collecting metrics for nouveau device {}", path.display());
-        Err(anyhow::anyhow!("nouveau not yet implemented"))
+    fn resolve(
+        &mut self,
+        _: &crate::collector::staging::Staging,
+        output: super::Gpu,
+    ) -> anyhow::Result<super::Gpu> {
+        // NVML already fills out all the important details
+        Ok(output)
+    }
+
+    fn primary_node(&self) -> String {
+        self.primary_node.to_string_lossy().to_string()
     }
 }
-
-// fn collect_processes(device: &nvml_wrapper::Device) -> Vec<super::Process> {
-//     let mut processes = Vec::new();
-//     for process in device.process_utilization_stats(None).iter().flatten() {
-//         let pid = process.pid;
-//         let graphics_utilization = process.sm_util as f64;
-//         let memory_usage = process.mem_util as u64;
-//         let encode_utilization = process.enc_util as f64;
-//         let decode_utilization = process.dec_util as f64;
-
-//         processes.push(unimplemented!())
-//     }
-//     processes
-// }
- */
