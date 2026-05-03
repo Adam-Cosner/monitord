@@ -25,21 +25,23 @@ message Config {
 // Represents a single physical GPU
 message Gpu {
   string brand_name = 1; // The GPU's branding name (i.e. NVIDIA RTX 4090)
+  string primary_node = 2; // The primary node for this GPU (/dev/dri/card*)
+  string render_node = 3; // The render node for this GPU (/dev/dri/renderD*)
 
   // The GPU drivers in use (kernel, OpenGL, Vulkan)
-  optional Drivers drivers = 2;
+  optional Drivers drivers = 4;
 
   // The GPU engines in use (3D engine, video decode/encode, compute)
-  repeated Engine engines = 3;
+  repeated Engine engines = 5;
   // The GPU clocks in use (graphics, memory, video)
-  repeated Clock clocks = 4;
+  repeated Clock clocks = 6;
   // The GPU memory usage
-  repeated Memory memory = 5;
+  repeated Memory memory = 7;
 
-  optional Power power = 6; // Power and temperatures
-  repeated Thermal thermals = 7; // Temperature of the GPU in degrees Celsius
+  optional Power power = 8; // Power and temperatures
+  repeated Thermal thermals = 9; // Temperature of the GPU in degrees Celsius
 
-  repeated Process processes = 8; // Process information
+  repeated Process processes = 10; // Process information
 }
 
 message Drivers {
@@ -54,12 +56,13 @@ message Drivers {
 enum ClockDomain {
   CLOCK_DOMAIN_UNSPECIFIED = 0;
   CLOCK_DOMAIN_GRAPHICS = 1; // Core/Shader clock
-  CLOCK_DOMAIN_MEMORY = 2; // VRAM clock
-  CLOCK_DOMAIN_VIDEO_UNIFIED = 3; // Video decode/encode clock
-  CLOCK_DOMAIN_VIDEO_DECODE = 4; // Video decode clock
-  CLOCK_DOMAIN_VIDEO_ENCODE = 5; // Video encode clock
-  CLOCK_DOMAIN_SOC = 6; // SoC/Fabric clock
-  CLOCK_DOMAIN_GT = 7; // Graphics Tile clock for i915
+  CLOCK_DOMAIN_COMPUTE = 2; // Compute clock
+  CLOCK_DOMAIN_MEMORY = 3; // VRAM clock
+  CLOCK_DOMAIN_VIDEO_UNIFIED = 4; // Video decode/encode clock
+  CLOCK_DOMAIN_VIDEO_DECODE = 5; // Video decode clock
+  CLOCK_DOMAIN_VIDEO_ENCODE = 6; // Video encode clock
+  CLOCK_DOMAIN_SOC = 7; // SoC/Fabric clock
+  CLOCK_DOMAIN_GT = 8; // Graphics Tile clock for i915
 }
 
 // Identifies a clock by its domain and index
