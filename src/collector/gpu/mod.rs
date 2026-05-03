@@ -17,6 +17,12 @@ mod nouveau;
 mod nvidia;
 mod xe;
 
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::os::fd::OwnedFd;
+use std::path::PathBuf;
+use std::rc::Rc;
+
 use crate::collector::helpers::*;
 use crate::collector::staging;
 
@@ -25,8 +31,10 @@ pub use crate::metrics::gpu::*;
 
 /// Collects GPU metrics
 pub struct Collector {
-    cards: discovery::Discovery<Vec<Box<dyn Card>>>,
-    nvml: discovery::Discovery<nvml_wrapper::Nvml>,
+    // Optimization so we don't have to traverse to /sys/class/drm every time
+    drm_root: discovery::Discovery<OwnedFd>,
+    cards: HashMap<CardIdentity, Box<dyn Card>>,
+    nvml: discovery::Discovery<Rc<nvml_wrapper::Nvml>>,
 }
 
 impl Default for Collector {
@@ -38,80 +46,10 @@ impl Default for Collector {
 impl Collector {
     pub fn new() -> Self {
         Self {
-            cards: discovery::Discovery::default(),
+            drm_root: discovery::Discovery::default(),
+            cards: HashMap::new(),
             nvml: discovery::Discovery::default(),
         }
-    }
-
-    fn enumerate_cards(&mut self) -> anyhow::Result<&mut [Box<dyn Card>]> {
-        self.cards
-            .probe_mut(|| {
-                let mut cards = Vec::new();
-                for entry in std::fs::read_dir("/sys/class/drm")? {
-                    let entry = entry?;
-                    let Ok(name) = entry.file_name().into_string() else {
-                        continue;
-                    };
-                    if name.starts_with("card") && !name.contains('-') {
-                        // check the symlink of device/driver
-                        let Ok(driver) = std::fs::read_link(entry.path().join("device/driver"))
-                            .map_err(|e| anyhow::anyhow!(e))
-                            .and_then(|driver_path| {
-                                driver_path
-                                    .file_name()
-                                    .map(|file_name| file_name.to_string_lossy().to_string())
-                                    .ok_or(anyhow::anyhow!("invalid driver symlink"))
-                            })
-                        else {
-                            continue;
-                        };
-                        match driver.as_str() {
-                            "amdgpu" => {
-                                let Ok(gpu) = amdgpu::Card::new(entry.path()) else {
-                                    continue;
-                                };
-                                cards.push(Box::new(gpu) as Box<dyn Card>)
-                            }
-                            "i915" => {
-                                let Ok(gpu) = i915::Card::new(entry.path()) else {
-                                    continue;
-                                };
-                                cards.push(Box::new(gpu) as Box<dyn Card>)
-                            }
-                            "xe" => {
-                                let Ok(gpu) = xe::Card::new(entry.path()) else {
-                                    continue;
-                                };
-                                cards.push(Box::new(gpu) as Box<dyn Card>)
-                            }
-                            "nvidia" => {
-                                let Some(nvml) = self.nvml.probe(|| {
-                                    nvml_wrapper::Nvml::init().map_err(|e| anyhow::anyhow!(e))
-                                }) else {
-                                    continue;
-                                };
-                                let Ok(gpu) = nvidia::Card::new(entry.path(), nvml) else {
-                                    continue;
-                                };
-                                cards.push(Box::new(gpu) as Box<dyn Card>)
-                            }
-                            "nouveau" => {
-                                let Ok(gpu) = nouveau::Card::new(entry.path()) else {
-                                    continue;
-                                };
-                                cards.push(Box::new(gpu) as Box<dyn Card>)
-                            }
-                            _ => {
-                                tracing::warn!("unsupported GPU driver: {}", driver);
-                                continue;
-                            }
-                        }
-                    }
-                }
-                Ok(cards)
-            })
-            .map(|cards| cards.as_mut_slice())
-            .ok_or_else(|| anyhow::anyhow!("GPU Collector failed to enumerate cards"))
     }
 }
 
@@ -126,10 +64,108 @@ impl super::Collector for Collector {
         let Some(config) = &config.gpu else {
             anyhow::bail!("GPU Collector did not receive a config");
         };
+
+        let drm_root = self.drm_root.require(|| {
+            rustix::fs::open(
+                "/sys/class/drm",
+                rustix::fs::OFlags::RDONLY
+                    | rustix::fs::OFlags::DIRECTORY
+                    | rustix::fs::OFlags::CLOEXEC,
+                rustix::fs::Mode::empty(),
+            )
+            .map_err(|e| anyhow::anyhow!(e))
+        })?;
+
+        let mut seen: HashSet<CardIdentity> = HashSet::with_capacity(self.cards.len());
         let mut gpus = Vec::new();
-        let cards = self.enumerate_cards()?;
-        for gpu in cards.iter_mut() {
-            gpus.push(gpu.collect(config)?);
+
+        let dir = rustix::fs::Dir::read_from(drm_root)?;
+
+        for entry in dir {
+            let entry = entry?;
+            let name = entry.file_name().to_string_lossy();
+            // skip non card* entries
+            if !name.starts_with("card") || !name.contains("-") || name == "." || name == ".." {
+                continue;
+            }
+
+            let card = match rustix::fs::openat(
+                drm_root,
+                name.as_ref(),
+                rustix::fs::OFlags::RDONLY
+                    | rustix::fs::OFlags::CLOEXEC
+                    | rustix::fs::OFlags::DIRECTORY,
+                rustix::fs::Mode::empty(),
+            ) {
+                Ok(file) => file,
+                Err(rustix::io::Errno::NOENT) => continue,
+                Err(rustix::io::Errno::NOTDIR) => continue,
+                Err(e) => {
+                    anyhow::bail!(e)
+                }
+            };
+            let st = rustix::fs::fstat(&card)?;
+            let id = CardIdentity {
+                dev: st.st_dev,
+                ino: st.st_ino,
+            };
+            seen.insert(id);
+
+            match self.cards.get_mut(&id) {
+                // already a fd, we can get rid of the new one
+                Some(_) => {
+                    drop(card);
+                }
+                None => {
+                    let device = match new_card(
+                        card,
+                        self.nvml.probe(|| {
+                            nvml_wrapper::Nvml::init()
+                                .map_err(|e| anyhow::anyhow!(e))
+                                .map(Rc::new)
+                        }),
+                    ) {
+                        Ok(device) => device,
+                        Err(e) => {
+                            tracing::warn!("failed to create card tracker: {}", e);
+                            continue;
+                        }
+                    };
+                    self.cards.insert(id, device);
+                }
+            }
+
+            // Usually I try to avoid unwrap whenever I can but in this case, if it's not present and has hit this part, there's a memory issue
+            let gpu = self.cards.get_mut(&id).unwrap();
+            let snap = match gpu.collect(config) {
+                Ok(snap) => snap,
+                Err(e) => {
+                    tracing::warn!("failed to collect GPU snapshot: {}", e);
+                    continue;
+                }
+            };
+            gpus.push(snap);
+        }
+
+        self.cards.retain(|id, _| seen.contains(id));
+        Ok(Snapshot { gpus })
+    }
+}
+
+impl super::Resolver for Collector {
+    fn resolve(
+        &mut self,
+        staging: &staging::Staging,
+        output: Self::Output,
+    ) -> anyhow::Result<Self::Output> {
+        let mut gpus = Vec::new();
+        for gpu in output.gpus.into_iter() {
+            let (_, card) = self
+                .cards
+                .iter_mut()
+                .find(|(_, card)| card.primary_node() == gpu.render_node.as_str())
+                .ok_or_else(|| anyhow::anyhow!("no card found for GPU {}", gpu.brand_name))?;
+            gpus.push(card.resolve(staging, gpu)?);
         }
         Ok(Snapshot { gpus })
     }
@@ -138,8 +174,50 @@ impl super::Collector for Collector {
 trait Card {
     // Collects a single snapshot of the GPU
     fn collect(&mut self, config: &Config) -> anyhow::Result<Gpu>;
+    // Gets the primary node for this card (e.g. /dev/dri/card0)
+    fn primary_node(&self) -> String;
     // Resolves a snapshot based on the staging
     fn resolve(&mut self, staging: &staging::Staging, output: Gpu) -> anyhow::Result<Gpu>;
+}
+
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
+struct CardIdentity {
+    dev: u64,
+    ino: u64,
+}
+
+fn new_card<'a>(
+    fd: OwnedFd,
+    nvml: Option<&Rc<nvml_wrapper::Nvml>>,
+) -> anyhow::Result<Box<dyn Card + 'a>> {
+    let driver = rustix::fs::readlinkat(&fd, "device/driver", Vec::new())?
+        .to_string_lossy()
+        .to_string();
+    let device = match PathBuf::from(driver)
+        .file_name()
+        .map(|n| n.to_string_lossy())
+    {
+        Some(name) => {
+            // match the driver name to the device type
+            match name.as_ref() {
+                "nvidia" => {
+                    let Some(nvml) = nvml else {
+                        anyhow::bail!("nvml not available for nvidia card");
+                    };
+                    Box::new(nvidia::Card::new(fd, nvml)?) as Box<dyn Card>
+                }
+                "nouveau" => Box::new(nouveau::Card::new(fd)?) as Box<dyn Card>,
+                "amdgpu" => Box::new(amdgpu::Card::new(fd)?) as Box<dyn Card>,
+                "i915" => Box::new(i915::Card::new(fd)?) as Box<dyn Card>,
+                "xe" => Box::new(xe::Card::new(fd)?) as Box<dyn Card>,
+                _ => anyhow::bail!("unsupported driver: {}", name),
+            }
+        }
+        None => {
+            anyhow::bail!("could not read driver symlink!");
+        }
+    };
+    Ok(device)
 }
 
 /*

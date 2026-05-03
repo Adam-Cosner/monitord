@@ -4,12 +4,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+use std::os::fd::OwnedFd;
+
 pub struct Card {
     // todo
 }
 
 impl Card {
-    pub fn new(path: std::path::PathBuf) -> anyhow::Result<Self> {
+    pub fn new(fd: OwnedFd) -> anyhow::Result<Self> {
         Ok(Self {})
     }
 }
@@ -18,11 +20,16 @@ impl super::Card for Card {
     fn collect(&mut self, config: &super::Config) -> anyhow::Result<super::Gpu> {
         todo!()
     }
+
     fn resolve(
         &mut self,
         staging: &crate::collector::staging::Staging,
         output: super::Gpu,
     ) -> anyhow::Result<super::Gpu> {
+        todo!()
+    }
+
+    fn primary_node(&self) -> String {
         todo!()
     }
 }

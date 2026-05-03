@@ -4,6 +4,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+use std::os::fd::OwnedFd;
+
 mod gpu_metrics;
 
 pub struct Card {
@@ -11,7 +13,7 @@ pub struct Card {
 }
 
 impl Card {
-    pub fn new(path: std::path::PathBuf) -> anyhow::Result<Self> {
+    pub fn new(fd: OwnedFd) -> anyhow::Result<Self> {
         Ok(Self {})
     }
 }
@@ -25,6 +27,10 @@ impl super::Card for Card {
         staging: &crate::collector::staging::Staging,
         output: super::Gpu,
     ) -> anyhow::Result<super::Gpu> {
+        todo!()
+    }
+
+    fn primary_node(&self) -> String {
         todo!()
     }
 }
