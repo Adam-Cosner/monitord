@@ -12,7 +12,6 @@ pub struct Card {
     pci: String,
     primary_node: PathBuf,
     render_node: PathBuf,
-    // todo
 }
 
 impl Card {
