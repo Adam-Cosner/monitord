@@ -8,9 +8,10 @@ use std::{os::fd::OwnedFd, path::PathBuf};
 
 use rustix::fs::{Mode, OFlags};
 
+use crate::metrics::gpu::*;
+
 pub struct Card {
     primary_node: PathBuf,
-    render_node: OwnedFd,
 }
 
 impl Card {
@@ -24,35 +25,35 @@ impl Card {
             rustix::fs::Mode::empty(),
         )?;
         let mut primary_node = PathBuf::new();
-        let mut render_node = PathBuf::new();
         for entry in rustix::fs::Dir::read_from(&drm_root)? {
             let entry = entry?;
             let name = entry.file_name().to_string_lossy().to_string();
             if name.starts_with("card") {
                 primary_node = PathBuf::from(format!("/dev/dri/{}", name));
-            } else if name.starts_with("renderD") {
-                render_node = PathBuf::from(format!("/dev/dri/{}", name));
             }
         }
-        let render_node =
-            rustix::fs::open(render_node, OFlags::CLOEXEC | OFlags::RDWR, Mode::empty())?;
-        Ok(Self {
-            primary_node,
-            render_node,
-        })
+        Ok(Self { primary_node })
     }
 }
 
 impl super::Card for Card {
-    fn collect(&mut self, config: &super::Config) -> anyhow::Result<super::Gpu> {
-        todo!()
+    fn collect(&mut self, config: &super::Config) -> anyhow::Result<Gpu> {
+        let mut gpu = super::Gpu::default();
+
+        gpu.drivers = config.drivers.then(|| Drivers {
+            kernel: "nouveau".to_string(),
+            opengl: "".to_string(),
+            vulkan: "".to_string(),
+        });
+
+        Ok(gpu)
     }
 
     fn resolve(
         &mut self,
         staging: &crate::collector::staging::Staging,
-        output: super::Gpu,
-    ) -> anyhow::Result<super::Gpu> {
+        output: Gpu,
+    ) -> anyhow::Result<Gpu> {
         todo!()
     }
 
