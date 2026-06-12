@@ -7,7 +7,6 @@
 //! Let the record show I absolutely despise amdgpu and everything about it
 //! I actually hate this file with a burning passion but what can ya do
 use num::traits::AsPrimitive;
-use std::path::Path;
 
 use crate::metrics::gpu::*;
 
@@ -46,32 +45,31 @@ pub enum GpuMetrics {
 }
 
 impl GpuMetrics {
-    pub fn read(path: &Path) -> anyhow::Result<Self> {
-        let content_bytes = std::fs::read(path)?;
-        let header = unsafe { &*(content_bytes.as_ptr() as *const amdgpu::Header) };
+    pub fn read(bytes: &[u8]) -> anyhow::Result<Self> {
+        let header = unsafe { &*(bytes.as_ptr() as *const amdgpu::Header) };
         match header.format_revision {
             1 => match header.content_revision {
-                0 => amdgpu::f1::C0::from_bytes(&content_bytes),
-                1 => amdgpu::f1::C1::from_bytes(&content_bytes),
-                2 => amdgpu::f1::C2::from_bytes(&content_bytes),
-                3 => amdgpu::f1::C3::from_bytes(&content_bytes),
-                4 => amdgpu::f1::C4::from_bytes(&content_bytes),
-                5 => amdgpu::f1::C5::from_bytes(&content_bytes),
-                6 => amdgpu::f1::C6::from_bytes(&content_bytes),
-                7 => amdgpu::f1::C7::from_bytes(&content_bytes),
-                8 => amdgpu::f1::C8::from_bytes(&content_bytes),
-                9 => amdgpu::f1::C9::from_bytes(&content_bytes),
+                0 => amdgpu::f1::C0::from_bytes(&bytes),
+                1 => amdgpu::f1::C1::from_bytes(&bytes),
+                2 => amdgpu::f1::C2::from_bytes(&bytes),
+                3 => amdgpu::f1::C3::from_bytes(&bytes),
+                4 => amdgpu::f1::C4::from_bytes(&bytes),
+                5 => amdgpu::f1::C5::from_bytes(&bytes),
+                6 => amdgpu::f1::C6::from_bytes(&bytes),
+                7 => amdgpu::f1::C7::from_bytes(&bytes),
+                8 => amdgpu::f1::C8::from_bytes(&bytes),
+                9 => amdgpu::f1::C9::from_bytes(&bytes),
                 _ => anyhow::bail!("unsupported content revision"),
             },
             2 => match header.content_revision {
-                0 => amdgpu::f2::C0::from_bytes(&content_bytes),
-                1 => amdgpu::f2::C1::from_bytes(&content_bytes),
-                2 => amdgpu::f2::C2::from_bytes(&content_bytes),
-                3 => amdgpu::f2::C3::from_bytes(&content_bytes),
-                4 => amdgpu::f2::C4::from_bytes(&content_bytes),
+                0 => amdgpu::f2::C0::from_bytes(&bytes),
+                1 => amdgpu::f2::C1::from_bytes(&bytes),
+                2 => amdgpu::f2::C2::from_bytes(&bytes),
+                3 => amdgpu::f2::C3::from_bytes(&bytes),
+                4 => amdgpu::f2::C4::from_bytes(&bytes),
                 _ => anyhow::bail!("unsupported content revision"),
             },
-            3 => amdgpu::f3::C0::from_bytes(&content_bytes),
+            3 => amdgpu::f3::C0::from_bytes(&bytes),
             _ => anyhow::bail!("unsupported format revision"),
         }
     }
