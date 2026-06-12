@@ -62,7 +62,7 @@ enum ClockDomain {
   CLOCK_DOMAIN_VIDEO_DECODE = 5; // Video decode clock
   CLOCK_DOMAIN_VIDEO_ENCODE = 6; // Video encode clock
   CLOCK_DOMAIN_SOC = 7; // SoC/Fabric clock
-  CLOCK_DOMAIN_GT = 8; // Graphics Tile clock for i915
+  CLOCK_DOMAIN_GT = 8; // Graphics Technology clock for Intel
 }
 
 // Identifies a clock by its domain and index
@@ -115,7 +115,7 @@ message Engine {
 enum MemoryType {
   MEMORY_TYPE_UNSPECIFIED = 0;
   MEMORY_TYPE_VRAM = 1;
-  MEMORY_TYPE_GTT = 2;
+  MEMORY_TYPE_SYSTEM = 2;
 }
 
 // Represents the usage of a specific type of memory
