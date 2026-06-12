@@ -12,11 +12,7 @@ use rustix::{
     fs::{Mode, OFlags},
 };
 
-use crate::collector::helpers::{
-    discovery::Discovery,
-    sampler::{Differential, Sampler},
-    *,
-};
+use crate::collector::helpers::*;
 
 /// Tracker for the CPU sensors.
 #[derive(Debug)]
@@ -96,7 +92,7 @@ impl Sample {
     }
 }
 
-impl Differential for u64 {
+impl sampler::Differential for u64 {
     type Delta = u64;
 
     fn delta(&self, other: &Self) -> Self::Delta {

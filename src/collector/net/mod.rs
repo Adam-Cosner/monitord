@@ -14,11 +14,7 @@
 //! ```
 mod wifi;
 
-use super::helpers::{
-    discovery::Discovery,
-    sampler::{Differential, Sampler},
-    *,
-};
+use super::helpers::*;
 use rustix::{
     fd::{AsFd, BorrowedFd},
     fs::{AtFlags, Mode, OFlags},
@@ -215,7 +211,7 @@ impl Counters {
     }
 }
 
-impl Differential for Counters {
+impl sampler::Differential for Counters {
     type Delta = CounterDelta;
 
     fn delta(&self, previous: &Self) -> Self::Delta {

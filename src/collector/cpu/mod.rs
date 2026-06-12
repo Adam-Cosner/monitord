@@ -20,7 +20,7 @@ mod utilization;
 #[doc(inline)]
 pub use crate::metrics::cpu::*;
 
-use super::helpers::discovery::Discovery;
+use super::helpers::*;
 
 pub struct Collector {
     topology: Discovery<topology::Topology>,

@@ -9,8 +9,7 @@ use std::os::fd::{BorrowedFd, OwnedFd};
 use rustix::fd::AsFd;
 use rustix::fs::{Mode, OFlags};
 
-/// Reads a string from a given fd, trimming whitespace and converting to a `String`.
-pub fn read_string(fd: BorrowedFd) -> Option<String> {
+pub fn read_bin(fd: BorrowedFd) -> Option<Vec<u8>> {
     let stat = rustix::fs::fstat(fd.as_fd()).ok()?;
     // 16 MiB limit
     if stat.st_size > 16 * 1024 * 1024 {
@@ -22,10 +21,14 @@ pub fn read_string(fd: BorrowedFd) -> Option<String> {
     rustix::io::read(fd, &mut buf)
         .map(|read_bytes| {
             buf.truncate(read_bytes);
-            let s = String::from_utf8_lossy(buf.as_slice());
-            s.trim().to_string()
+            buf
         })
         .ok()
+}
+
+/// Reads a string from a given fd, trimming whitespace and converting to a `String`.
+pub fn read_string(fd: BorrowedFd) -> Option<String> {
+    read_bin(fd).map(|buf| String::from_utf8_lossy(buf.as_slice()).trim().to_string())
 }
 
 /// Reads a string from a given path relative to fd, trimming whitespace and converting to a `String`.

@@ -33,10 +33,10 @@ pub use crate::metrics::gpu::*;
 /// Collects GPU metrics
 pub struct Collector {
     // Optimization so we don't have to traverse to /sys/class/drm every time
-    drm_root: discovery::Discovery<OwnedFd>,
-    pci_ids: discovery::Discovery<pciids::PciIds>,
+    drm_root: Discovery<OwnedFd>,
+    pci_ids: Discovery<PciIds>,
     cards: HashMap<CardFileId, Box<dyn Card>>,
-    nvml: discovery::Discovery<Rc<nvml_wrapper::Nvml>>,
+    nvml: Discovery<Rc<nvml_wrapper::Nvml>>,
 }
 
 impl Default for Collector {
@@ -48,10 +48,10 @@ impl Default for Collector {
 impl Collector {
     pub fn new() -> Self {
         Self {
-            drm_root: discovery::Discovery::default(),
-            pci_ids: discovery::Discovery::default(),
+            drm_root: Discovery::default(),
+            pci_ids: Discovery::default(),
             cards: HashMap::new(),
-            nvml: discovery::Discovery::default(),
+            nvml: Discovery::default(),
         }
     }
 }
@@ -150,7 +150,7 @@ impl super::Collector for Collector {
             if snap.brand_name.is_empty() {
                 snap.brand_name = sysfs::read_string_path("/usr/share/hwdata/pci.ids")
                     .or_else(|| sysfs::read_string_path("/usr/share/misc/pci.ids"))
-                    .and_then(|pci_ids| self.pci_ids.probe(|| pciids::PciIds::parse(&pci_ids)))
+                    .and_then(|pci_ids| self.pci_ids.probe(|| PciIds::parse(&pci_ids)))
                     .and_then(|pci_ids| {
                         let (vendor, device, subvendor, subdevice) = gpu.identify();
                         tracing::info!("looking up PCI ID: vendor={vendor}, device={device}, subvendor={subvendor:?}, subdevice={subdevice:?}");
