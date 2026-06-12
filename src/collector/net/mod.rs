@@ -14,15 +14,16 @@
 //! ```
 mod wifi;
 
-use super::{
-    helpers::{
-        discovery::Discovery,
-        sampler::{Differential, Sampler},
-        *,
-    },
-    staging,
+use super::helpers::{
+    discovery::Discovery,
+    sampler::{Differential, Sampler},
+    *,
 };
-use std::{net::IpAddr, path::Path};
+use rustix::{
+    fd::{AsFd, BorrowedFd},
+    fs::{AtFlags, Mode, OFlags},
+};
+use std::net::IpAddr;
 
 #[doc(inline)]
 pub use crate::metrics::network::*;
@@ -70,17 +71,31 @@ impl Collector {
             anyhow::bail!("no config supplied to collector")
         };
         let addresses = get_addresses()?;
-        match std::fs::read_dir("/sys/class/net") {
+        let net_root = rustix::fs::open(
+            "/sys/class/net",
+            OFlags::RDONLY | OFlags::CLOEXEC | OFlags::DIRECTORY,
+            Mode::empty(),
+        )?;
+
+        match rustix::fs::Dir::read_from(net_root.as_fd()) {
             Ok(dir) => {
                 let mut adapters = Vec::new();
 
                 for interface in dir.flatten() {
                     let interface_name = interface.file_name().to_string_lossy().into_owned();
-                    let interface_path = interface.path();
+                    let Ok(interface) = rustix::fs::openat(
+                        net_root.as_fd(),
+                        interface.file_name(),
+                        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::DIRECTORY,
+                        Mode::empty(),
+                    ) else {
+                        continue;
+                    };
+
                     adapters.push(self.build_adapter(
                         config,
                         &interface_name,
-                        &interface_path,
+                        interface.as_fd(),
                         &addresses,
                     ));
                 }
@@ -98,7 +113,7 @@ impl Collector {
         &mut self,
         config: &Config,
         name: &str,
-        path: &Path,
+        fd: BorrowedFd,
         addresses: &[IfAddr],
     ) -> Adapter {
         let ipv4_addresses = config
@@ -109,11 +124,12 @@ impl Collector {
             .addresses
             .then(|| get_ipv6_addresses(addresses, name))
             .unwrap_or_default();
-        let adapter_type = classify_adapter(path);
-        let is_up = sysfs::read_string(&path.join("operstate"))
+        let adapter_type = classify_adapter(fd);
+
+        let is_up = sysfs::readat_string(fd, "operstate")
             .map(|s| s == "up")
             .unwrap_or(false);
-        let packet_counters = Counters::read(path);
+        let packet_counters = Counters::read(fd.clone());
         let counter_delta = self
             .counters
             .entry(name.to_string())
@@ -125,11 +141,11 @@ impl Collector {
             .flatten();
         Adapter {
             interface_name: name.to_string(),
-            mac_address: sysfs::read_string(&path.join("address")).unwrap_or_default(),
+            mac_address: sysfs::readat_string(fd, "address").unwrap_or_default(),
             ipv4_addresses,
             ipv6_addresses,
             adapter_type: adapter_type as i32,
-            mtu: sysfs::read_u32(&path.join("mtu")).unwrap_or_default(),
+            mtu: sysfs::readat_u32(fd, "mtu").unwrap_or_default(),
             is_up,
             rx_bytes_total: packet_counters.rx_bytes,
             tx_bytes_total: packet_counters.tx_bytes,
@@ -185,16 +201,16 @@ struct Counters {
 }
 
 impl Counters {
-    fn read(path: &Path) -> Self {
+    fn read(fd: BorrowedFd) -> Self {
         Self {
-            rx_bytes: sysfs::read_u64(&path.join("statistics/rx_bytes")).unwrap_or_default(),
-            tx_bytes: sysfs::read_u64(&path.join("statistics/tx_bytes")).unwrap_or_default(),
-            rx_packets: sysfs::read_u64(&path.join("statistics/rx_packets")).unwrap_or_default(),
-            tx_packets: sysfs::read_u64(&path.join("statistics/tx_packets")).unwrap_or_default(),
-            rx_errors: sysfs::read_u64(&path.join("statistics/rx_errors")).unwrap_or_default(),
-            tx_errors: sysfs::read_u64(&path.join("statistics/tx_errors")).unwrap_or_default(),
-            rx_drops: sysfs::read_u64(&path.join("statistics/rx_dropped")).unwrap_or_default(),
-            tx_drops: sysfs::read_u64(&path.join("statistics/tx_dropped")).unwrap_or_default(),
+            rx_bytes: sysfs::readat_u64(fd.as_fd(), "statistics/rx_bytes").unwrap_or_default(),
+            tx_bytes: sysfs::readat_u64(fd.as_fd(), "statistics/tx_bytes").unwrap_or_default(),
+            rx_packets: sysfs::readat_u64(fd.as_fd(), "statistics/rx_packets").unwrap_or_default(),
+            tx_packets: sysfs::readat_u64(fd.as_fd(), "statistics/tx_packets").unwrap_or_default(),
+            rx_errors: sysfs::readat_u64(fd.as_fd(), "statistics/rx_errors").unwrap_or_default(),
+            tx_errors: sysfs::readat_u64(fd.as_fd(), "statistics/tx_errors").unwrap_or_default(),
+            rx_drops: sysfs::readat_u64(fd.as_fd(), "statistics/rx_dropped").unwrap_or_default(),
+            tx_drops: sysfs::readat_u64(fd.as_fd(), "statistics/tx_dropped").unwrap_or_default(),
         }
     }
 }
@@ -222,13 +238,15 @@ const ARPHRD_LOOPBACK: u32 = 772;
 const ARPHRD_SIT: u32 = 776;
 const ARPHRD_NONE: u32 = 65534;
 
-fn classify_adapter(path: &Path) -> adapter::AdapterType {
-    if path.join("wireless").exists() || path.join("phy80211").exists() {
+fn classify_adapter(fd: BorrowedFd) -> adapter::AdapterType {
+    if rustix::fs::statat(fd, "wireless", AtFlags::empty()).is_ok()
+        || rustix::fs::statat(fd, "phy80211", AtFlags::empty()).is_ok()
+    {
         adapter::AdapterType::Wifi
-    } else if path.join("bridge").exists() {
+    } else if rustix::fs::statat(fd, "bridge", AtFlags::empty()).is_ok() {
         adapter::AdapterType::Bridge
     } else {
-        match sysfs::read_u32(&path.join("type")) {
+        match sysfs::readat_u32(fd, "type") {
             Some(ARPHRD_LOOPBACK) => adapter::AdapterType::Loopback,
             Some(ARPHRD_ETHER) => adapter::AdapterType::Ethernet,
             Some(ARPHRD_NONE) | Some(ARPHRD_TUNNEL) | Some(ARPHRD_SIT) => {
