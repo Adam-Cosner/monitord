@@ -11,10 +11,20 @@ use rustix::fs::{Mode, OFlags};
 
 /// Reads a string from a given fd, trimming whitespace and converting to a `String`.
 pub fn read_string(fd: BorrowedFd) -> Option<String> {
+    let stat = rustix::fs::fstat(fd.as_fd()).ok()?;
+    // 16 MiB limit
+    if stat.st_size > 16 * 1024 * 1024 {
+        tracing::warn!("read_string: file size {} is too large", stat.st_size);
+        return None;
+    }
     let mut buf = Vec::new();
+    buf.resize(stat.st_size as usize, 0);
     rustix::io::read(fd, &mut buf)
-        .map(|_| String::from_utf8_lossy(buf.as_slice()))
-        .map(|s| s.trim().to_string())
+        .map(|read_bytes| {
+            buf.truncate(read_bytes);
+            let s = String::from_utf8_lossy(buf.as_slice());
+            s.trim().to_string()
+        })
         .ok()
 }
 
