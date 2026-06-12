@@ -376,6 +376,7 @@ enum GpuVendor {
     // TODO: Add support for smaller vendors at a later date
 }
 
+*/
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -403,4 +404,3 @@ mod tests {
         Ok(())
     }
 }
- */
