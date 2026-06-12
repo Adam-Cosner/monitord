@@ -226,34 +226,30 @@ impl super::Card for Card {
     }
 
     fn collect(&mut self, config: &Config) -> anyhow::Result<Gpu> {
-        let drivers = config
-            .drivers
-            .then(|| {
-                Some(Drivers {
-                    kernel: "xe".to_string(),
-                    ..Default::default()
-                })
+        let mut gpu = Gpu::default();
+        gpu.primary_node = self.primary_node.to_string_lossy().to_string();
+        gpu.render_node = self.render_node.to_string_lossy().to_string();
+        gpu.pci_id = rustix::fs::readlinkat(self.card_fd.as_fd(), "device", [])
+            .ok()
+            .and_then(|p| {
+                PathBuf::from(p.to_string_lossy().to_string())
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
             })
             .unwrap_or_default();
-
-        let engines = Vec::new();
-        let clocks = config.clocks.then(|| self.clocks()).unwrap_or_default();
-        let memory = config.memory.then(|| self.memory()).unwrap_or_default();
-        let power = config.power.then(|| self.power()).unwrap_or_default();
-        let thermals = config.thermals.then(|| self.thermals()).unwrap_or_default();
-
-        Ok(Gpu {
-            brand_name: String::new(),
-            primary_node: self.primary_node.to_string_lossy().to_string(),
-            render_node: self.render_node.to_string_lossy().to_string(),
-            drivers,
-            engines,
-            clocks,
-            memory,
-            power,
-            thermals,
-            processes: Vec::new(),
-        })
+        gpu.drivers = config.drivers.then(|| Drivers {
+            kernel: Some(KernelDriver {
+                name: "xe".to_string(),
+                version: None,
+            }),
+            opengl: None,
+            vulkan: None,
+        });
+        gpu.clocks = config.clocks.then(|| self.clocks()).unwrap_or_default();
+        gpu.memory = config.memory.then(|| self.memory()).unwrap_or_default();
+        gpu.power = config.power.then(|| self.power()).unwrap_or_default();
+        gpu.thermals = config.thermals.then(|| self.thermals()).unwrap_or_default();
+        Ok(gpu)
     }
     fn resolve(
         &mut self,

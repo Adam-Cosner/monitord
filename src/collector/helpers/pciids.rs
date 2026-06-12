@@ -63,7 +63,6 @@ impl PciIds {
             }
         }
 
-        tracing::debug!("entries: {:?}", entries);
         Ok(Self { entries })
     }
 

@@ -102,26 +102,34 @@ impl super::Card for Card {
 
     fn collect(&mut self, config: &super::Config) -> anyhow::Result<super::Gpu> {
         rustix::fs::seek(self.gpu_metrics.as_fd(), rustix::fs::SeekFrom::Start(0))?;
-        let gpu_metrics = sysfs::read_bin(self.gpu_metrics.as_fd())
+        let bytes = sysfs::read_bin(self.gpu_metrics.as_fd())
             .ok_or_else(|| anyhow::anyhow!("could not read gpu_metrics file!"))?;
-        let gpu_metrics = gpu_metrics::GpuMetrics::read(&gpu_metrics)?;
+        let gpu_metrics = gpu_metrics::GpuMetrics::read(&bytes)?;
 
         let mut gpu = super::Gpu::default();
-
         gpu.brand_name = self
             .brand_name
             .probe(|| get_brand_name(self.card_fd.as_fd()))
             .cloned()
             .unwrap_or_default();
+        gpu.drivers = config.drivers.then(|| Drivers {
+            kernel: Some(KernelDriver {
+                name: "amdgpu".to_string(),
+                version: None,
+            }),
+            opengl: None,
+            vulkan: None,
+        });
         gpu.primary_node = self.primary_node.to_string_lossy().to_string();
         gpu.render_node = self.render_node.to_string_lossy().to_string();
-
-        gpu.drivers = config.drivers.then(|| Drivers {
-            kernel: "amdgpu".to_string(),
-            opengl: "".to_string(),
-            vulkan: "".to_string(),
-        });
-
+        gpu.pci_id = rustix::fs::readlinkat(self.card_fd.as_fd(), "device", [])
+            .ok()
+            .and_then(|p| {
+                PathBuf::from(p.to_string_lossy().to_string())
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+            })
+            .unwrap_or_default();
         gpu.engines = config
             .engines
             .then(|| gpu_metrics.engines())

@@ -17,6 +17,8 @@ mod nouveau;
 mod nvidia;
 mod xe;
 
+mod api_drivers;
+
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -37,6 +39,7 @@ pub struct Collector {
     pci_ids: Discovery<PciIds>,
     cards: HashMap<CardFileId, Box<dyn Card>>,
     nvml: Discovery<Rc<nvml_wrapper::Nvml>>,
+    drivers: Discovery<api_drivers::DriverInfo>,
 }
 
 impl Default for Collector {
@@ -50,8 +53,9 @@ impl Collector {
         Self {
             drm_root: Discovery::default(),
             pci_ids: Discovery::default(),
-            cards: HashMap::new(),
+            cards: HashMap::default(),
             nvml: Discovery::default(),
+            drivers: Discovery::default(),
         }
     }
 }
@@ -64,6 +68,11 @@ impl super::Collector for Collector {
     }
 
     fn collect(&mut self, config: &crate::metrics::Config) -> anyhow::Result<Self::Output> {
+        tracing::trace!("collecting GPU metrics");
+        let Some(api_drivers) = self.drivers.probe(|| Ok(api_drivers::get_drivers())) else {
+            anyhow::bail!("failed to collect graphics API drivers");
+        };
+
         let Some(config) = &config.gpu else {
             anyhow::bail!("GPU Collector did not receive a config");
         };
@@ -120,14 +129,7 @@ impl super::Collector for Collector {
                     drop(card);
                 }
                 None => {
-                    let device = match new_card(
-                        card,
-                        self.nvml.probe(|| {
-                            nvml_wrapper::Nvml::init()
-                                .map_err(|e| anyhow::anyhow!(e))
-                                .map(Rc::new)
-                        }),
-                    ) {
+                    let device = match new_card(card, &mut self.nvml) {
                         Ok(device) => device,
                         Err(e) => {
                             tracing::warn!("failed to create card tracker: {}", e);
@@ -147,18 +149,38 @@ impl super::Collector for Collector {
                     continue;
                 }
             };
+            // GPU name fallback
             if snap.brand_name.is_empty() {
                 snap.brand_name = sysfs::read_string_path("/usr/share/hwdata/pci.ids")
                     .or_else(|| sysfs::read_string_path("/usr/share/misc/pci.ids"))
                     .and_then(|pci_ids| self.pci_ids.probe(|| PciIds::parse(&pci_ids)))
                     .and_then(|pci_ids| {
                         let (vendor, device, subvendor, subdevice) = gpu.identify();
-                        tracing::info!("looking up PCI ID: vendor={vendor}, device={device}, subvendor={subvendor:?}, subdevice={subdevice:?}");
                         pci_ids.lookup(&vendor, &device, subvendor.as_deref(), subdevice.as_deref())
                     })
                     .map(String::from)
                     .unwrap_or_default();
             }
+            // Driver association
+            if let Some(drivers) = snap.drivers.as_mut() {
+                if let Some(opengl) = api_drivers.gl_drivers.get(
+                    &PathBuf::from(&snap.render_node)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default(),
+                ) {
+                    drivers.opengl = Some(opengl.clone());
+                }
+                if let Some(vulkan) = api_drivers.vk_drivers.get(
+                    &PathBuf::from(&snap.pci_id)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default(),
+                ) {
+                    drivers.vulkan = Some(vulkan.clone());
+                }
+            }
+
             gpus.push(snap);
         }
 
@@ -205,7 +227,7 @@ struct CardFileId {
 
 fn new_card<'a>(
     fd: OwnedFd,
-    nvml: Option<&Rc<nvml_wrapper::Nvml>>,
+    nvml: &mut Discovery<Rc<nvml_wrapper::Nvml>>,
 ) -> anyhow::Result<Box<dyn Card + 'a>> {
     let driver = rustix::fs::readlinkat(fd.as_fd(), "device/driver", Vec::new())?
         .to_string_lossy()
@@ -218,7 +240,11 @@ fn new_card<'a>(
             // match the driver name to the device type
             match name.as_ref() {
                 "nvidia" => {
-                    let Some(nvml) = nvml else {
+                    let Some(nvml) = nvml.probe(|| {
+                        nvml_wrapper::Nvml::init()
+                            .map_err(|e| anyhow::anyhow!(e))
+                            .map(Rc::new)
+                    }) else {
                         anyhow::bail!("nvml not available for nvidia card");
                     };
                     Box::new(nvidia::Card::new(fd, nvml)?) as Box<dyn Card>
@@ -237,170 +263,14 @@ fn new_card<'a>(
     Ok(device)
 }
 
-/*
-mod amd;
-mod intel;
-mod nvidia;
-mod opengl_vulkan;
-
-use anyhow::Context;
-use std::path::PathBuf;
-
-use crate::collector::helpers::*;
-use crate::collector::staging;
-#[doc(inline)]
-pub use crate::metrics::gpu::*;
-
-pub struct Collector {
-    gpus: Vec<GpuCache>,
-    oglv_collector: opengl_vulkan::Collector,
-    nvidia: nvidia::Collector,
-    intel: intel::Collector,
-    amd: amd::Collector,
-}
-
-impl Default for Collector {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl std::fmt::Display for GpuVendor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GpuVendor::Intel => write!(f, "Intel"),
-            GpuVendor::Nvidia => write!(f, "Nvidia"),
-            GpuVendor::Amd => write!(f, "AMD"),
-        }
-    }
-}
-
-impl super::Collector for Collector {
-    type Output = Snapshot;
-
-    fn name(&self) -> &'static str {
-        "gpu"
-    }
-
-    fn collect(&mut self, config: &crate::metrics::Config) -> anyhow::Result<Self::Output> {
-        self.collect_gpus(config.gpu.as_ref())
-            .inspect_err(|e| tracing::error!("collector failed: {e}"))
-    }
-}
-
-impl Collector {
-    pub fn new() -> Self {
-        tracing::info!("creating collector");
-        Collector {
-            gpus: Vec::new(),
-            oglv_collector: opengl_vulkan::Collector::new(),
-            nvidia: nvidia::Collector::new(),
-            intel: intel::Collector::new(),
-            amd: amd::Collector::new(),
-        }
-    }
-
-    /// Collects the GPU metrics and returns a snapshot.
-    fn collect_gpus(&mut self, config: Option<&Config>) -> anyhow::Result<Snapshot> {
-        let mut gpus = Vec::new();
-        let Some(config) = config else {
-            anyhow::bail!("gpu collector did not receive a config");
-        };
-
-        if self.gpus.is_empty() {
-            self.gpus = self.collect_static_info()?;
-        }
-        for gpu in self.gpus.iter() {
-            let snapshot = match gpu.vendor {
-                GpuVendor::Intel => self.intel.collect(&gpu.path, &config),
-                GpuVendor::Nvidia => self.nvidia.collect(&gpu.path, &config),
-                GpuVendor::Amd => self.amd.collect(&gpu.path, &config),
-            };
-
-            match snapshot {
-                Ok(mut snapshot) => {
-                    if config.drivers {
-                        snapshot.drivers.as_mut().map(|drivers| {
-                            drivers.opengl = gpu.opengl_driver.clone();
-                            drivers.vulkan = gpu.vulkan_driver.clone();
-                        });
-                    }
-                    gpus.push(snapshot)
-                }
-                Err(e) => tracing::warn!("failed to collect a GPU's metrics: {}", e),
-            };
-        }
-        Ok(Snapshot { gpus })
-    }
-
-    /// Iterates over /sys/class/drm to find the GPU devices. This is the best way to get them in a consistent order.
-    fn collect_static_info(&mut self) -> anyhow::Result<Vec<GpuCache>> {
-        let mut paths = Vec::new();
-        for entry in std::fs::read_dir("/sys/class/drm")
-            .with_context(|| format!("{} at {}", file!(), line!()))?
-            .flatten()
-            .filter(|entry| entry.file_name().to_string_lossy().starts_with("renderD"))
-        {
-            let path = entry.path();
-
-            // Read vendor name
-            let vendor_path = path.join("device/vendor");
-            let device_path = path.join("device/device");
-            let Some(vendor_val) = sysfs::read_string(&vendor_path) else {
-                continue;
-            };
-            let Some(device_val) = sysfs::read_hex(&device_path) else {
-                continue;
-            };
-
-            let vendor = match vendor_val.as_str() {
-                "0x8086" => GpuVendor::Intel,
-                "0x10de" => GpuVendor::Nvidia,
-                "0x1002" => GpuVendor::Amd,
-                _ => continue,
-            };
-
-            // Get OpenGL and Vulkan drivers
-            let (opengl_driver, vulkan_driver) =
-                self.oglv_collector
-                    .get_drivers(&path, &vendor, device_val as u16);
-
-            paths.push(GpuCache {
-                path,
-                vendor,
-                opengl_driver,
-                vulkan_driver,
-            });
-        }
-        Ok(paths)
-    }
-}
-
-/// Caches information about a GPU device.
-struct GpuCache {
-    path: PathBuf,
-    vendor: GpuVendor,
-    opengl_driver: String,
-    vulkan_driver: String,
-}
-
-/// The vendor of a GPU device.
-enum GpuVendor {
-    Intel,
-    Nvidia,
-    Amd,
-    // TODO: Add support for smaller vendors at a later date
-}
-
-*/
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::collector::Collector;
 
-    #[tracing_test::traced_test]
     #[test]
     fn gpu() -> Result<(), Box<dyn std::error::Error>> {
+        tracing_subscriber::fmt::init();
         let mut collector = super::Collector::new();
         let mut config = crate::metrics::Config::default();
         config.gpu = Some(Config {

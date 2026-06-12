@@ -334,19 +334,19 @@ impl super::Card for Card {
 
     fn collect(&mut self, config: &Config) -> anyhow::Result<super::Gpu> {
         let mut gpu = Gpu::default();
-
         let device = self.nvml.device_by_pci_bus_id(self.pci.clone())?;
-
         gpu.brand_name = device.name().unwrap_or_default();
         gpu.primary_node = self.primary_node.to_string_lossy().to_string();
         gpu.render_node = self.render_node.to_string_lossy().to_string();
-
+        gpu.pci_id = self.pci.clone();
         gpu.drivers = config.drivers.then(|| Drivers {
-            kernel: "nvidia".to_string(),
-            opengl: String::new(),
-            vulkan: String::new(),
+            kernel: Some(KernelDriver {
+                name: "nvidia".to_string(),
+                version: self.nvml.sys_driver_version().ok(),
+            }),
+            opengl: None,
+            vulkan: None,
         });
-
         gpu.engines = config
             .engines
             .then(|| self.engines(&device))
@@ -371,7 +371,6 @@ impl super::Card for Card {
             .processes
             .then(|| self.processes(&device))
             .unwrap_or_default();
-
         Ok(gpu)
     }
 
