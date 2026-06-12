@@ -7,6 +7,109 @@
 syntax = "proto3";
 package metrics.v1.process;
 
-message Snapshot {}
+message Snapshot {
+  map<uint32, Process> processes = 1;
+}
 
-message Config {}
+message Config {
+  bool identity = 1;
+  bool status = 2;
+  bool start_time = 3;
+  bool cpu_usage = 4;
+  bool memory_usage = 5;
+  bool gpu_usage = 6;
+  bool disk_usage = 7;
+  bool net_usage = 8;
+}
+
+message Process {
+  Identity identity = 1;
+
+  Status status = 2;
+  uint64 start_time = 3; // also used for pid reuse validation on process signals
+
+  Usage usage = 4;
+}
+
+message Identity {
+  uint32 pid = 1;
+  uint32 ppid = 2;
+  uint32 uid = 3;
+  uint32 gid = 4;
+
+  int32 session = 5;
+
+  string name = 6;
+  string exe = 7;
+  string cmdline = 8;
+}
+
+enum Status {
+  RUNNING = 0; // R
+  SLEEPING = 1; // S
+  DISK_SLEEP = 2; // D
+  STOPPED = 3; // T
+  TRACING = 4; // t
+  ZOMBIE = 5; // Z
+  IDLE = 6; // I
+
+  // Less common process statuses
+
+  WAKE_KILL = 7; // K
+  WAKING = 8; // W
+  PARKED = 9; // P
+  NO_LOAD = 10; // N
+}
+
+message Usage {
+  CpuUsage cpu = 1;
+  MemoryUsage memory = 2;
+  map<string, GpuUsage> gpu = 3;
+  DiskUsage disk = 4;
+  map<string, NetUsage> net = 5;
+}
+
+message CpuUsage {
+  uint32 usage = 1; // percentage
+  uint32 time = 2; // total process time
+  uint32 threads = 3; // number of threads
+  int32 nice = 4; // the nice level of the process, from -20 (highest priority) to 19 (lowest priority)
+  repeated uint32 affinity = 5; // list of CPU cores the process is bound to
+}
+
+message MemoryUsage {
+  uint64 usage = 1; // resident - shared, good for displaying a single number
+  uint64 resident = 2; // resident
+  uint64 shared = 3; // shared memory
+  uint64 virtual = 4; // virtual memory
+}
+
+message DiskUsage {
+  uint64 read_bytes = 1;
+  uint64 read_total = 2;
+  uint64 write_bytes = 3;
+  uint64 write_total = 4;
+}
+
+message GpuUsage {
+  uint32 client_id = 1; // Used for preventing duplicate counts!
+  repeated GpuEngine engines = 2; // list of GPU engines used by the process
+  uint64 vram_usage = 3; // VRAM usage in bytes
+  uint64 system_usage = 4; // the system memory usage in bytes
+}
+
+message GpuEngine {
+  string name = 1;
+  uint32 utilization = 2; // utilization percentage (accounted for dynamic cycles)
+}
+
+message NetUsage {
+  uint64 recv_bytes = 1; // received bytes since last sample
+  uint64 recv_packets = 2; // received total packets since last sample
+  uint64 recv_errors = 3; // received errors since last sample
+  uint64 recv_drop = 4; // number of packets dropped since last sample
+  uint64 send_bytes = 5; // sent bytes since last sample
+  uint64 send_packets = 6; // sent total packets since last sample
+  uint64 send_errors = 7; // sent errors since last sample
+  uint64 send_drop = 8; // number of packets dropped since last sample
+}
