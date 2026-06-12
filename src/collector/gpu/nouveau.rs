@@ -66,16 +66,24 @@ impl super::Card for Card {
 
     fn collect(&mut self, config: &super::Config) -> anyhow::Result<Gpu> {
         let mut gpu = super::Gpu::default();
-
-        gpu.drivers = config.drivers.then(|| Drivers {
-            kernel: "nouveau".to_string(),
-            opengl: "".to_string(),
-            vulkan: "".to_string(),
-        });
-
         gpu.primary_node = self.primary_node.to_string_lossy().to_string();
         gpu.render_node = self.render_node.to_string_lossy().to_string();
-
+        gpu.pci_id = rustix::fs::readlinkat(self.card_fd.as_fd(), "device", [])
+            .ok()
+            .and_then(|p| {
+                PathBuf::from(p.to_string_lossy().to_string())
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+            })
+            .unwrap_or_default();
+        gpu.drivers = config.drivers.then(|| Drivers {
+            kernel: Some(KernelDriver {
+                name: "nouveau".to_string(),
+                version: None,
+            }),
+            opengl: None,
+            vulkan: None,
+        });
         Ok(gpu)
     }
 
