@@ -19,6 +19,10 @@ impl Card {
 }
 
 impl super::Card for Card {
+    fn identify(&self) -> (String, String, Option<String>, Option<String>) {
+        (String::new(), String::new(), None, None)
+    }
+
     fn collect(&mut self, config: &super::Config) -> anyhow::Result<super::Gpu> {
         todo!()
     }

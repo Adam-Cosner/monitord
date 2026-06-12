@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-use crate::collector::helpers::{discovery::Discovery, sysfs};
+use crate::collector::helpers::sysfs;
 use crate::metrics::gpu::*;
 use std::path::PathBuf;
 
@@ -15,7 +15,6 @@ pub struct Card {
     primary_node: PathBuf,
     render_node: PathBuf,
     render_node_fd: OwnedFd,
-    brand_name: Discovery<String>,
 }
 
 impl Card {
@@ -52,7 +51,6 @@ impl Card {
             primary_node,
             render_node: render_node_path,
             render_node_fd: render_node.ok_or_else(|| anyhow::anyhow!("render node not found"))?,
-            brand_name: Discovery::default(),
         })
     }
 
@@ -154,13 +152,26 @@ impl Card {
 }
 
 impl super::Card for Card {
-    fn collect(&mut self, config: &super::Config) -> anyhow::Result<super::Gpu> {
-        let brand_name = self
-            .brand_name
-            .probe(|| Ok(String::from("todo")))
-            .cloned()
-            .unwrap_or_default();
+    fn identify(&self) -> (String, String, Option<String>, Option<String>) {
+        (
+            sysfs::readat_string(self.card_fd.as_fd(), "device/vendor")
+                .and_then(|v| v.strip_prefix("0x").map(|v| v.to_string()))
+                .map(String::from)
+                .unwrap_or_default(),
+            sysfs::readat_string(self.card_fd.as_fd(), "device/device")
+                .and_then(|d| d.strip_prefix("0x").map(|d| d.to_string()))
+                .map(String::from)
+                .unwrap_or_default(),
+            sysfs::readat_string(self.card_fd.as_fd(), "device/subsystem_vendor")
+                .and_then(|sv| sv.strip_prefix("0x").map(|sv| sv.to_string()))
+                .map(String::from),
+            sysfs::readat_string(self.card_fd.as_fd(), "device/subsystem_device")
+                .and_then(|sd| sd.strip_prefix("0x").map(|sd| sd.to_string()))
+                .map(String::from),
+        )
+    }
 
+    fn collect(&mut self, config: &super::Config) -> anyhow::Result<super::Gpu> {
         let drivers = config
             .drivers
             .then(|| {
@@ -178,7 +189,7 @@ impl super::Card for Card {
         let thermals = config.thermals.then(|| self.thermals()).unwrap_or_default();
 
         Ok(Gpu {
-            brand_name,
+            brand_name: String::new(),
             primary_node: self.primary_node.to_string_lossy().to_string(),
             render_node: self.render_node.to_string_lossy().to_string(),
             drivers,

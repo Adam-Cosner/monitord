@@ -4,10 +4,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-use crate::metrics::gpu::*;
-use std::{os::fd::OwnedFd, path::PathBuf, rc::Rc};
+use crate::{collector::helpers::sysfs, metrics::gpu::*};
+use std::{path::PathBuf, rc::Rc};
+
+use rustix::fd::{AsFd, OwnedFd};
 
 pub struct Card {
+    card_fd: OwnedFd,
     nvml: Rc<nvml_wrapper::Nvml>,
     pci: String,
     primary_node: PathBuf,
@@ -45,6 +48,7 @@ impl Card {
             }
         }
         Ok(Self {
+            card_fd: fd,
             nvml: nvml.clone(),
             pci,
             primary_node,
@@ -309,6 +313,25 @@ impl Card {
 }
 
 impl super::Card for Card {
+    fn identify(&self) -> (String, String, Option<String>, Option<String>) {
+        (
+            sysfs::readat_string(self.card_fd.as_fd(), "device/vendor")
+                .and_then(|v| v.strip_prefix("0x").map(|v| v.to_string()))
+                .map(String::from)
+                .unwrap_or_default(),
+            sysfs::readat_string(self.card_fd.as_fd(), "device/device")
+                .and_then(|d| d.strip_prefix("0x").map(|d| d.to_string()))
+                .map(String::from)
+                .unwrap_or_default(),
+            sysfs::readat_string(self.card_fd.as_fd(), "device/subsystem_vendor")
+                .and_then(|sv| sv.strip_prefix("0x").map(|sv| sv.to_string()))
+                .map(String::from),
+            sysfs::readat_string(self.card_fd.as_fd(), "device/subsystem_device")
+                .and_then(|sd| sd.strip_prefix("0x").map(|sd| sd.to_string()))
+                .map(String::from),
+        )
+    }
+
     fn collect(&mut self, config: &Config) -> anyhow::Result<super::Gpu> {
         let mut gpu = Gpu::default();
 
