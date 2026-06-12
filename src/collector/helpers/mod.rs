@@ -9,5 +9,6 @@
 pub(crate) mod discovery;
 pub(crate) mod fam;
 pub(crate) mod ioctl;
+pub(crate) mod pciids;
 pub(crate) mod sampler;
 pub(crate) mod sysfs;

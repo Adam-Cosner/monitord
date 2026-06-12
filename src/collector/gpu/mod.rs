@@ -23,9 +23,9 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use rustix::fd::{OwnedFd, AsFd}
 use crate::collector::helpers::*;
 use crate::collector::staging;
+use rustix::fd::{AsFd, OwnedFd};
 
 #[doc(inline)]
 pub use crate::metrics::gpu::*;
@@ -34,7 +34,8 @@ pub use crate::metrics::gpu::*;
 pub struct Collector {
     // Optimization so we don't have to traverse to /sys/class/drm every time
     drm_root: discovery::Discovery<OwnedFd>,
-    cards: HashMap<CardIdentity, Box<dyn Card>>,
+    pci_ids: discovery::Discovery<pciids::PciIds>,
+    cards: HashMap<CardFileId, Box<dyn Card>>,
     nvml: discovery::Discovery<Rc<nvml_wrapper::Nvml>>,
 }
 
@@ -48,6 +49,7 @@ impl Collector {
     pub fn new() -> Self {
         Self {
             drm_root: discovery::Discovery::default(),
+            pci_ids: discovery::Discovery::default(),
             cards: HashMap::new(),
             nvml: discovery::Discovery::default(),
         }
@@ -77,7 +79,7 @@ impl super::Collector for Collector {
             .map_err(|e| anyhow::anyhow!(e))
         })?;
 
-        let mut seen: HashSet<CardIdentity> = HashSet::with_capacity(self.cards.len());
+        let mut seen: HashSet<CardFileId> = HashSet::with_capacity(self.cards.len());
         let mut gpus = Vec::new();
 
         let dir = rustix::fs::Dir::read_from(drm_root)?;
@@ -106,7 +108,7 @@ impl super::Collector for Collector {
                 }
             };
             let st = rustix::fs::fstat(&card)?;
-            let id = CardIdentity {
+            let id = CardFileId {
                 dev: st.st_dev,
                 ino: st.st_ino,
             };
@@ -138,13 +140,25 @@ impl super::Collector for Collector {
 
             // Usually I try to avoid unwrap whenever I can but in this case, if it's not present and has hit this part, there's a memory issue
             let gpu = self.cards.get_mut(&id).unwrap();
-            let snap = match gpu.collect(config) {
+            let mut snap = match gpu.collect(config) {
                 Ok(snap) => snap,
                 Err(e) => {
                     tracing::warn!("failed to collect GPU snapshot: {}", e);
                     continue;
                 }
             };
+            if snap.brand_name.is_empty() {
+                snap.brand_name = sysfs::read_string_path("/usr/share/hwdata/pci.ids")
+                    .or_else(|| sysfs::read_string_path("/usr/share/misc/pci.ids"))
+                    .and_then(|pci_ids| self.pci_ids.probe(|| pciids::PciIds::parse(&pci_ids)))
+                    .and_then(|pci_ids| {
+                        let (vendor, device, subvendor, subdevice) = gpu.identify();
+                        tracing::info!("looking up PCI ID: vendor={vendor}, device={device}, subvendor={subvendor:?}, subdevice={subdevice:?}");
+                        pci_ids.lookup(&vendor, &device, subvendor.as_deref(), subdevice.as_deref())
+                    })
+                    .map(String::from)
+                    .unwrap_or_default();
+            }
             gpus.push(snap);
         }
 
@@ -173,6 +187,8 @@ impl super::Resolver for Collector {
 }
 
 trait Card {
+    // Gets the identity of the card (vendor:device:subvendor:subdevice)
+    fn identify(&self) -> (String, String, Option<String>, Option<String>);
     // Collects a single snapshot of the GPU
     fn collect(&mut self, config: &Config) -> anyhow::Result<Gpu>;
     // Gets the primary node for this card (e.g. /dev/dri/card0)
@@ -182,7 +198,7 @@ trait Card {
 }
 
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
-struct CardIdentity {
+struct CardFileId {
     dev: u64,
     ino: u64,
 }
