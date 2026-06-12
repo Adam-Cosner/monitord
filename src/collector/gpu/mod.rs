@@ -86,7 +86,7 @@ impl super::Collector for Collector {
             let entry = entry?;
             let name = entry.file_name().to_string_lossy();
             // skip non card* entries
-            if !name.starts_with("card") || !name.contains("-") || name == "." || name == ".." {
+            if !name.starts_with("card") || name.contains("-") || name == "." || name == ".." {
                 continue;
             }
 
