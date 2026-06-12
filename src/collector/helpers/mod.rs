@@ -7,8 +7,12 @@
 //! Helper modules for the collectors.
 
 pub(crate) mod discovery;
+pub(crate) use discovery::Discovery;
 pub(crate) mod fam;
+pub(crate) use fam::FAM;
 pub(crate) mod ioctl;
 pub(crate) mod pciids;
+pub(crate) use pciids::PciIds;
 pub(crate) mod sampler;
+pub(crate) use sampler::Sampler;
 pub(crate) mod sysfs;

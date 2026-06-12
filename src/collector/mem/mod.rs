@@ -13,7 +13,7 @@
 //! ```
 use std::{collections::BTreeMap, path::PathBuf};
 
-use super::helpers::discovery::Discovery;
+use super::helpers::*;
 use anyhow::Context;
 use procfs::Current;
 

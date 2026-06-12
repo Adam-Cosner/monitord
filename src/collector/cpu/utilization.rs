@@ -10,10 +10,7 @@ use procfs::CurrentSI;
 use rustix::fd::AsFd;
 use rustix::fs::{Mode, OFlags};
 
-use crate::collector::helpers::{
-    sampler::{Differential, Sampler},
-    *,
-};
+use crate::collector::helpers::*;
 
 pub struct Tracker {
     sampler: Sampler<procfs::KernelStats>,
@@ -40,7 +37,7 @@ impl Tracker {
     }
 }
 
-impl Differential for procfs::KernelStats {
+impl sampler::Differential for procfs::KernelStats {
     type Delta = Vec<Utilization>;
 
     fn delta(&self, other: &Self) -> Self::Delta {
