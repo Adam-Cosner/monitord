@@ -221,7 +221,7 @@ mod drm_i915 {
     pub struct QueryMemoryRegions {
         pub num_regions: u32,
         _rsvd: [u32; 3], // reserved
-        pub regions: fam::FAM<MemoryRegionInfo>,
+        pub regions: FAM<MemoryRegionInfo>,
     }
 
     /// Represents a memory region accessible to the GPU

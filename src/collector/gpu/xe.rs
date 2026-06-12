@@ -334,7 +334,7 @@ mod drm_xe {
     pub struct MemRegions {
         pub num_mem_regions: u32,
         pub _pad: u32,
-        pub regions: fam::FAM<MemRegion>,
+        pub regions: FAM<MemRegion>,
     }
 
     /// struct drm_xe_mem_region (linux/include/uapi/drm/xe_drm.h)
