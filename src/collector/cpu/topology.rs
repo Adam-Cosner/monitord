@@ -4,12 +4,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 //! CPU topology discovery and cache
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-};
+use std::collections::BTreeMap;
 
 use procfs::Current;
+use rustix::fd::{AsFd, BorrowedFd};
+use rustix::fs::{Mode, OFlags};
 
 use crate::collector::helpers::sysfs;
 
@@ -168,26 +167,36 @@ impl Topology {
             .map(|c| c.threads.len() as u32)
             .unwrap_or(1);
 
-        let cache_dir = PathBuf::from(format!("/sys/devices/system/cpu/cpu{cpu_idx}/cache"));
-        let Ok(entries) = std::fs::read_dir(&cache_dir) else {
+        let Ok(cache_dir) = rustix::fs::open(
+            format!("/sys/devices/system/cpu/cpu{cpu_idx}/cache"),
+            OFlags::RDONLY | OFlags::CLOEXEC | OFlags::DIRECTORY,
+            Mode::empty(),
+        ) else {
+            return;
+        };
+        let Ok(entries) = rustix::fs::Dir::read_from(cache_dir.as_fd()) else {
             return;
         };
 
         for entry in entries.flatten() {
-            let path = entry.path();
-
-            if !path
-                .file_name()
-                .is_some_and(|n| n.to_string_lossy().starts_with("index"))
-            {
+            if !entry.file_name().to_string_lossy().starts_with("index") {
                 continue;
             }
 
-            let Some(cache) = Cache::from_sysfs(&path) else {
+            let Ok(cache_entry) = rustix::fs::openat(
+                cache_dir.as_fd(),
+                entry.file_name(),
+                OFlags::RDONLY | OFlags::CLOEXEC | OFlags::DIRECTORY,
+                Mode::empty(),
+            ) else {
                 continue;
             };
 
-            let shared_count = sysfs::read_string(&path.join("shared_cpu_list"))
+            let Some(cache) = Cache::from_sysfs(cache_entry.as_fd()) else {
+                continue;
+            };
+
+            let shared_count = sysfs::readat_string(cache_entry.as_fd(), "shared_cpu_list")
                 .and_then(|s| sysfs::count_cpu_list(&s))
                 .unwrap_or(1);
 
@@ -308,13 +317,22 @@ impl Package {
 impl Core {
     /// Creates a [`Core`] from the sysfs information for a given CPU index.
     fn from_sysfs(cpu_idx: u32) -> Self {
-        let min_freq_mhz = sysfs::read_u32(&PathBuf::from(format!(
-            "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/cpuinfo_min_freq"
-        )))
+        let min_freq_mhz = rustix::fs::open(
+            format!("/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/cpuinfo_min_freq"),
+            OFlags::RDONLY | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .ok()
+        .and_then(|fd| sysfs::read_u32(fd.as_fd()))
         .unwrap_or(0);
-        let max_freq_mhz = sysfs::read_u32(&PathBuf::from(format!(
-            "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/cpuinfo_max_freq"
-        )))
+
+        let max_freq_mhz = rustix::fs::open(
+            format!("/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/cpuinfo_max_freq"),
+            OFlags::RDONLY | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .ok()
+        .and_then(|fd| sysfs::read_u32(fd.as_fd()))
         .unwrap_or(0);
         Self {
             min_freq_mhz,
@@ -327,20 +345,14 @@ impl Core {
 
 impl Cache {
     /// Creates a [`Cache`] from the sysfs information for a given cache path.
-    fn from_sysfs(path: &Path) -> Option<Self> {
-        let level = sysfs::read_u32(&path.join("level")).unwrap_or(0);
-        let cache_type = CacheType::from(
-            sysfs::read_string(&path.join("type"))
-                .unwrap_or_default()
-                .as_str(),
-        );
-        let size_kb = sysfs::read_string(&path.join("size"))
-            .as_ref()
-            .and_then(|s| s.strip_suffix('K'))
-            .and_then(|s| s.parse::<u32>().ok())
-            .unwrap_or(0);
-        let line_size_bytes = sysfs::read_u32(&path.join("coherency_line_size")).unwrap_or(0);
-        let associativity = sysfs::read_u32(&path.join("ways_of_associativity")).unwrap_or(0);
+    fn from_sysfs(fd: BorrowedFd) -> Option<Self> {
+        let level = sysfs::readat_u32(fd, "level").unwrap_or(0);
+        let cache_type = sysfs::readat_string(fd, "type")
+            .map(|ty| CacheType::from(ty.as_str()))
+            .unwrap_or(CacheType::Unknown);
+        let size_kb = sysfs::readat_u32(fd, "size").unwrap_or(0);
+        let line_size_bytes = sysfs::readat_u32(fd, "coherency_line_size").unwrap_or(0);
+        let associativity = sysfs::readat_u32(fd, "ways_of_associativity").unwrap_or(0);
         Some(Self {
             level,
             cache_type,
@@ -363,29 +375,24 @@ impl From<&str> for CacheType {
 }
 
 fn read_cluster_id(cpu_idx: u32) -> u32 {
-    let die_id_path = PathBuf::from(format!(
+    sysfs::read_u32_path(format!(
         "/sys/devices/system/cpu/cpu{cpu_idx}/topology/die_id"
-    ));
-    sysfs::read_u32(&die_id_path).unwrap_or(0)
+    ))
+    .unwrap_or(0)
 }
 
 fn get_cpufreq_info(cpu_idx: u32) -> (String, String, Option<String>) {
-    let driver = sysfs::read_string(&PathBuf::from(format!(
-        "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/scaling_driver"
-    )))
-    .unwrap_or_default();
-    let governor = sysfs::read_string(&PathBuf::from(format!(
-        "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/scaling_governor"
-    )))
-    .unwrap_or_default();
-    let mode = match driver.as_str() {
-        "intel_pstate" => sysfs::read_string(&PathBuf::from(
-            "/sys/devices/system/cpu/intel_pstate/status",
-        )),
-        "amd-pstate" | "amd-pstate-epp" => {
-            sysfs::read_string(&PathBuf::from("/sys/devices/system/cpu/amd_pstate/status"))
-        }
-        _ => None,
+    let Some(cpufreq) = rustix::fs::open(
+        format!("/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq"),
+        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::DIRECTORY,
+        Mode::empty(),
+    )
+    .ok() else {
+        return (String::new(), String::new(), None);
     };
+    let driver = sysfs::readat_string(cpufreq.as_fd(), "scaling_driver").unwrap_or_default();
+    let governor = sysfs::readat_string(cpufreq.as_fd(), "scaling_governor").unwrap_or_default();
+    let mode = sysfs::read_string_path("/sys/devices/system/cpu/intel_pstate/status")
+        .or_else(|| sysfs::read_string_path("/sys/devices/system/cpu/amd_pstate/status"));
     (driver, governor, mode)
 }

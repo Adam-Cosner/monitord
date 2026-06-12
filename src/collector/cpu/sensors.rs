@@ -5,9 +5,11 @@
  */
 //! CPU temperature and power sensor tracking.
 
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
+use std::collections::BTreeMap;
+
+use rustix::{
+    fd::{AsFd, BorrowedFd, OwnedFd},
+    fs::{Mode, OFlags},
 };
 
 use crate::collector::helpers::{
@@ -17,7 +19,7 @@ use crate::collector::helpers::{
 };
 
 /// Tracker for the CPU sensors.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Tracker {
     sources: Discovery<Sources>,
     last_energy: BTreeMap<u32, Sampler<u64>>, // for RAPL diff
@@ -102,34 +104,34 @@ impl Differential for u64 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct Sources {
     thermal: BTreeMap<u32, ThermalSource>,
     power: BTreeMap<u32, PowerSource>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum ThermalSource {
     /// Intel coretemp via platform hwmon
-    Coretemp { hwmon: PathBuf },
+    Coretemp { hwmon: OwnedFd },
     /// AMD k10temp via PCI hwmon
-    K10temp { hwmon: PathBuf },
+    K10temp { hwmon: OwnedFd },
     /// AMD zenpower (third-party, mutually exclusive with k10temp)
-    Zenpower { hwmon: PathBuf },
+    Zenpower { hwmon: OwnedFd },
     /// VIA/Centaur via platform hwmon
-    ViaCputemp { hwmon: PathBuf },
+    ViaCputemp { hwmon: OwnedFd },
     /// ARM or generic thermal zone fallback
-    ThermalZone { zone: PathBuf },
+    ThermalZone { zone: OwnedFd },
     /// No supported source found
     None,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum PowerSource {
     /// Intel RAPL energy counters (requires two-sample diffing)
-    Rapl { energy_path: PathBuf },
+    Rapl { energy_path: OwnedFd },
     /// AMD power via same hwmon as thermal (instantaneous reading)
-    Hwmon { path: PathBuf },
+    Hwmon { path: OwnedFd },
     /// No supported source found
     None,
 }
@@ -187,9 +189,9 @@ impl Sources {
         for (&package_id, source) in self.power.iter() {
             let watts = match source {
                 PowerSource::Rapl { energy_path } => {
-                    read_rapl_energy(package_id, energy_path, last_energy)
+                    read_rapl_energy(package_id, energy_path.as_fd(), last_energy)
                 }
-                PowerSource::Hwmon { path } => sysfs::read_hwmon_power(path),
+                PowerSource::Hwmon { path } => sysfs::read_hwmon_power(path.as_fd()),
                 PowerSource::None => None,
             };
             package.insert(package_id, watts);
@@ -210,11 +212,9 @@ fn detect_thermal(package_id: u32, vendor: &str) -> ThermalSource {
 }
 
 fn detect_coretemp(package_id: u32) -> ThermalSource {
-    let platform = PathBuf::from(format!("/sys/devices/platform/coretemp.{package_id}/hwmon"));
-    match sysfs::first_hwmon_subdir(&platform) {
-        Some(hwmon) => ThermalSource::Coretemp { hwmon },
-        None => detect_thermal_zone(),
-    }
+    sysfs::first_hwmon_subdir_path(format!("/sys/devices/platform/coretemp.{package_id}/hwmon"))
+        .map(|hwmon| ThermalSource::Coretemp { hwmon })
+        .unwrap_or_else(|| detect_thermal_zone())
 }
 
 fn detect_amd_thermal() -> ThermalSource {
@@ -228,18 +228,30 @@ fn detect_amd_thermal() -> ThermalSource {
 }
 
 fn detect_via_thermal(package_id: u32) -> ThermalSource {
-    let platform = PathBuf::from(format!(
-        "/sys/devices/platform/via_cputemp.{package_id}/hwmon"
-    ));
-    match sysfs::first_hwmon_subdir(&platform) {
+    let Ok(platform) = rustix::fs::open(
+        format!("/sys/devices/platform/via_cputemp.{package_id}/hwmon"),
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+        Mode::empty(),
+    ) else {
+        tracing::warn!("Failed to open via_cputemp hwmon");
+        return detect_thermal_zone();
+    };
+    match sysfs::first_hwmon_subdir(platform.as_fd()) {
         Some(hwmon) => ThermalSource::ViaCputemp { hwmon },
         None => detect_thermal_zone(),
     }
 }
 
 fn detect_thermal_zone() -> ThermalSource {
-    let thermal_dir = PathBuf::from("/sys/class/thermal");
-    let Ok(entries) = std::fs::read_dir(&thermal_dir) else {
+    let Ok(thermal_dir) = rustix::fs::open(
+        "/sys/class/thermal",
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+        Mode::empty(),
+    ) else {
+        tracing::warn!("Failed to open thermal hwmon");
+        return ThermalSource::None;
+    };
+    let Ok(entries) = rustix::fs::Dir::read_from(thermal_dir.as_fd()) else {
         return ThermalSource::None;
     };
 
@@ -254,18 +266,27 @@ fn detect_thermal_zone() -> ThermalSource {
     ];
 
     for entry in entries.flatten() {
-        let path = entry.path();
-        if !path
+        if !entry
             .file_name()
-            .is_some_and(|n| n.to_string_lossy().starts_with("thermal_zone"))
+            .to_string_lossy()
+            .starts_with("thermal_zone")
         {
             continue;
         }
-        if let Some(zone_type) = sysfs::read_string(&path.join("type")) {
-            let lower = zone_type.to_lowercase();
-            if cpu_zone_types.iter().any(|pat| lower.contains(pat)) {
-                return ThermalSource::ThermalZone { zone: path };
-            }
+        let Ok(zone) = rustix::fs::openat(
+            thermal_dir.as_fd(),
+            entry.file_name().to_string_lossy(),
+            OFlags::RDONLY | OFlags::CLOEXEC | OFlags::DIRECTORY,
+            Mode::empty(),
+        ) else {
+            continue;
+        };
+        let Some(zone_type) = sysfs::readat_string(zone.as_fd(), "type") else {
+            continue;
+        };
+        let lower = zone_type.to_lowercase();
+        if cpu_zone_types.iter().any(|pat| lower.contains(pat)) {
+            return ThermalSource::ThermalZone { zone };
         }
     }
 
@@ -282,27 +303,35 @@ fn detect_power(package_id: u32, vendor: &str) -> PowerSource {
 }
 
 fn detect_rapl(package_id: u32) -> PowerSource {
-    let energy_path = PathBuf::from(format!(
-        "/sys/class/powercap/intel-rapl:{package_id}/energy_uj"
-    ));
-    if energy_path.exists() {
-        PowerSource::Rapl { energy_path }
-    } else {
-        PowerSource::None
-    }
+    let Ok(energy_path) = rustix::fs::open(
+        format!("/sys/class/powercap/intel-rapl:{package_id}/energy_uj"),
+        OFlags::RDONLY | OFlags::CLOEXEC,
+        Mode::empty(),
+    ) else {
+        return PowerSource::None;
+    };
+    PowerSource::Rapl { energy_path }
 }
 
 fn detect_amd_power() -> PowerSource {
     // AMD exposes power through the same hwmon as thermal ON SOME SYSTEMS
     if let Some(hwmon) = sysfs::find_pci_driver_hwmon("zenpower") {
-        let path = hwmon.join("power1_input");
-        if path.exists() {
+        if let Ok(path) = rustix::fs::openat(
+            hwmon.as_fd(),
+            "power1_input",
+            OFlags::RDONLY | OFlags::CLOEXEC,
+            Mode::empty(),
+        ) {
             return PowerSource::Hwmon { path };
         }
     }
     if let Some(hwmon) = sysfs::find_pci_driver_hwmon("k10temp") {
-        let path = hwmon.join("power1_input");
-        if path.exists() {
+        if let Ok(path) = rustix::fs::openat(
+            hwmon.as_fd(),
+            "power1_input",
+            OFlags::RDONLY | OFlags::CLOEXEC,
+            Mode::empty(),
+        ) {
             return PowerSource::Hwmon { path };
         }
     }
@@ -315,14 +344,16 @@ fn read_package_temp(source: &ThermalSource) -> Option<f32> {
     match source {
         ThermalSource::Coretemp { hwmon } => {
             // temp1_input is typically the package temperature
-            sysfs::read_hwmon_temp(&hwmon.join("temp1_input"))
+            sysfs::readat_hwmon_temp(hwmon.as_fd(), "temp1_input")
         }
         ThermalSource::K10temp { hwmon } | ThermalSource::Zenpower { hwmon } => {
             // Tctl or Tdie — temp1 is usually Tctl
-            sysfs::read_hwmon_temp(&hwmon.join("temp1_input"))
+            sysfs::readat_hwmon_temp(hwmon.as_fd(), "temp1_input")
         }
-        ThermalSource::ViaCputemp { hwmon } => sysfs::read_hwmon_temp(&hwmon.join("temp1_input")),
-        ThermalSource::ThermalZone { zone } => sysfs::read_hwmon_temp(&zone.join("temp")),
+        ThermalSource::ViaCputemp { hwmon } => {
+            sysfs::readat_hwmon_temp(hwmon.as_fd(), "temp1_input")
+        }
+        ThermalSource::ThermalZone { zone } => sysfs::readat_hwmon_temp(zone.as_fd(), "temp"),
         ThermalSource::None => None,
     }
 }
@@ -332,8 +363,7 @@ fn read_cluster_temp(source: &ThermalSource, cluster_id: u32) -> Option<f32> {
         ThermalSource::K10temp { hwmon } | ThermalSource::Zenpower { hwmon } => {
             // CCD temperatures: temp3_input, temp4_input, etc.
             // CCD n maps to temp(n+3)_input on most AMD chips
-            let path = hwmon.join(format!("temp{}_input", cluster_id + 3));
-            sysfs::read_hwmon_temp(&path)
+            sysfs::readat_hwmon_temp(hwmon.as_fd(), &format!("temp{}_input", cluster_id + 3))
         }
         _ => None, // Most other sources don't expose per-cluster temps
     }
@@ -343,8 +373,7 @@ fn read_core_temp(source: &ThermalSource, core_id: u32) -> Option<f32> {
     match source {
         ThermalSource::Coretemp { hwmon } => {
             // Core temps start at temp2_input (temp1 is package)
-            let path = hwmon.join(format!("temp{}_input", core_id + 2));
-            sysfs::read_hwmon_temp(&path)
+            sysfs::readat_hwmon_temp(hwmon.as_fd(), &format!("temp{}_input", core_id + 2))
         }
         _ => None, // AMD k10temp/zenpower don't expose per-core temps
     }
@@ -354,10 +383,10 @@ fn read_core_temp(source: &ThermalSource, core_id: u32) -> Option<f32> {
 
 fn read_rapl_energy(
     package_id: u32,
-    energy_path: &Path,
+    energy_path: BorrowedFd,
     energy: &mut BTreeMap<u32, Sampler<u64>>,
 ) -> Option<f32> {
-    let energy_uj = sysfs::read_u64(energy_path).unwrap_or_default();
+    let energy_uj = sysfs::read_u64(energy_path.as_fd()).unwrap_or_default();
     let delta = energy
         .entry(package_id)
         .or_insert_with(Sampler::new)

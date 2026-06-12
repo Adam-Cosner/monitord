@@ -7,7 +7,8 @@
 //! CPU utilization tracking.
 
 use procfs::CurrentSI;
-use std::path::PathBuf;
+use rustix::fd::AsFd;
+use rustix::fs::{Mode, OFlags};
 
 use crate::collector::helpers::{
     sampler::{Differential, Sampler},
@@ -90,9 +91,13 @@ fn cpu_times(time: &procfs::CpuTime) -> (u64, u64) {
 }
 
 fn get_cur_freq_mhz(cpu_idx: usize) -> u32 {
-    sysfs::read_u32(&PathBuf::from(format!(
-        "/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/scaling_cur_freq"
-    )))
+    rustix::fs::open(
+        format!("/sys/devices/system/cpu/cpu{cpu_idx}/cpufreq/scaling_cur_freq"),
+        OFlags::RDONLY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .ok()
+    .and_then(|fd| sysfs::read_u32(fd.as_fd()))
     .unwrap_or(0)
         / 1000
 }

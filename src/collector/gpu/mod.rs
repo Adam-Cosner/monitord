@@ -19,10 +19,11 @@ mod xe;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::os::fd::OwnedFd;
+
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use rustix::fd::{OwnedFd, AsFd}
 use crate::collector::helpers::*;
 use crate::collector::staging;
 
@@ -190,7 +191,7 @@ fn new_card<'a>(
     fd: OwnedFd,
     nvml: Option<&Rc<nvml_wrapper::Nvml>>,
 ) -> anyhow::Result<Box<dyn Card + 'a>> {
-    let driver = rustix::fs::readlinkat(&fd, "device/driver", Vec::new())?
+    let driver = rustix::fs::readlinkat(fd.as_fd(), "device/driver", Vec::new())?
         .to_string_lossy()
         .to_string();
     let device = match PathBuf::from(driver)
