@@ -17,7 +17,6 @@ use super::helpers::discovery::Discovery;
 use anyhow::Context;
 use procfs::Current;
 
-use crate::collector::staging;
 #[doc(inline)]
 pub use crate::metrics::memory::*;
 
