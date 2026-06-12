@@ -17,7 +17,6 @@ mod sensors;
 mod topology;
 mod utilization;
 
-use crate::collector::staging;
 #[doc(inline)]
 pub use crate::metrics::cpu::*;
 
