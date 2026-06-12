@@ -7,6 +7,7 @@ pub mod cpu;
 pub mod gpu;
 pub mod mem;
 pub mod net;
+pub mod process;
 pub mod staging;
 
 /// Trait for independent data collection
@@ -32,5 +33,4 @@ pub trait Resolver: Collector {
     ) -> anyhow::Result<Self::Output>;
 }
 
-#[cfg(feature = "collector")]
 pub(crate) mod helpers;
