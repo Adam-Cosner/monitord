@@ -104,90 +104,99 @@ mod opengl {
                     };
 
                     // process each device
-                    let display = unsafe {
-                        lib.get_platform_display(
+                    unsafe {
+                        let Ok(display) = lib.get_platform_display(
                             egl::EGL_PLATFORM_DEVICE_EXT,
                             device as *mut egl::c_void,
                             &[egl::ATTRIB_NONE],
-                        )
-                    }?;
-                    if lib.initialize(display).is_ok() {
-                        let display_extensions = lib
-                            .query_string(Some(display), egl::EXTENSIONS)?
-                            .to_string_lossy();
-
-                        if lib.bind_api(egl::OPENGL_API).is_ok()
-                            && display_extensions.contains("EGL_KHR_no_config_context")
-                            && display_extensions.contains("EGL_KHR_surfaceless_context")
-                        {
-                            let Ok(context) = lib.create_context(
-                                display,
-                                unsafe { egl::Config::from_ptr(std::ptr::null_mut()) },
-                                None,
-                                &[egl::NONE],
-                            ) else {
+                        ) else {
+                            continue;
+                        };
+                        if lib.initialize(display).is_ok() {
+                            let Ok(display_extensions) = lib
+                                .query_string(Some(display), egl::EXTENSIONS)
+                                .map(|s| s.to_string_lossy().into_owned())
+                            else {
                                 continue;
                             };
-                            lib.make_current(display, None, None, Some(context))?;
 
-                            gl::GetString::load_with(|name| {
-                                lib.get_proc_address(name)
-                                    .map(|p| p as *const c_void)
-                                    .unwrap_or(std::ptr::null())
-                            });
-
-                            if gl::GetString::is_loaded() {
-                                let version =
-                                    unsafe {
-                                        std::ffi::CStr::from_ptr(
-                                            gl::GetString(gl::VERSION) as *const i8
-                                        )
-                                    }
-                                    .to_string_lossy()
-                                    .to_string();
-                                let renderer = unsafe {
-                                    std::ffi::CStr::from_ptr(
-                                        gl::GetString(gl::RENDERER) as *const i8
-                                    )
-                                }
-                                .to_string_lossy()
-                                .to_string();
-
-                                // get short names for the common opengl drivers
-                                let name = if renderer.contains("zink") {
-                                    "zink".to_string()
-                                } else if renderer.contains("radeonsi") {
-                                    "radeonsi".to_string()
-                                } else if renderer.contains("nouveau") {
-                                    "nouveau".to_string()
-                                } else if renderer.contains("nvidia") {
-                                    "nvidia".to_string()
-                                } else {
-                                    renderer
+                            if lib.bind_api(egl::OPENGL_API).is_ok()
+                                && display_extensions.contains("EGL_KHR_no_config_context")
+                                && display_extensions.contains("EGL_KHR_surfaceless_context")
+                            {
+                                let Ok(context) = lib.create_context(
+                                    display,
+                                    egl::Config::from_ptr(std::ptr::null_mut()),
+                                    None,
+                                    &[egl::NONE],
+                                ) else {
+                                    continue;
+                                };
+                                let Ok(_) = lib.make_current(display, None, None, Some(context))
+                                else {
+                                    continue;
                                 };
 
-                                drivers.insert(
-                                    render_node,
-                                    ApiDriver {
-                                        name,
-                                        driver_version: version
-                                            .split_whitespace()
-                                            .skip(3)
-                                            .map(|v| v.to_string())
-                                            .collect::<Vec<_>>()
-                                            .join(" "),
-                                        api_version: version
-                                            .split_whitespace()
-                                            .nth(0)
-                                            .map(|v| v.to_string())
-                                            .unwrap_or("unknown".to_string()),
-                                    },
-                                );
-                            }
+                                gl::GetString::load_with(|name| {
+                                    lib.get_proc_address(name)
+                                        .map(|p| p as *const c_void)
+                                        .unwrap_or(std::ptr::null())
+                                });
 
-                            lib.destroy_context(display, context)?;
+                                if gl::GetString::is_loaded() {
+                                    let version = std::ffi::CStr::from_ptr(gl::GetString(
+                                        gl::VERSION,
+                                    )
+                                        as *const i8)
+                                    .to_string_lossy()
+                                    .to_string();
+                                    let renderer = std::ffi::CStr::from_ptr(gl::GetString(
+                                        gl::RENDERER,
+                                    )
+                                        as *const i8)
+                                    .to_string_lossy()
+                                    .to_string();
+
+                                    // get short names for the common opengl drivers
+                                    let name = if renderer.contains("zink") {
+                                        "zink".to_string()
+                                    } else if renderer.contains("radeonsi") {
+                                        "radeonsi".to_string()
+                                    } else if renderer.contains("nouveau") {
+                                        "nouveau".to_string()
+                                    } else if renderer.contains("nvidia") {
+                                        "nvidia".to_string()
+                                    } else {
+                                        renderer
+                                    };
+
+                                    drivers.insert(
+                                        render_node,
+                                        ApiDriver {
+                                            name,
+                                            driver_version: version
+                                                .split_whitespace()
+                                                .skip(3)
+                                                .map(|v| v.to_string())
+                                                .collect::<Vec<_>>()
+                                                .join(" "),
+                                            api_version: version
+                                                .split_whitespace()
+                                                .nth(0)
+                                                .map(|v| v.to_string())
+                                                .unwrap_or("unknown".to_string()),
+                                        },
+                                    );
+                                }
+
+                                let Ok(_) = lib.destroy_context(display, context) else {
+                                    continue;
+                                };
+                            }
+                            let Ok(_) = lib.terminate(display) else {
+                                continue;
+                            };
                         }
-                        lib.terminate(display)?;
                     }
                 }
             }
@@ -369,228 +378,3 @@ mod vulkan {
         Ok(drivers)
     }
 }
-/*
-
-impl OpenglInfo {
-    /// Yeah this is ugly as hell but it's better than pulling in glutin or something which is bloated for this use case
-    pub fn init() -> anyhow::Result<OpenglInfo> {
-        let mut drivers = HashMap::new();
-        let lib = unsafe { egl::DynamicInstance::<egl::EGL1_5>::load_required() }?;
-        let egl_client_extensions = lib.query_string(None, egl::EXTENSIONS)?.to_string_lossy();
-
-        // set EGL debug callback function for nice error messages
-        if egl_client_extensions.contains("EGL_KHR_debug") {
-            #[allow(non_snake_case)]
-            let Some(eglDebugMessageControlKHR) = (unsafe {
-                lib.get_proc_address("eglDebugMessageControlKHR")
-                    .map(|proc| {
-                        std::mem::transmute::<_, egl::PFNEGLDEBUGMESSAGECONTROLKHRPROC>(proc)
-                    })
-            }) else {
-                return Ok(OpenglInfo { drivers });
-            };
-            let attrib = [
-                egl::EGL_DEBUG_MSG_WARNING_KHR as egl::Attrib,
-                egl::TRUE as egl::Attrib,
-                egl::EGL_DEBUG_MSG_INFO_KHR as egl::Attrib,
-                egl::TRUE as egl::Attrib,
-                egl::NONE as egl::Attrib,
-            ];
-            unsafe { eglDebugMessageControlKHR(egl_debug_callback, attrib.as_ptr()) };
-        }
-
-        if egl_client_extensions.contains("EGL_EXT_device_base") {
-            #[allow(non_snake_case)]
-            let eglQueryDevicesEXT: egl::PFNEGLQUERYDEVICESEXTPROC =
-                unsafe { std::mem::transmute(lib.get_proc_address("eglQueryDevicesEXT").unwrap()) };
-            let mut device_count = 0i32;
-            unsafe { eglQueryDevicesEXT(0, std::ptr::null_mut(), &mut device_count) };
-            let mut devices: Vec<egl::EGLDeviceEXT> = Vec::new();
-            devices.resize(device_count as usize, std::ptr::null());
-            unsafe { eglQueryDevicesEXT(device_count, devices.as_mut_ptr(), &mut device_count) };
-
-            #[allow(non_snake_case)]
-            let eglQueryDeviceStringEXT: egl::PFNEGLQUERYDEVICESTRINGEXTPROC = unsafe {
-                std::mem::transmute(lib.get_proc_address("eglQueryDeviceStringEXT").unwrap())
-            };
-            for &device in devices.iter() {
-                // Read device extensions
-                let device_extensions = unsafe {
-                    std::ffi::CStr::from_ptr(eglQueryDeviceStringEXT(device, egl::EXTENSIONS))
-                }
-                .to_string_lossy();
-
-                if device_extensions.contains("EGL_EXT_device_drm_render_node") {
-                    let Some(render_node) = PathBuf::from(
-                        unsafe {
-                            let rn =
-                                eglQueryDeviceStringEXT(device, egl::EGL_DRM_RENDER_NODE_FILE_EXT);
-                            if rn == std::ptr::null() {
-                                continue;
-                            }
-                            std::ffi::CStr::from_ptr(rn)
-                        }
-                        .to_string_lossy()
-                        .to_string(),
-                    )
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|n| n.to_string()) else {
-                        continue;
-                    };
-
-                    // process each device
-                    let display = unsafe {
-                        lib.get_platform_display(
-                            egl::EGL_PLATFORM_DEVICE_EXT,
-                            device as *mut egl::c_void,
-                            &[egl::ATTRIB_NONE],
-                        )
-                    }?;
-                    if lib.initialize(display).is_ok() {
-                        let display_extensions = lib
-                            .query_string(Some(display), egl::EXTENSIONS)?
-                            .to_string_lossy();
-
-                        if lib.bind_api(egl::OPENGL_API).is_ok()
-                            && display_extensions.contains("EGL_KHR_no_config_context")
-                            && display_extensions.contains("EGL_KHR_surfaceless_context")
-                        {
-                            let Ok(context) = lib.create_context(
-                                display,
-                                unsafe { egl::Config::from_ptr(std::ptr::null_mut()) },
-                                None,
-                                &[egl::NONE],
-                            ) else {
-                                continue;
-                            };
-                            lib.make_current(display, None, None, Some(context))?;
-
-                            gl::GetString::load_with(|name| {
-                                lib.get_proc_address(name)
-                                    .map(|p| p as *const c_void)
-                                    .unwrap_or(std::ptr::null())
-                            });
-
-                            if gl::GetString::is_loaded() {
-                                let version =
-                                    unsafe {
-                                        std::ffi::CStr::from_ptr(
-                                            gl::GetString(gl::VERSION) as *const i8
-                                        )
-                                    }
-                                    .to_string_lossy()
-                                    .to_string();
-                                let renderer = unsafe {
-                                    std::ffi::CStr::from_ptr(
-                                        gl::GetString(gl::RENDERER) as *const i8
-                                    )
-                                }
-                                .to_string_lossy()
-                                .to_string();
-
-                                // get short names for the common opengl drivers
-                                let name = if renderer.contains("zink") {
-                                    "zink".to_string()
-                                } else if renderer.contains("radeonsi") {
-                                    "radeonsi".to_string()
-                                } else if renderer.contains("nouveau") {
-                                    "nouveau".to_string()
-                                } else if renderer.contains("nvidia") {
-                                    "nvidia".to_string()
-                                } else {
-                                    renderer
-                                };
-
-                                drivers.insert(
-                                    render_node,
-                                    GlDriverInfo {
-                                        name,
-                                        version: version
-                                            .split_whitespace()
-                                            .nth(0)
-                                            .map(|v| v.to_string())
-                                            .unwrap_or("unknown".to_string()),
-                                        driver_info: version
-                                            .split_whitespace()
-                                            .skip(3)
-                                            .map(|v| v.to_string())
-                                            .collect::<Vec<_>>()
-                                            .join(" "),
-                                    },
-                                );
-                            }
-
-                            lib.destroy_context(display, context)?;
-                        }
-                        lib.terminate(display)?;
-                    }
-                }
-            }
-        }
-
-        Ok(OpenglInfo { drivers })
-    }
-}
-
-struct VulkanInfo {
-    drivers: HashMap<DeviceId, VkDriverInfo>,
-}
-
-impl VulkanInfo {
-    pub fn init() -> anyhow::Result<VulkanInfo> {
-        use ash::vk;
-        let entry = unsafe { ash::Entry::load()? };
-        let api_version =
-            unsafe { entry.try_enumerate_instance_version() }?.unwrap_or(vk::API_VERSION_1_0);
-        let application_info = vk::ApplicationInfo::default().api_version(api_version);
-        let instance_info = vk::InstanceCreateInfo::default().application_info(&application_info);
-        let instance = unsafe { entry.create_instance(&instance_info, None)? };
-
-        let physical_devices = unsafe { instance.enumerate_physical_devices() }?;
-
-        let mut drivers = HashMap::new();
-        for physical_device in physical_devices.iter() {
-            let mut driver_props = vk::PhysicalDeviceDriverProperties::default();
-            let mut props2 = vk::PhysicalDeviceProperties2::default().push_next(&mut driver_props);
-            unsafe { instance.get_physical_device_properties2(*physical_device, &mut props2) };
-
-            let driver_props = if props2.p_next.is_null() {
-                vk::PhysicalDeviceDriverProperties::default()
-            } else {
-                unsafe { *(props2.p_next as *const vk::PhysicalDeviceDriverProperties) }
-            };
-
-            if driver_props.driver_id == vk::DriverId::MESA_LLVMPIPE {
-                continue;
-            }
-
-            let device_id = DeviceId {
-                vendor: props2.properties.vendor_id as u16,
-                device: props2.properties.device_id as u16,
-            };
-            let driver_info = VkDriverInfo {
-                version: format!(
-                    "{}.{}.{}",
-                    vk::api_version_major(props2.properties.api_version),
-                    vk::api_version_minor(props2.properties.api_version),
-                    vk::api_version_patch(props2.properties.api_version)
-                ),
-                name: driver_props
-                    .driver_name_as_c_str()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .into_owned(),
-                driver_info: driver_props
-                    .driver_info_as_c_str()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .into_owned(),
-            };
-            drivers.insert(device_id, driver_info);
-        }
-
-        Ok(VulkanInfo { drivers })
-    }
-}
- */
