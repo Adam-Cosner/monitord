@@ -8,7 +8,6 @@ pub mod gpu;
 pub mod mem;
 pub mod net;
 pub mod process;
-pub mod staging;
 
 /// Trait for independent data collection
 pub trait Collector {
@@ -24,13 +23,11 @@ pub trait Collector {
 
 /// Trait for dependent data resolution after collection
 pub trait Resolver: Collector {
+    type Input: Send;
+
     /// Resolves the snapshot using any data that another collector generated.
     /// Current usage is for sharing GPU Snapshot processes and Process Snapshot GPU statistics
-    fn resolve(
-        &mut self,
-        staging: &staging::Staging,
-        output: Self::Output,
-    ) -> anyhow::Result<Self::Output>;
+    fn resolve(&mut self, input: &Self::Input, output: &mut Self::Output) -> anyhow::Result<()>;
 }
 
 pub(crate) mod helpers;

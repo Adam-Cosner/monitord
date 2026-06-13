@@ -26,7 +26,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::collector::helpers::*;
-use crate::collector::staging;
+use crate::metrics::process;
 use rustix::fd::{AsFd, OwnedFd};
 
 #[doc(inline)]
@@ -190,21 +190,19 @@ impl super::Collector for Collector {
 }
 
 impl super::Resolver for Collector {
-    fn resolve(
-        &mut self,
-        staging: &staging::Staging,
-        output: Self::Output,
-    ) -> anyhow::Result<Self::Output> {
+    type Input = crate::metrics::process::Snapshot;
+
+    fn resolve(&mut self, input: &Self::Input, output: &mut Self::Output) -> anyhow::Result<()> {
         let mut gpus = Vec::new();
-        for gpu in output.gpus.into_iter() {
+        for gpu in output.gpus.iter_mut() {
             let (_, card) = self
                 .cards
                 .iter_mut()
                 .find(|(_, card)| card.primary_node() == gpu.render_node.as_str())
                 .ok_or_else(|| anyhow::anyhow!("no card found for GPU {}", gpu.brand_name))?;
-            gpus.push(card.resolve(staging, gpu)?);
+            gpus.push(card.resolve(input, gpu)?);
         }
-        Ok(Snapshot { gpus })
+        Ok(())
     }
 }
 
@@ -216,7 +214,7 @@ trait Card {
     // Gets the primary node for this card (e.g. /dev/dri/card0)
     fn primary_node(&self) -> String;
     // Resolves a snapshot based on the staging
-    fn resolve(&mut self, staging: &staging::Staging, output: Gpu) -> anyhow::Result<Gpu>;
+    fn resolve(&mut self, input: &process::Snapshot, output: &mut Gpu) -> anyhow::Result<()>;
 }
 
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]

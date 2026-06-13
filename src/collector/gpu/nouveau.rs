@@ -89,10 +89,10 @@ impl super::Card for Card {
 
     fn resolve(
         &mut self,
-        _staging: &crate::collector::staging::Staging,
-        _output: Gpu,
-    ) -> anyhow::Result<Gpu> {
-        todo!()
+        _input: &super::process::Snapshot,
+        _output: &mut Gpu,
+    ) -> anyhow::Result<()> {
+        Ok(())
     }
 
     fn primary_node(&self) -> String {
