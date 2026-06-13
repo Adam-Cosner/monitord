@@ -76,9 +76,33 @@ impl Collector {
         match rustix::fs::Dir::read_from(net_root.as_fd()) {
             Ok(dir) => {
                 let mut adapters = Vec::new();
-
                 for interface in dir.flatten() {
                     let interface_name = interface.file_name().to_string_lossy().into_owned();
+                    if interface_name == "." || interface_name == ".." {
+                        continue;
+                    }
+                    if interface_name == "lo"
+                        || interface_name.starts_with("veth")
+                        || interface_name.starts_with("docker")
+                        || interface_name.starts_with("br-")
+                        || interface_name.starts_with("cni")
+                        || interface_name.starts_with("flannel")
+                        || interface_name.starts_with("cali")
+                        || interface_name.starts_with("virbr")
+                        || interface_name.starts_with("vnet")
+                        || interface_name.starts_with("vmnet")
+                        || interface_name.starts_with("vboxnet")
+                        || interface_name.starts_with("tun")
+                        || interface_name.starts_with("tap")
+                        || interface_name.starts_with("wg")
+                        || interface_name.starts_with("sit")
+                        || interface_name.starts_with("ipip")
+                        || interface_name.starts_with("dummy")
+                        || interface_name.starts_with("ifb")
+                        || interface_name.starts_with("teql")
+                    {
+                        continue;
+                    }
                     let Ok(interface) = rustix::fs::openat(
                         net_root.as_fd(),
                         interface.file_name(),
