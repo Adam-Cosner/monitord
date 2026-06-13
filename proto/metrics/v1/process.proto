@@ -58,7 +58,7 @@ enum Status {
   WAKE_KILL = 7; // K
   WAKING = 8; // W
   PARKED = 9; // P
-  NO_LOAD = 10; // N
+  DEAD = 10; // D
 }
 
 message Usage {
@@ -71,10 +71,9 @@ message Usage {
 
 message CpuUsage {
   uint32 usage = 1; // percentage
-  uint32 time = 2; // total process time
-  uint32 threads = 3; // number of threads
-  int32 nice = 4; // the nice level of the process, from -20 (highest priority) to 19 (lowest priority)
-  repeated uint32 affinity = 5; // list of CPU cores the process is bound to
+  uint32 threads = 2; // number of threads
+  int32 nice = 3; // the nice level of the process, from -20 (highest priority) to 19 (lowest priority)
+  repeated uint32 affinity = 4; // list of CPU cores the process is bound to
 }
 
 message MemoryUsage {
@@ -84,23 +83,17 @@ message MemoryUsage {
   uint64 virtual = 4; // virtual memory
 }
 
+message GpuUsage {
+  map<string, uint32> engines = 1; // list of GPU engines used by the process
+  uint64 vram_usage = 2; // VRAM usage in bytes
+  uint64 system_usage = 3; // the system memory usage in bytes
+}
+
 message DiskUsage {
   uint64 read_bytes = 1;
   uint64 read_total = 2;
   uint64 write_bytes = 3;
   uint64 write_total = 4;
-}
-
-message GpuUsage {
-  uint32 client_id = 1; // Used for preventing duplicate counts!
-  repeated GpuEngine engines = 2; // list of GPU engines used by the process
-  uint64 vram_usage = 3; // VRAM usage in bytes
-  uint64 system_usage = 4; // the system memory usage in bytes
-}
-
-message GpuEngine {
-  string name = 1;
-  uint32 utilization = 2; // utilization percentage (accounted for dynamic cycles)
 }
 
 message NetUsage {
