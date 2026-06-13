@@ -174,17 +174,23 @@ pub fn read_hwmon_power_path<P: rustix::path::Arg>(path: P) -> Option<f32> {
 
 /// Returns the first hwmon subdirectory under a given path.
 pub fn first_hwmon_subdir(hwmon_parent: BorrowedFd) -> Option<OwnedFd> {
-    let mut dir_stream = rustix::fs::Dir::read_from(hwmon_parent).ok()?;
-    dir_stream.next().and_then(|e| {
-        let e = e.ok()?;
-        rustix::fs::openat(
-            hwmon_parent,
-            e.file_name().to_string_lossy().to_string(),
-            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
-            Mode::empty(),
-        )
-        .ok()
-    })
+    rustix::fs::Dir::read_from(hwmon_parent)
+        .ok()?
+        .skip_while(|e| {
+            e.as_ref()
+                .is_ok_and(|e| e.file_name().to_string_lossy().starts_with("."))
+        })
+        .next()
+        .and_then(|e| {
+            let e = e.ok()?;
+            rustix::fs::openat(
+                hwmon_parent,
+                e.file_name().to_string_lossy().to_string(),
+                OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+                Mode::empty(),
+            )
+            .ok()
+        })
 }
 
 /// Returns the first hwmon subdirectory under a given path relative to fd.
@@ -196,17 +202,7 @@ pub fn first_hwmon_subdir_at(fd: BorrowedFd, path: &str) -> Option<OwnedFd> {
         Mode::empty(),
     )
     .ok()?;
-    let mut dir_stream = rustix::fs::Dir::read_from(rel_fd.as_fd()).ok()?;
-    dir_stream.next().and_then(|e| {
-        let e = e.ok()?;
-        rustix::fs::openat(
-            rel_fd.as_fd(),
-            format!("{}/{}", path, e.file_name().to_string_lossy()),
-            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
-            Mode::empty(),
-        )
-        .ok()
-    })
+    first_hwmon_subdir(rel_fd.as_fd())
 }
 
 /// Returns the first hwmon subdirectory underr a given path.
@@ -217,17 +213,7 @@ pub fn first_hwmon_subdir_path<P: rustix::path::Arg>(path: P) -> Option<OwnedFd>
         Mode::empty(),
     )
     .ok()?;
-    let mut dir_stream = rustix::fs::Dir::read_from(fd.as_fd()).ok()?;
-    dir_stream.next().and_then(|e| {
-        let e = e.ok()?;
-        rustix::fs::openat(
-            fd,
-            e.file_name().to_string_lossy(),
-            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
-            Mode::empty(),
-        )
-        .ok()
-    })
+    first_hwmon_subdir(fd.as_fd())
 }
 
 /// Opens the first hwmon subdirectory for a given PCI driver name.
@@ -240,9 +226,13 @@ pub fn find_pci_driver_hwmon(driver_name: &str) -> Option<OwnedFd> {
     .ok()?;
     let driver_dir_stream = rustix::fs::Dir::read_from(&driver).ok()?;
     for entry in driver_dir_stream.flatten() {
+        let entry_name = entry.file_name().to_string_lossy().to_string();
+        if entry_name.starts_with(".") {
+            continue;
+        }
         let entry_fd = rustix::fs::openat(
             &driver,
-            entry.file_name().to_string_lossy().to_string(),
+            entry_name,
             OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
             Mode::empty(),
         )
