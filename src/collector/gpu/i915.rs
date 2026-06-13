@@ -15,10 +15,20 @@ pub struct Card {
     primary_node: PathBuf,
     render_node: PathBuf,
     render_node_fd: OwnedFd,
+    pci_id: String,
 }
 
 impl Card {
     pub fn new(fd: OwnedFd) -> anyhow::Result<Self> {
+        let pci_id = PathBuf::from(
+            rustix::fs::readlinkat(&fd, "device", Vec::new())?
+                .to_string_lossy()
+                .to_string(),
+        )
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("could not read GPU PCI address"))?
+        .to_string_lossy()
+        .to_string();
         let drm_subsystem = rustix::fs::openat(
             &fd,
             "device/drm",
@@ -51,6 +61,7 @@ impl Card {
             primary_node,
             render_node: render_node_path,
             render_node_fd: render_node.ok_or_else(|| anyhow::anyhow!("render node not found"))?,
+            pci_id,
         })
     }
 
@@ -209,8 +220,8 @@ impl super::Card for Card {
         Ok(())
     }
 
-    fn primary_node(&self) -> String {
-        self.primary_node.to_string_lossy().to_string()
+    fn pci_id(&self) -> String {
+        self.pci_id.clone()
     }
 }
 
