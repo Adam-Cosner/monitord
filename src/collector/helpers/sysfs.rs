@@ -10,20 +10,34 @@ use rustix::fd::AsFd;
 use rustix::fs::{Mode, OFlags};
 
 pub fn read_bin(fd: BorrowedFd) -> Option<Vec<u8>> {
-    let stat = rustix::fs::fstat(fd.as_fd()).ok()?;
-    // 16 MiB limit
-    if stat.st_size > 16 * 1024 * 1024 {
-        tracing::warn!("read_string: file size {} is too large", stat.st_size);
-        return None;
-    }
     let mut buf = Vec::new();
-    buf.resize(stat.st_size as usize, 0);
-    rustix::io::read(fd, &mut buf)
-        .map(|read_bytes| {
-            buf.truncate(read_bytes);
-            buf
-        })
-        .ok()
+    let chunk_size = 4096;
+
+    for _ in 0..4096 {
+        let start = buf.len();
+        buf.resize(start + chunk_size, 0u8);
+
+        let read_slice = &mut buf[start..];
+        match rustix::io::read(fd, read_slice) {
+            Ok(0) => {
+                buf.truncate(start);
+                break;
+            }
+            Ok(bytes_read) => {
+                buf.truncate(start + bytes_read);
+            }
+            Err(rustix::io::Errno::INTR) => {
+                // sys call interrupted, try again
+                buf.truncate(start);
+                continue;
+            }
+            Err(e) => {
+                tracing::warn!("read_bin: read error: {}", e);
+                return None;
+            }
+        }
+    }
+    Some(buf)
 }
 
 /// Reads a string from a given fd, trimming whitespace and converting to a `String`.
