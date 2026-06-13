@@ -25,7 +25,7 @@ impl Card {
                 .to_string(),
         )
         .file_name()
-        .ok_or_else(|| anyhow::anyhow!("could not read NVIDIA PCI address"))?
+        .ok_or_else(|| anyhow::anyhow!("could not read GPU PCI address"))?
         .to_string_lossy()
         .to_string();
         let mut primary_node = PathBuf::new();
@@ -383,7 +383,7 @@ impl super::Card for Card {
         Ok(())
     }
 
-    fn primary_node(&self) -> String {
-        self.primary_node.to_string_lossy().to_string()
+    fn pci_id(&self) -> String {
+        self.pci.clone()
     }
 }

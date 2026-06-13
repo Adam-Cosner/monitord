@@ -18,6 +18,7 @@ pub struct Card {
     primary_node: PathBuf,
     render_node: PathBuf,
     gpu_metrics: OwnedFd,
+    pci_id: String,
 
     brand_name: Discovery<String>,
     power_counters: Option<gpu_metrics::PowerCounters>,
@@ -27,6 +28,15 @@ pub struct Card {
 
 impl Card {
     pub fn new(fd: OwnedFd) -> anyhow::Result<Self> {
+        let pci_id = PathBuf::from(
+            rustix::fs::readlinkat(&fd, "device", Vec::new())?
+                .to_string_lossy()
+                .to_string(),
+        )
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("could not read GPU PCI address"))?
+        .to_string_lossy()
+        .to_string();
         let drm_root = rustix::fs::openat(
             &fd,
             "device/drm",
@@ -57,6 +67,7 @@ impl Card {
             primary_node,
             render_node,
             gpu_metrics,
+            pci_id,
             brand_name: Discovery::default(),
             power_counters: None,
             memory_total: Discovery::default(),
@@ -170,8 +181,8 @@ impl super::Card for Card {
         Ok(())
     }
 
-    fn primary_node(&self) -> String {
-        self.primary_node.to_string_lossy().to_string()
+    fn pci_id(&self) -> String {
+        self.pci_id.clone()
     }
 }
 

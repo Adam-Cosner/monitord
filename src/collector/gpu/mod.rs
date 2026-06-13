@@ -198,7 +198,7 @@ impl super::Resolver for Collector {
             let (_, card) = self
                 .cards
                 .iter_mut()
-                .find(|(_, card)| card.primary_node() == gpu.render_node.as_str())
+                .find(|(_, card)| card.pci_id() == gpu.pci_id.as_str())
                 .ok_or_else(|| anyhow::anyhow!("no card found for GPU {}", gpu.brand_name))?;
             gpus.push(card.resolve(input, gpu)?);
         }
@@ -211,8 +211,8 @@ trait Card {
     fn identify(&self) -> (String, String, Option<String>, Option<String>);
     // Collects a single snapshot of the GPU
     fn collect(&mut self, config: &Config) -> anyhow::Result<Gpu>;
-    // Gets the primary node for this card (e.g. /dev/dri/card0)
-    fn primary_node(&self) -> String;
+    // Gets the pci id of the card (e.g. 0000:01:00.0)
+    fn pci_id(&self) -> String;
     // Resolves a snapshot based on the staging
     fn resolve(&mut self, input: &process::Snapshot, output: &mut Gpu) -> anyhow::Result<()>;
 }
