@@ -376,11 +376,11 @@ impl super::Card for Card {
 
     fn resolve(
         &mut self,
-        _: &crate::collector::staging::Staging,
-        output: super::Gpu,
-    ) -> anyhow::Result<super::Gpu> {
+        _input: &super::process::Snapshot,
+        _output: &mut Gpu,
+    ) -> anyhow::Result<()> {
         // NVML already fills out all the important details
-        Ok(output)
+        Ok(())
     }
 
     fn primary_node(&self) -> String {
