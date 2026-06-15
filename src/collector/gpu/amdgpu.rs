@@ -175,9 +175,96 @@ impl super::Card for Card {
 
     fn resolve(
         &mut self,
-        _input: &super::process::Snapshot,
-        _output: &mut Gpu,
+        input: &super::process::Snapshot,
+        output: &mut Gpu,
     ) -> anyhow::Result<()> {
+        for (pid, process) in input.processes.iter() {
+            if let Some(usage) = process.usage.as_ref() {
+                for (device, gpu_usage) in usage.gpu.iter() {
+                    if *device == self.pci_id {
+                        // now we've verified that his process is using this GPU
+                        let mut engine_utilization = Vec::new();
+                        for (engine, &engine_usage) in gpu_usage.engines.iter() {
+                            match engine.as_str() {
+                                "gfx" => engine_utilization.push(Engine {
+                                    identifier: Some(EngineIdentifier {
+                                        r#type: EngineType::EngineType3d as i32,
+                                        index: 0,
+                                        clock: None,
+                                    }),
+                                    utilization: engine_usage as u64,
+                                }),
+                                "compute" => engine_utilization.push(Engine {
+                                    identifier: Some(EngineIdentifier {
+                                        r#type: EngineType::Compute as i32,
+                                        index: 0,
+                                        clock: None,
+                                    }),
+                                    utilization: engine_usage as u64,
+                                }),
+                                "dma" => engine_utilization.push(Engine {
+                                    identifier: Some(EngineIdentifier {
+                                        r#type: EngineType::MemoryController as i32,
+                                        index: 0,
+                                        clock: None,
+                                    }),
+                                    utilization: engine_usage as u64,
+                                }),
+                                "dec" => engine_utilization.push(Engine {
+                                    identifier: Some(EngineIdentifier {
+                                        r#type: EngineType::VideoDecode as i32,
+                                        index: 0,
+                                        clock: None,
+                                    }),
+                                    utilization: engine_usage as u64,
+                                }),
+                                "enc" => engine_utilization.push(Engine {
+                                    identifier: Some(EngineIdentifier {
+                                        r#type: EngineType::VideoEncode as i32,
+                                        index: 0,
+                                        clock: None,
+                                    }),
+                                    utilization: engine_usage as u64,
+                                }),
+                                "enc_1" => engine_utilization.push(Engine {
+                                    identifier: Some(EngineIdentifier {
+                                        r#type: EngineType::VideoEncode as i32,
+                                        index: 1,
+                                        clock: None,
+                                    }),
+                                    utilization: engine_usage as u64,
+                                }),
+                                "jpeg" => engine_utilization.push(Engine {
+                                    identifier: Some(EngineIdentifier {
+                                        r#type: EngineType::Jpeg as i32,
+                                        index: 0,
+                                        clock: None,
+                                    }),
+                                    utilization: engine_usage as u64,
+                                }),
+                                "vpe" => engine_utilization.push(Engine {
+                                    identifier: Some(EngineIdentifier {
+                                        r#type: EngineType::VideoUnified as i32,
+                                        index: 0,
+                                        clock: None,
+                                    }),
+                                    utilization: engine_usage as u64,
+                                }),
+                                _ => {
+                                    tracing::warn!("unknown engine: {}", engine)
+                                }
+                            }
+                        }
+                        output.processes.push(Process {
+                            pid: *pid,
+                            engine_utilization,
+                            vram_usage: gpu_usage.vram_usage,
+                            gtt_usage: gpu_usage.system_usage,
+                        })
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
