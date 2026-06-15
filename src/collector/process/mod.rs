@@ -280,7 +280,9 @@ impl super::Collector for Collector {
             if let Some(prev) = self.prev_gpu_fdinfo.get(client_id)
                 && let Some(pdev) = cur.pdev.clone()
             {
-                let fd_usage = diff_fdinfo(prev, cur);
+                let Some(fd_usage) = diff_fdinfo(prev, cur) else {
+                    continue;
+                };
                 if let Some(oldest) = cur.pids.iter().min_by(|pid_a, pid_b| {
                     snapshot.processes[pid_a]
                         .start_time
@@ -509,44 +511,8 @@ fn parse_fdinfo(proc: PidId, fd: u32) -> anyhow::Result<DrmFdinfo> {
     Ok(fdinfo)
 }
 
-fn diff_fdinfo(prev: &DrmFdinfo, cur: &DrmFdinfo) -> GpuUsage {
+fn diff_fdinfo(prev: &DrmFdinfo, cur: &DrmFdinfo) -> Option<GpuUsage> {
     let mut result = GpuUsage::default();
-    for (engine, &cycles) in cur.cycles.iter() {
-        let Some(&prev_cycles) = prev.cycles.get(engine) else {
-            continue;
-        };
-
-        let cycle_diff = cycles.saturating_sub(prev_cycles);
-
-        // If it's using total_cycles
-        if let Some(&cur_total_cycles) = cur.total_cycles.get(engine)
-            && let Some(&prev_total_cycles) = prev.total_cycles.get(engine)
-        {
-            let total_cycle_diff = cur_total_cycles.saturating_sub(prev_total_cycles);
-            result
-                .engines
-                .insert(engine.clone(), (cycle_diff * 100 / total_cycle_diff) as u32);
-        } else if let Some(&maxfreq) = cur.maxfreq.get(engine) {
-            let time_delta = cur.timestamp - prev.timestamp;
-
-            result.engines.insert(
-                engine.clone(),
-                (cycle_diff as f64 * 100.0 / (time_delta.as_secs_f64() * maxfreq as f64)) as u32,
-            );
-        } else {
-            // fallback times instead of total_cycles, technically less accurate definition of "utilization", more like "busy time"
-            if let Some(&cur_time) = cur.times.get(engine)
-                && let Some(&prev_time) = prev.times.get(engine)
-            {
-                let active_time_diff = cur_time - prev_time;
-                let total_time_diff = (cur.timestamp - prev.timestamp).as_nanos() as u64;
-                result.engines.insert(
-                    engine.clone(),
-                    (active_time_diff * 100 / total_time_diff) as u32,
-                );
-            }
-        }
-    }
     for (region, &cur_shared) in cur.shared_mem.iter() {
         let Some(&cur_resident) = cur.resident_mem.get(region) else {
             continue;
@@ -561,8 +527,51 @@ fn diff_fdinfo(prev: &DrmFdinfo, cur: &DrmFdinfo) -> GpuUsage {
             result.system_usage += cur_resident - cur_shared;
         }
     }
+    if !cur.cycles.is_empty() {
+        for (engine, &cur_cycles) in cur.cycles.iter() {
+            let Some(&prev_cycles) = prev.cycles.get(engine) else {
+                continue;
+            };
 
-    result
+            let cycle_diff = cur_cycles.saturating_sub(prev_cycles);
+
+            // priority to use total cycles since that's more of a "utilization" metric
+            if let Some(&cur_total_cycles) = cur.total_cycles.get(engine)
+                && let Some(&prev_total_cycles) = prev.total_cycles.get(engine)
+            {
+                let total_cycle_diff = cur_total_cycles.saturating_sub(prev_total_cycles);
+                if total_cycle_diff > 0 {
+                    result
+                        .engines
+                        .insert(engine.clone(), (total_cycle_diff * 100 / cycle_diff) as u32);
+                }
+            } else if let Some(&max_freq) = cur.maxfreq.get(engine) {
+                if max_freq > 0 {
+                    result
+                        .engines
+                        .insert(engine.clone(), (cycle_diff * 100 / max_freq) as u32);
+                }
+            }
+        }
+    } else if !cur.times.is_empty() {
+        for (engine, &cur_time) in cur.times.iter() {
+            let Some(&prev_time) = prev.times.get(engine) else {
+                continue;
+            };
+            let time_diff = cur_time.saturating_sub(prev_time);
+            let total_time_diff = cur.timestamp - prev.timestamp;
+            if total_time_diff.as_nanos() > 0 {
+                result.engines.insert(
+                    engine.clone(),
+                    (time_diff * 100 / total_time_diff.as_nanos() as u64) as u32,
+                );
+            }
+        }
+    } else if result.vram_usage == 0 && result.system_usage == 0 {
+        return None;
+    }
+
+    Some(result)
 }
 
 fn merge_gpu_usage(accumulator: &mut GpuUsage, usage: &GpuUsage) {
