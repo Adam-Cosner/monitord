@@ -6,7 +6,7 @@
 
 use crate::collector::helpers::sysfs;
 use crate::metrics::gpu::*;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use rustix::fd::{AsFd, OwnedFd};
 
@@ -214,9 +214,90 @@ impl super::Card for Card {
 
     fn resolve(
         &mut self,
-        _input: &super::process::Snapshot,
-        _output: &mut Gpu,
+        input: &super::process::Snapshot,
+        output: &mut Gpu,
     ) -> anyhow::Result<()> {
+        for (pid, process) in input.processes.iter() {
+            if let Some(usage) = process.usage.as_ref() {
+                for (device, gpu_usage) in usage.gpu.iter() {
+                    if *device == self.pci_id {
+                        // now we've verified that his process is using this GPU
+                        let mut engine_utilization = Vec::new();
+                        for (engine, &engine_usage) in gpu_usage.engines.iter() {
+                            match engine.as_str() {
+                                "render" => engine_utilization.push(Engine {
+                                    identifier: Some(EngineIdentifier {
+                                        r#type: EngineType::EngineType3d as i32,
+                                        index: 0,
+                                        clock: None,
+                                    }),
+                                    utilization: engine_usage as u64,
+                                }),
+                                "compute" => engine_utilization.push(Engine {
+                                    identifier: Some(EngineIdentifier {
+                                        r#type: EngineType::Compute as i32,
+                                        index: 0,
+                                        clock: None,
+                                    }),
+                                    utilization: engine_usage as u64,
+                                }),
+                                "copy" => engine_utilization.push(Engine {
+                                    identifier: Some(EngineIdentifier {
+                                        r#type: EngineType::Copy as i32,
+                                        index: 0,
+                                        clock: None,
+                                    }),
+                                    utilization: engine_usage as u64,
+                                }),
+                                "video" => engine_utilization.push(Engine {
+                                    identifier: Some(EngineIdentifier {
+                                        r#type: EngineType::VideoUnified as i32,
+                                        index: 0,
+                                        clock: None,
+                                    }),
+                                    utilization: engine_usage as u64,
+                                }),
+                                "video-enhance" => engine_utilization.push(Engine {
+                                    identifier: Some(EngineIdentifier {
+                                        r#type: EngineType::MediaClear as i32,
+                                        index: 1,
+                                        clock: None,
+                                    }),
+                                    utilization: engine_usage as u64,
+                                }),
+                                _ => {
+                                    tracing::warn!("unknown engine: {}", engine)
+                                }
+                            }
+                        }
+                        output.processes.push(Process {
+                            pid: *pid,
+                            engine_utilization,
+                            vram_usage: gpu_usage.vram_usage,
+                            gtt_usage: gpu_usage.system_usage,
+                        })
+                    }
+                }
+            }
+        }
+        let mut engine_utilizations: HashMap<EngineIdentifier, u64> = HashMap::new();
+        // After the fact, we can use the processes to figure out engine utilization
+        for process in &output.processes {
+            for engine_utilization in &process.engine_utilization {
+                let engine = engine_utilizations
+                    .entry(engine_utilization.identifier.unwrap_or_default())
+                    .or_default();
+
+                *engine += engine_utilization.utilization;
+            }
+        }
+        output.engines = engine_utilizations
+            .into_iter()
+            .map(|(identifier, utiilization)| Engine {
+                identifier: Some(identifier),
+                utilization: utiilization,
+            })
+            .collect::<Vec<_>>();
         Ok(())
     }
 
