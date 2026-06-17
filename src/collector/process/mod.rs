@@ -647,38 +647,49 @@ mod tests {
         gpu_collector.resolve(&proc, &mut gpu)?;
 
         print_processes_gpu(&proc);
-        println!("{:#?}", gpu);
 
         Ok(())
     }
 
     fn print_processes_gpu(snapshot: &Snapshot) {
-        let mut engine_usages = HashMap::new();
         for process in snapshot.processes.values() {
             if process
                 .usage
                 .as_ref()
                 .is_some_and(|usage| !usage.gpu.is_empty())
             {
+                println!(
+                    "PID: {}, ({})",
+                    process.identity.as_ref().map(|i| i.pid).unwrap_or(0),
+                    process
+                        .identity
+                        .as_ref()
+                        .map(|i| i.name.clone())
+                        .unwrap_or_default()
+                );
+
                 for (device, gpu_usage) in process.usage.as_ref().unwrap().gpu.iter() {
+                    println!("  Device: {device}");
+                    println!("    VRAM Usage: {}", bytes(gpu_usage.vram_usage));
+                    println!("    System Memory Usage: {}", bytes(gpu_usage.system_usage));
                     for (engine, &utilization) in gpu_usage.engines.iter() {
-                        *engine_usages
-                            .entry(device.clone())
-                            .or_insert_with(|| HashMap::new())
-                            .entry(engine.clone())
-                            .or_insert(0) += utilization;
+                        println!("    Engine: {} (utilization: {})", engine, utilization);
                     }
                 }
-                println!("{:#?}", process);
-                println!("\n\n");
+                println!("");
             }
         }
+    }
 
-        for (device, engine_usages) in engine_usages.iter() {
-            println!("Device: {}", device);
-            for (engine, utilization) in engine_usages.iter() {
-                println!("  Engine: {} - Utilization: {}%", engine, utilization);
-            }
+    fn bytes(b: u64) -> String {
+        if b / 1 < 1024 {
+            format!("{b} bytes")
+        } else if b / 1024 < 1024 {
+            format!("{} KiB", b / 1024)
+        } else if b / 1024 / 1024 < 1024 {
+            format!("{} MiB", b / 1024 / 1024)
+        } else {
+            format!("{} GiB", b / 1024 / 1024 / 1024)
         }
     }
 }
