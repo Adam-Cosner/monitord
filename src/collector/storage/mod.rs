@@ -115,6 +115,8 @@ impl super::Collector for Collector {
                         return None;
                     };
                     let Some(&(prev_read, prev_write)) = self.previous_samples.get(&key) else {
+                        self.previous_samples
+                            .insert(key.clone(), (total_read, total_write));
                         return Some(DiskUsage {
                             read: 0,
                             write: 0,
@@ -187,10 +189,20 @@ mod tests {
         config.storage = Some(Config { usage: true });
 
         let _ = collector.collect(&config)?;
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        let snapshot = collector.collect(&config)?;
-        assert!(!snapshot.devices.is_empty());
-        println!("{:#?}", snapshot);
+        for _ in 0..60 {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let snapshot = collector.collect(&config)?;
+
+            for device in snapshot.devices.iter() {
+                if let Some(usage) = &device.usage {
+                    println!(
+                        "device: {} read: {} write: {}",
+                        device.device_id, usage.read, usage.write
+                    )
+                }
+            }
+            println!("")
+        }
         Ok(())
     }
 }
