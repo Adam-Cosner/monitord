@@ -8,6 +8,7 @@ pub mod gpu;
 pub mod mem;
 pub mod net;
 pub mod process;
+pub mod storage;
 
 /// Trait for independent data collection
 pub trait Collector {
