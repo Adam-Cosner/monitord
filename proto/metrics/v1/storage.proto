@@ -26,7 +26,9 @@ enum DeviceType {
   HDD = 1;
   SSD = 2;
   NVME = 3;
-  EXTERNAL = 4;
+  USB = 4;
+  SD_CARD = 5;
+  OPTICAL = 6;
 }
 
 message DiskUsage {
@@ -38,5 +40,4 @@ message DiskUsage {
 
 message Config {
   bool usage = 1;
-  bool device_id = 2;
 }
