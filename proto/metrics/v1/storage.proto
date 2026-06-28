@@ -7,6 +7,36 @@
 syntax = "proto3";
 package metrics.v1.storage;
 
-message Snapshot {}
+message Snapshot {
+  repeated Device devices = 1;
+}
 
-message Config {}
+message Device {
+  string name = 1;
+  DeviceType ty = 2;
+  uint64 capacity = 3;
+  DiskUsage usage = 4;
+  string device_id = 5;
+  bool writable = 6;
+  bool removable = 7;
+}
+
+enum DeviceType {
+  UNKNOWN = 0;
+  HDD = 1;
+  SSD = 2;
+  NVME = 3;
+  EXTERNAL = 4;
+}
+
+message DiskUsage {
+  uint64 write = 1;
+  uint64 total_write = 2;
+  uint64 read = 3;
+  uint64 total_read = 4;
+}
+
+message Config {
+  bool usage = 1;
+  bool device_id = 2;
+}
