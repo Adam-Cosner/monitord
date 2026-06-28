@@ -538,6 +538,7 @@ fn diff_fdinfo(prev: &DrmFdinfo, cur: &DrmFdinfo) -> Option<GpuUsage> {
             // priority to use total cycles since that's more of a "utilization" metric
             if let Some(&cur_total_cycles) = cur.total_cycles.get(engine)
                 && let Some(&prev_total_cycles) = prev.total_cycles.get(engine)
+                && cycle_diff > 0
             {
                 let total_cycle_diff = cur_total_cycles.saturating_sub(prev_total_cycles);
                 if total_cycle_diff > 0 {
