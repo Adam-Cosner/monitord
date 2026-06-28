@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::collector::helpers::*;
 use crate::metrics::process;
@@ -37,8 +37,8 @@ pub struct Collector {
     // Optimization so we don't have to traverse to /sys/class/drm every time
     drm_root: Discovery<OwnedFd>,
     pci_ids: Discovery<PciIds>,
-    cards: HashMap<CardFileId, Box<dyn Card>>,
-    nvml: Discovery<Rc<nvml_wrapper::Nvml>>,
+    cards: HashMap<CardFileId, Box<dyn Card + Send>>,
+    nvml: Discovery<Arc<nvml_wrapper::Nvml>>,
     drivers: Discovery<api_drivers::DriverInfo>,
 }
 
@@ -225,8 +225,8 @@ struct CardFileId {
 
 fn new_card<'a>(
     fd: OwnedFd,
-    nvml: &mut Discovery<Rc<nvml_wrapper::Nvml>>,
-) -> anyhow::Result<Box<dyn Card + 'a>> {
+    nvml: &mut Discovery<Arc<nvml_wrapper::Nvml>>,
+) -> anyhow::Result<Box<dyn Card + Send + 'a>> {
     let driver = rustix::fs::readlinkat(fd.as_fd(), "device/driver", Vec::new())?
         .to_string_lossy()
         .to_string();
@@ -241,16 +241,16 @@ fn new_card<'a>(
                     let Some(nvml) = nvml.probe(|| {
                         nvml_wrapper::Nvml::init()
                             .map_err(|e| anyhow::anyhow!(e))
-                            .map(Rc::new)
+                            .map(Arc::new)
                     }) else {
                         anyhow::bail!("nvml not available for nvidia card");
                     };
-                    Box::new(nvidia::Card::new(fd, nvml)?) as Box<dyn Card>
+                    Box::new(nvidia::Card::new(fd, nvml)?) as Box<dyn Card + Send>
                 }
-                "nouveau" => Box::new(nouveau::Card::new(fd)?) as Box<dyn Card>,
-                "amdgpu" => Box::new(amdgpu::Card::new(fd)?) as Box<dyn Card>,
-                "i915" => Box::new(i915::Card::new(fd)?) as Box<dyn Card>,
-                "xe" => Box::new(xe::Card::new(fd)?) as Box<dyn Card>,
+                "nouveau" => Box::new(nouveau::Card::new(fd)?) as Box<dyn Card + Send>,
+                "amdgpu" => Box::new(amdgpu::Card::new(fd)?) as Box<dyn Card + Send>,
+                "i915" => Box::new(i915::Card::new(fd)?) as Box<dyn Card + Send>,
+                "xe" => Box::new(xe::Card::new(fd)?) as Box<dyn Card + Send>,
                 _ => anyhow::bail!("unsupported driver: {}", name),
             }
         }

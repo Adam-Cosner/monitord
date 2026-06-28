@@ -5,20 +5,20 @@
  */
 
 use crate::{collector::helpers::sysfs, metrics::gpu::*};
-use std::{path::PathBuf, rc::Rc};
+use std::{path::PathBuf, sync::Arc};
 
 use rustix::fd::{AsFd, OwnedFd};
 
 pub struct Card {
     card_fd: OwnedFd,
-    nvml: Rc<nvml_wrapper::Nvml>,
+    nvml: Arc<nvml_wrapper::Nvml>,
     pci: String,
     primary_node: PathBuf,
     render_node: PathBuf,
 }
 
 impl Card {
-    pub fn new(fd: OwnedFd, nvml: &Rc<nvml_wrapper::Nvml>) -> anyhow::Result<Self> {
+    pub fn new(fd: OwnedFd, nvml: &Arc<nvml_wrapper::Nvml>) -> anyhow::Result<Self> {
         let pci = PathBuf::from(
             rustix::fs::readlinkat(&fd, "device", Vec::new())?
                 .to_string_lossy()
