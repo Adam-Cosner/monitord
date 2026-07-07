@@ -16,7 +16,7 @@ pub trait Collector {
     type Output: Send;
 
     /// The name of the collector
-    fn name(&self) -> &'static str;
+    fn name() -> &'static str;
 
     /// Collect any independent data and return it
     fn collect(&mut self, config: &crate::metrics::Config) -> anyhow::Result<Self::Output>;

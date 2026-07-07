@@ -29,7 +29,7 @@ impl Default for Collector {
 impl super::Collector for Collector {
     type Output = Snapshot;
 
-    fn name(&self) -> &'static str {
+    fn name() -> &'static str {
         "storage"
     }
 
