@@ -33,11 +33,20 @@ async fn run_collectors(
 ) -> anyhow::Result<()> {
     use crate::collector::*;
     let mut cpu_collector = cpu::Collector::new();
+    let mut cpu_tries = 0;
     let mut memory_collector = mem::Collector::new();
+    let mut memory_tries = 0;
     let mut gpu_collector = gpu::Collector::new();
+    let mut gpu_tries = 0;
     let mut network_collector = net::Collector::new();
+    let mut network_tries = 0;
     let mut storage_collector = storage::Collector::new();
+    let mut storage_tries = 0;
     let mut process_collector = process::Collector::new();
+    let mut process_tries = 0;
+
+    // temporary, add to daemon config
+    const MAX_TRIES: u32 = 5;
 
     loop {
         // Collect
@@ -50,56 +59,104 @@ async fn run_collectors(
             mut process_snapshot,
         ) = tokio::join!(
             async {
-                cpu_collector
-                    .collect(&config)
-                    .inspect_err(|e| tracing::error!("cpu collector failed: {}", e))
+                if cpu_tries < MAX_TRIES {
+                    cpu_collector
+                        .collect(&config)
+                        .inspect_err(|e| {
+                            tracing::error!("cpu collector failed: {}", e);
+                            cpu_tries += 1;
+                        })
+                        .ok()
+                } else {
+                    None
+                }
             },
             async {
-                memory_collector
-                    .collect(&config)
-                    .inspect_err(|e| tracing::error!("memory collector failed: {}", e))
+                if memory_tries < MAX_TRIES {
+                    memory_collector
+                        .collect(&config)
+                        .inspect_err(|e| {
+                            tracing::error!("memory collector failed: {}", e);
+                            memory_tries += 1;
+                        })
+                        .ok()
+                } else {
+                    None
+                }
             },
             async {
-                gpu_collector
-                    .collect(&config)
-                    .inspect_err(|e| tracing::error!("gpu collector failed: {}", e))
+                if gpu_tries < MAX_TRIES {
+                    gpu_collector
+                        .collect(&config)
+                        .inspect_err(|e| {
+                            tracing::error!("gpu collector failed: {}", e);
+                            gpu_tries += 1;
+                        })
+                        .ok()
+                } else {
+                    None
+                }
             },
             async {
-                network_collector
-                    .collect(&config)
-                    .inspect_err(|e| tracing::error!("network collector failed: {}", e))
+                if network_tries < MAX_TRIES {
+                    network_collector
+                        .collect(&config)
+                        .inspect_err(|e| {
+                            tracing::error!("network collector failed: {}", e);
+                            network_tries += 1;
+                        })
+                        .ok()
+                } else {
+                    None
+                }
             },
             async {
-                storage_collector
-                    .collect(&config)
-                    .inspect_err(|e| tracing::error!("storage collector failed: {}", e))
+                if storage_tries < MAX_TRIES {
+                    storage_collector
+                        .collect(&config)
+                        .inspect_err(|e| {
+                            tracing::error!("storage collector failed: {}", e);
+                            storage_tries += 1;
+                        })
+                        .ok()
+                } else {
+                    None
+                }
             },
             async {
-                process_collector
-                    .collect(&config)
-                    .inspect_err(|e| tracing::error!("process collector failed: {}", e))
+                if process_tries < MAX_TRIES {
+                    process_collector
+                        .collect(&config)
+                        .inspect_err(|e| {
+                            tracing::error!("process collector failed: {}", e);
+                            process_tries += 1;
+                        })
+                        .ok()
+                } else {
+                    None
+                }
             },
         );
 
         // Resolve
-        if let Ok(proc) = process_snapshot.as_mut()
-            && let Ok(gpu) = gpu_snapshot.as_mut()
+        if let Some(proc) = process_snapshot.as_mut()
+            && let Some(gpu) = gpu_snapshot.as_mut()
         {
             process_collector.resolve(&gpu, proc)?;
         }
-        if let Ok(gpu) = gpu_snapshot.as_mut()
-            && let Ok(proc) = process_snapshot.as_mut()
+        if let Some(gpu) = gpu_snapshot.as_mut()
+            && let Some(proc) = process_snapshot.as_mut()
         {
             gpu_collector.resolve(&proc, gpu)?;
         }
 
         let snapshot = crate::metrics::Snapshot {
-            cpu: cpu_snapshot.ok(),
-            memory: memory_snapshot.ok(),
-            gpu: gpu_snapshot.ok(),
-            network: network_snapshot.ok(),
-            storage: storage_snapshot.ok(),
-            process: process_snapshot.ok(),
+            cpu: cpu_snapshot,
+            memory: memory_snapshot,
+            gpu: gpu_snapshot,
+            network: network_snapshot,
+            storage: storage_snapshot,
+            process: process_snapshot,
         };
 
         snap_tx.send(snapshot).await?;
