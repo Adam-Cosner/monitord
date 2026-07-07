@@ -5,11 +5,6 @@
  */
 
 //! Contains the runtime manager for the collectors
-//!
-//! Todo list:
-//! - Error handling
-//!     - Retry counters
-//!     - Printing vs stopping handling
 
 pub async fn runtime(
     snap_tx: tokio::sync::mpsc::Sender<crate::metrics::Snapshot>,
@@ -19,11 +14,11 @@ pub async fn runtime(
     tokio::select! {
         _ = stop_rx => {
             tracing::info!("received stop signal");
-            return Ok(());
+            Ok(())
         }
         res =
             run_collectors(snap_tx, config)
-         => { return res; }
+         => { res }
     }
 }
 
@@ -32,23 +27,18 @@ async fn run_collectors(
     config: crate::metrics::Config,
 ) -> anyhow::Result<()> {
     use crate::collector::*;
-    let mut cpu_collector = cpu::Collector::new();
-    let mut cpu_tries = 0;
-    let mut memory_collector = mem::Collector::new();
-    let mut memory_tries = 0;
-    let mut gpu_collector = gpu::Collector::new();
-    let mut gpu_tries = 0;
-    let mut network_collector = net::Collector::new();
-    let mut network_tries = 0;
-    let mut storage_collector = storage::Collector::new();
-    let mut storage_tries = 0;
-    let mut process_collector = process::Collector::new();
-    let mut process_tries = 0;
+    let mut cpu_collector = CollectorWrapper::new(cpu::Collector::new());
+    let mut mem_collector = CollectorWrapper::new(mem::Collector::new());
+    let mut gpu_collector = CollectorWrapper::new(gpu::Collector::new());
+    let mut net_collector = CollectorWrapper::new(net::Collector::new());
+    let mut stor_collector = CollectorWrapper::new(storage::Collector::new());
+    let mut proc_collector = CollectorWrapper::new(process::Collector::new());
 
-    // temporary, add to daemon config
-    const MAX_TRIES: u32 = 5;
+    // TODO: Daemon config interval
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(200));
 
     loop {
+        interval.tick().await;
         // Collect
         let (
             cpu_snapshot,
@@ -58,96 +48,24 @@ async fn run_collectors(
             storage_snapshot,
             mut process_snapshot,
         ) = tokio::join!(
-            async {
-                if cpu_tries < MAX_TRIES {
-                    cpu_collector
-                        .collect(&config)
-                        .inspect_err(|e| {
-                            tracing::error!("cpu collector failed: {}", e);
-                            cpu_tries += 1;
-                        })
-                        .ok()
-                } else {
-                    None
-                }
-            },
-            async {
-                if memory_tries < MAX_TRIES {
-                    memory_collector
-                        .collect(&config)
-                        .inspect_err(|e| {
-                            tracing::error!("memory collector failed: {}", e);
-                            memory_tries += 1;
-                        })
-                        .ok()
-                } else {
-                    None
-                }
-            },
-            async {
-                if gpu_tries < MAX_TRIES {
-                    gpu_collector
-                        .collect(&config)
-                        .inspect_err(|e| {
-                            tracing::error!("gpu collector failed: {}", e);
-                            gpu_tries += 1;
-                        })
-                        .ok()
-                } else {
-                    None
-                }
-            },
-            async {
-                if network_tries < MAX_TRIES {
-                    network_collector
-                        .collect(&config)
-                        .inspect_err(|e| {
-                            tracing::error!("network collector failed: {}", e);
-                            network_tries += 1;
-                        })
-                        .ok()
-                } else {
-                    None
-                }
-            },
-            async {
-                if storage_tries < MAX_TRIES {
-                    storage_collector
-                        .collect(&config)
-                        .inspect_err(|e| {
-                            tracing::error!("storage collector failed: {}", e);
-                            storage_tries += 1;
-                        })
-                        .ok()
-                } else {
-                    None
-                }
-            },
-            async {
-                if process_tries < MAX_TRIES {
-                    process_collector
-                        .collect(&config)
-                        .inspect_err(|e| {
-                            tracing::error!("process collector failed: {}", e);
-                            process_tries += 1;
-                        })
-                        .ok()
-                } else {
-                    None
-                }
-            },
+            async { cpu_collector.try_collect(&config) },
+            async { mem_collector.try_collect(&config) },
+            async { gpu_collector.try_collect(&config) },
+            async { net_collector.try_collect(&config) },
+            async { stor_collector.try_collect(&config) },
+            async { proc_collector.try_collect(&config) },
         );
 
         // Resolve
         if let Some(proc) = process_snapshot.as_mut()
             && let Some(gpu) = gpu_snapshot.as_mut()
         {
-            process_collector.resolve(&gpu, proc)?;
+            proc_collector.collector.resolve(&gpu, proc)?;
         }
         if let Some(gpu) = gpu_snapshot.as_mut()
             && let Some(proc) = process_snapshot.as_mut()
         {
-            gpu_collector.resolve(&proc, gpu)?;
+            gpu_collector.collector.resolve(&proc, gpu)?;
         }
 
         let snapshot = crate::metrics::Snapshot {
@@ -160,7 +78,37 @@ async fn run_collectors(
         };
 
         snap_tx.send(snapshot).await?;
-        // TODO: Variable interval
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    }
+}
+
+// TODO: Daemon config retry count
+const MAX_TRIES: u32 = 5;
+
+struct CollectorWrapper<C: crate::collector::Collector> {
+    try_count: u32,
+    pub collector: C,
+}
+
+impl<C: crate::collector::Collector> CollectorWrapper<C> {
+    fn new(c: C) -> Self {
+        Self {
+            try_count: 0,
+            collector: c,
+        }
+    }
+
+    fn try_collect(&mut self, config: &crate::metrics::Config) -> Option<C::Output> {
+        if self.try_count < MAX_TRIES {
+            self.collector
+                .collect(config)
+                .inspect_err(|e| {
+                    tracing::error!("{} collector failed: {e}", C::name());
+                    self.try_count += 1;
+                })
+                .ok()
+        } else {
+            tracing::warn!("no {} data collected due to too many fails!", C::name());
+            None
+        }
     }
 }
