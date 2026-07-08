@@ -36,6 +36,7 @@ async fn run_collectors(
 
     // TODO: Daemon config interval
     let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(200));
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
         interval.tick().await;
