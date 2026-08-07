@@ -9,7 +9,7 @@
 pub async fn runtime(
     snap_tx: tokio::sync::mpsc::Sender<crate::metrics::Snapshot>,
     stop_rx: tokio::sync::oneshot::Receiver<()>,
-    config: crate::metrics::Config,
+    config: crate::config::Config,
 ) -> anyhow::Result<()> {
     tokio::select! {
         _ = stop_rx => {
@@ -24,9 +24,10 @@ pub async fn runtime(
 
 async fn run_collectors(
     snap_tx: tokio::sync::mpsc::Sender<crate::metrics::Snapshot>,
-    config: crate::metrics::Config,
+    dconfig: crate::config::Config,
 ) -> anyhow::Result<()> {
     use crate::collector::*;
+    let config = parse_dconfig(&dconfig);
     let mut cpu_collector = CollectorWrapper::new(cpu::Collector::new());
     let mut mem_collector = CollectorWrapper::new(mem::Collector::new());
     let mut gpu_collector = CollectorWrapper::new(gpu::Collector::new());
@@ -34,8 +35,9 @@ async fn run_collectors(
     let mut stor_collector = CollectorWrapper::new(storage::Collector::new());
     let mut proc_collector = CollectorWrapper::new(process::Collector::new());
 
-    // TODO: Daemon config interval
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(200));
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(
+        dconfig.core.interval_ms as u64,
+    ));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
@@ -111,5 +113,21 @@ impl<C: crate::collector::Collector> CollectorWrapper<C> {
             tracing::warn!("no {} data collected due to too many fails!", C::name());
             None
         }
+    }
+}
+
+fn parse_dconfig(dconfig: &crate::config::Config) -> crate::metrics::Config {
+    use crate::metrics;
+    crate::metrics::Config {
+        cpu: Some(metrics::cpu::Config::from_strings(&dconfig.metrics.cpu)),
+        memory: Some(metrics::memory::Config::from_strings(&dconfig.metrics.mem)),
+        gpu: Some(metrics::gpu::Config::from_strings(&dconfig.metrics.gpu)),
+        network: Some(metrics::network::Config::from_strings(&dconfig.metrics.net)),
+        storage: Some(metrics::storage::Config::from_strings(
+            &dconfig.metrics.storage,
+        )),
+        process: Some(metrics::process::Config::from_strings(
+            &dconfig.metrics.process,
+        )),
     }
 }
