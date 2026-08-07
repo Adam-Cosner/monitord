@@ -23,14 +23,14 @@ pub async fn main() {
     let (snap_tx, _snap_rx) = tokio::sync::mpsc::channel(12);
     let (_stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
 
-    let config = metrics::Config::default();
+    tracing::info!("initializing monitord");
     // let config = config::read();
 
     tokio::select! {
         _ = runtime::runtime(snap_tx, stop_rx, config) => {}
     }
 
-    tracing::info!("initializing monitord");
+    Ok(())
 }
 
 #[cfg(test)]

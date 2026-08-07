@@ -52,7 +52,7 @@ impl super::Collector for Collector {
 
 impl Collector {
     pub fn new() -> Self {
-        tracing::info!("creating collector");
+        tracing::debug!("creating collector");
         Self {
             topology: RetryCell::Pending { tries: 16 },
             utilization: utilization::Tracker::new(),

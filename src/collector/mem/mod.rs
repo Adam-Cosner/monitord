@@ -47,7 +47,7 @@ impl super::Collector for Collector {
 impl Collector {
     /// Create a new instance of the collector
     pub fn new() -> Self {
-        tracing::info!("creating collector");
+        tracing::debug!("creating collector");
         Self {
             cached_dimms: RetryCell::Pending { tries: 4 },
         }
@@ -59,7 +59,6 @@ impl Collector {
             anyhow::bail!("no config supplied to collector")
         };
 
-        tracing::debug!("collecting metrics");
         let meminfo =
             procfs::Meminfo::current().with_context(|| format!("{} on {}", file!(), line!()))?;
         tracing::trace!("read /proc/meminfo");

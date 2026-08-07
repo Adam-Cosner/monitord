@@ -29,7 +29,7 @@ impl Default for Collector {
 
 impl Collector {
     pub fn new() -> Self {
-        tracing::info!("creating collector");
+        tracing::debug!("creating collector");
         Self {
             cpu_counters: HashMap::new(),
             prev_gpu_fdinfo: HashMap::new(),
