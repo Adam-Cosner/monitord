@@ -6,7 +6,7 @@
 
 //! Contains helpers for reading from and writing to files
 
-use rustix::fd::{AsFd, BorrowedFd, OwnedFd};
+use rustix::fd::{AsFd, AsRawFd, BorrowedFd};
 use rustix::fs::{Mode, OFlags};
 
 pub fn read_bin(fd: BorrowedFd) -> Option<Vec<u8>> {
@@ -40,9 +40,39 @@ pub fn read_bin(fd: BorrowedFd) -> Option<Vec<u8>> {
     Some(buf)
 }
 
+pub fn write_bin(fd: BorrowedFd, buf: &[u8]) -> anyhow::Result<()> {
+    // Allow retries in case of syscall interrupts
+    for _ in 0..16 {
+        match rustix::io::write(fd, buf) {
+            Ok(bytes_written) => {
+                if bytes_written != buf.len() {
+                    anyhow::bail!("write_bin: write was not completed!");
+                }
+                tracing::trace!(
+                    "successfully wrote {bytes_written} bytes to fd {}",
+                    fd.as_raw_fd()
+                );
+                break;
+            }
+            Err(rustix::io::Errno::INTR) => {
+                continue;
+            }
+            Err(e) => {
+                anyhow::bail!("write_bin: write error: {}", e);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Reads a string from a given fd, trimming whitespace and converting to a `String`.
 pub fn read_string(fd: BorrowedFd) -> Option<String> {
     read_bin(fd).map(|buf| String::from_utf8_lossy(buf.as_slice()).trim().to_string())
+}
+
+/// Writes a string to a given fd
+pub fn write_string(fd: BorrowedFd, text: &str) -> anyhow::Result<()> {
+    write_bin(fd, text.as_bytes())
 }
 
 /// Reads a string from a given path relative to fd, trimming whitespace and converting to a `String`.
