@@ -18,7 +18,7 @@ use crate::helpers::*;
 /// Tracker for the CPU sensors.
 #[derive(Debug)]
 pub struct Tracker {
-    sources: Discovery<Sources>,
+    sources: RetryCell<Sources>,
     last_energy: BTreeMap<u32, Sampler<u64>>, // for RAPL diff
 }
 
@@ -47,7 +47,7 @@ impl Tracker {
     /// Creates a new `Tracker`
     pub fn new() -> Self {
         Self {
-            sources: Discovery::default(),
+            sources: RetryCell::Pending { tries: 1 },
             last_energy: BTreeMap::new(),
         }
     }
@@ -56,8 +56,7 @@ impl Tracker {
     pub fn read(&mut self, topology: &super::topology::Topology) -> anyhow::Result<Sample> {
         let sources = self
             .sources
-            .probe_mut(|| Ok(Sources::detect(topology)))
-            .ok_or_else(|| anyhow::anyhow!("Failed to detect sensors"))?;
+            .get_or_try_init_mut(|| Ok(Sources::detect(topology)))?;
         let temperatures = sources.read_temperatures(topology);
         let power = sources.read_power(&mut self.last_energy);
         Ok(Sample {

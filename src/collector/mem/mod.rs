@@ -22,7 +22,7 @@ pub use crate::metrics::memory::*;
 
 /// The metric collector, create an instance with `mem::Collector::new()` and collect with `collector.collect(&store)`
 pub struct Collector {
-    cached_dimms: Discovery<Vec<Dimm>>,
+    cached_dimms: RetryCell<Vec<Dimm>>,
 }
 
 impl Default for Collector {
@@ -49,7 +49,7 @@ impl Collector {
     pub fn new() -> Self {
         tracing::info!("creating collector");
         Self {
-            cached_dimms: Discovery::default(),
+            cached_dimms: RetryCell::Pending { tries: 4 },
         }
     }
 
@@ -83,7 +83,12 @@ impl Collector {
 
         let dimms = config
             .dimms
-            .then(|| self.cached_dimms.probe(collect_dimms).cloned())
+            .then(|| {
+                self.cached_dimms
+                    .get_or_try_init(collect_dimms)
+                    .cloned()
+                    .ok()
+            })
             .flatten()
             .unwrap_or_default();
 
@@ -108,7 +113,7 @@ fn collect_dimms() -> anyhow::Result<Vec<Dimm>> {
 }
 
 fn collect_from_dmi() -> anyhow::Result<Vec<Dimm>> {
-    tracing::debug!("attempting to parse DMI tables");
+    tracing::trace!("attempting to parse DMI tables");
     // read in bytes from /sys/firmware/dmi/tables/DMI
     let bytes = std::fs::read(PathBuf::from("/sys/firmware/dmi/tables/DMI"))?;
     let entrypoint = dmidecode::EntryPoint::search(bytes.as_slice())?;
@@ -212,7 +217,7 @@ fn ramtype_to_string(ram_type: dmidecode::memory_device::Type) -> String {
 }
 
 fn collect_from_udev_database() -> anyhow::Result<Vec<Dimm>> {
-    tracing::debug!("attempting to read udev database");
+    tracing::trace!("attempting to read udev database");
     let udev_filedata = std::fs::read_to_string("/run/udev/data/+dmi:id")?;
     let udev_filedata_lines = udev_filedata.lines().collect::<Vec<&str>>();
 
