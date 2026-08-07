@@ -21,3 +21,7 @@ target
 .idea/
 
 Cargo.lock
+
+config.toml
+
+config.toml.old
