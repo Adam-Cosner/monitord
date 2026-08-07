@@ -17,5 +17,8 @@ test TEST:
 test-all:
     RUST_LOG=debug,wgpu=warn cargo test --release --features=daemon -- --show-output
 
+run-daemon:
+    RUST_LOG=debug,wgpu=warn cargo run --release --features=daemon --bin monitord
+
 clippy:
     cargo clippy --release --features=daemon
