@@ -23,7 +23,7 @@ pub use crate::metrics::cpu::*;
 use super::helpers::*;
 
 pub struct Collector {
-    topology: Discovery<topology::Topology>,
+    topology: RetryCell<topology::Topology>,
     utilization: utilization::Tracker,
     sensors: sensors::Tracker,
 }
@@ -54,7 +54,7 @@ impl Collector {
     pub fn new() -> Self {
         tracing::info!("creating collector");
         Self {
-            topology: Discovery::default(),
+            topology: RetryCell::Pending { tries: 16 },
             utilization: utilization::Tracker::new(),
             sensors: sensors::Tracker::new(),
         }
@@ -68,7 +68,7 @@ impl Collector {
         let topo = if config.topology {
             Some(
                 self.topology
-                    .require(|| topology::Topology::discover(Some(config)))?,
+                    .get_or_try_init(|| topology::Topology::discover(Some(config)))?,
             )
         } else {
             None

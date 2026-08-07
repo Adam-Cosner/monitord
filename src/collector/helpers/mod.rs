@@ -6,8 +6,8 @@
 
 //! Helper modules for the collectors.
 
-pub(crate) mod discovery;
-pub(crate) use discovery::Discovery;
+pub(crate) mod cell;
+pub(crate) use cell::RetryCell;
 pub(crate) mod fam;
 pub(crate) use fam::FAM;
 pub(crate) mod ioctl;

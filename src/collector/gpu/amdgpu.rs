@@ -21,10 +21,10 @@ pub struct Card {
     gpu_metrics: OwnedFd,
     pci_id: String,
 
-    brand_name: Discovery<String>,
+    brand_name: RetryCell<String>,
     power_counters: Option<gpu_metrics::PowerCounters>,
-    memory_total: Discovery<u64>,
-    system_total: Discovery<u64>,
+    memory_total: RetryCell<u64>,
+    system_total: RetryCell<u64>,
 }
 
 impl Card {
@@ -69,34 +69,40 @@ impl Card {
             render_node,
             gpu_metrics,
             pci_id,
-            brand_name: Discovery::default(),
+            brand_name: RetryCell::Pending { tries: 1 },
             power_counters: None,
-            memory_total: Discovery::default(),
-            system_total: Discovery::default(),
+            memory_total: RetryCell::Pending { tries: 1 },
+            system_total: RetryCell::Pending { tries: 1 },
         })
     }
 
     fn memory(&mut self) -> Vec<Memory> {
         let mut memory = Vec::new();
-        let vram_total = self.memory_total.probe(|| {
-            io::readat_u64(self.card_fd.as_fd(), "device/mem_info_vram_total")
-                .ok_or(anyhow::anyhow!("could not read mem_info_vram_total"))
-        });
+        let vram_total = self
+            .memory_total
+            .get_or_try_init(|| {
+                io::readat_u64(self.card_fd.as_fd(), "device/mem_info_vram_total")
+                    .ok_or(anyhow::anyhow!("could not read mem_info_vram_total"))
+            })
+            .inspect_err(|err| tracing::error!("{err}"));
         let vram_used = io::readat_u64(self.card_fd.as_fd(), "device/mem_info_vram_used");
-        let system_total = self.system_total.probe(|| {
-            io::readat_u64(self.card_fd.as_fd(), "device/mem_info_gtt_total")
-                .ok_or(anyhow::anyhow!("could not read mem_info_gtt_total"))
-        });
+        let system_total = self
+            .system_total
+            .get_or_try_init(|| {
+                io::readat_u64(self.card_fd.as_fd(), "device/mem_info_gtt_total")
+                    .ok_or(anyhow::anyhow!("could not read mem_info_gtt_total"))
+            })
+            .inspect_err(|err| tracing::error!("{err}"));
         let system_used = io::readat_u64(self.card_fd.as_fd(), "device/mem_info_gtt_used");
 
-        if let Some(&vram_total) = vram_total {
+        if let Ok(&vram_total) = vram_total {
             memory.push(Memory {
                 r#type: MemoryType::Vram as i32,
                 total_memory: vram_total,
                 used_memory: vram_used.unwrap_or(0),
             });
         }
-        if let Some(&system_total) = system_total {
+        if let Ok(&system_total) = system_total {
             memory.push(Memory {
                 r#type: MemoryType::System as i32,
                 total_memory: system_total,
@@ -121,7 +127,7 @@ impl super::Card for Card {
         let mut gpu = super::Gpu::default();
         gpu.brand_name = self
             .brand_name
-            .probe(|| get_brand_name(self.card_fd.as_fd()))
+            .get_or_try_init(|| get_brand_name(self.card_fd.as_fd()))
             .cloned()
             .unwrap_or_default();
         gpu.drivers = config.drivers.then(|| Drivers {

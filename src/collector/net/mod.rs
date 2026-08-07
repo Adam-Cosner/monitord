@@ -29,8 +29,8 @@ pub use crate::metrics::network::*;
 pub struct Collector {
     /// Map of network adapter names to its tx/rx counters
     counters: std::collections::HashMap<String, Sampler<Counters>>,
-    /// Wi-Fi reader wrapped in a `Discovery` lazy-init wrapper
-    wifi_reader: Discovery<wifi::WifiReader>,
+    /// Wi-Fi reader wrapped in a `RetryCell` lazy-init wrapper
+    wifi_reader: RetryCell<wifi::WifiReader>,
 }
 
 impl Default for Collector {
@@ -59,7 +59,7 @@ impl Collector {
     pub fn new() -> Self {
         Self {
             counters: std::collections::HashMap::new(),
-            wifi_reader: Discovery::default(),
+            wifi_reader: RetryCell::Pending { tries: 4 },
         }
     }
 
@@ -195,7 +195,9 @@ impl Collector {
     ) -> Option<WifiInfo> {
         if adapter_type == adapter::AdapterType::Wifi && is_up {
             self.wifi_reader
-                .probe_mut(wifi::WifiReader::new)
+                .get_or_try_init_mut(wifi::WifiReader::new)
+                .inspect_err(|err| tracing::error!("could not create wi-fi reader: {err}"))
+                .ok()
                 .and_then(|reader| match reader.read(name) {
                     Ok(wifi_info) => Some(wifi_info),
                     Err(e) => {

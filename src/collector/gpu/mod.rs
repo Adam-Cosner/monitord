@@ -36,11 +36,11 @@ pub use crate::metrics::gpu::*;
 /// Collects GPU metrics
 pub struct Collector {
     // Optimization so we don't have to traverse to /sys/class/drm every time
-    drm_root: Discovery<OwnedFd>,
-    pci_ids: Discovery<PciIds>,
+    drm_root: RetryCell<OwnedFd>,
+    pci_ids: RetryCell<PciIds>,
     cards: HashMap<CardFileId, Box<dyn Card + Send>>,
-    nvml: Discovery<Arc<nvml_wrapper::Nvml>>,
-    drivers: Discovery<api_drivers::DriverInfo>,
+    nvml: RetryCell<Arc<nvml_wrapper::Nvml>>,
+    drivers: RetryCell<api_drivers::DriverInfo>,
 }
 
 impl Default for Collector {
@@ -52,11 +52,11 @@ impl Default for Collector {
 impl Collector {
     pub fn new() -> Self {
         Self {
-            drm_root: Discovery::default(),
-            pci_ids: Discovery::default(),
+            drm_root: RetryCell::Pending { tries: 4 },
+            pci_ids: RetryCell::Pending { tries: 4 },
             cards: HashMap::default(),
-            nvml: Discovery::default(),
-            drivers: Discovery::default(),
+            nvml: RetryCell::Pending { tries: 4 },
+            drivers: RetryCell::Pending { tries: 1 },
         }
     }
 }
@@ -70,15 +70,15 @@ impl super::Collector for Collector {
 
     fn collect(&mut self, config: &crate::metrics::Config) -> anyhow::Result<Self::Output> {
         tracing::trace!("collecting GPU metrics");
-        let Some(api_drivers) = self.drivers.probe(|| Ok(api_drivers::get_drivers())) else {
-            anyhow::bail!("failed to collect graphics API drivers");
-        };
+        let api_drivers = self
+            .drivers
+            .get_or_try_init(|| Ok(api_drivers::get_drivers()))?;
 
         let Some(config) = &config.gpu else {
             anyhow::bail!("GPU Collector did not receive a config");
         };
 
-        let drm_root = self.drm_root.require(|| {
+        let drm_root = self.drm_root.get_or_try_init(|| {
             rustix::fs::open(
                 "/sys/class/drm",
                 rustix::fs::OFlags::RDONLY
@@ -154,7 +154,11 @@ impl super::Collector for Collector {
             if snap.brand_name.is_empty() {
                 snap.brand_name = io::read_string_path("/usr/share/hwdata/pci.ids")
                     .or_else(|| io::read_string_path("/usr/share/misc/pci.ids"))
-                    .and_then(|pci_ids| self.pci_ids.probe(|| PciIds::parse(&pci_ids)))
+                    .and_then(|pci_ids| {
+                        self.pci_ids
+                            .get_or_try_init(|| PciIds::parse(&pci_ids))
+                            .ok()
+                    })
                     .and_then(|pci_ids| {
                         let (vendor, device, subvendor, subdevice) = gpu.identify();
                         pci_ids.lookup(&vendor, &device, subvendor.as_deref(), subdevice.as_deref())
@@ -226,7 +230,7 @@ struct CardFileId {
 
 fn new_card<'a>(
     fd: OwnedFd,
-    nvml: &mut Discovery<Arc<nvml_wrapper::Nvml>>,
+    nvml: &mut RetryCell<Arc<nvml_wrapper::Nvml>>,
 ) -> anyhow::Result<Box<dyn Card + Send + 'a>> {
     let driver = rustix::fs::readlinkat(fd.as_fd(), "device/driver", Vec::new())?
         .to_string_lossy()
@@ -239,13 +243,11 @@ fn new_card<'a>(
             // match the driver name to the device type
             match name.as_ref() {
                 "nvidia" => {
-                    let Some(nvml) = nvml.probe(|| {
+                    let nvml = nvml.get_or_try_init(|| {
                         nvml_wrapper::Nvml::init()
                             .map_err(|e| anyhow::anyhow!(e))
                             .map(Arc::new)
-                    }) else {
-                        anyhow::bail!("nvml not available for nvidia card");
-                    };
+                    })?;
                     Box::new(nvidia::Card::new(fd, nvml)?) as Box<dyn Card + Send>
                 }
                 "nouveau" => Box::new(nouveau::Card::new(fd)?) as Box<dyn Card + Send>,
