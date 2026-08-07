@@ -13,6 +13,7 @@ use rustix::{
 };
 
 use crate::collector::helpers::*;
+use crate::helpers::*;
 
 /// Tracker for the CPU sensors.
 #[derive(Debug)]
@@ -277,7 +278,7 @@ fn detect_thermal_zone() -> ThermalSource {
         ) else {
             continue;
         };
-        let Some(zone_type) = sysfs::readat_string(zone.as_fd(), "type") else {
+        let Some(zone_type) = io::readat_string(zone.as_fd(), "type") else {
             continue;
         };
         let lower = zone_type.to_lowercase();
@@ -382,7 +383,7 @@ fn read_rapl_energy(
     energy_path: BorrowedFd,
     energy: &mut BTreeMap<u32, Sampler<u64>>,
 ) -> Option<f32> {
-    let energy_uj = sysfs::read_u64(energy_path.as_fd()).unwrap_or_default();
+    let energy_uj = io::read_u64(energy_path.as_fd()).unwrap_or_default();
     let delta = energy
         .entry(package_id)
         .or_insert_with(Sampler::new)

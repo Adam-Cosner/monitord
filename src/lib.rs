@@ -12,3 +12,8 @@ pub mod metrics;
 
 #[cfg(feature = "collector")]
 pub mod collector;
+
+#[cfg(not(any(feature = "client", feature = "daemon", feature = "control")))]
+compile_error!("Must have at least one target feature!");
+
+pub mod helpers;

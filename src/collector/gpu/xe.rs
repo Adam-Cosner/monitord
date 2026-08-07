@@ -5,6 +5,7 @@
  */
 
 use crate::collector::helpers::sysfs;
+use crate::helpers::*;
 use crate::metrics::gpu::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -117,12 +118,11 @@ impl Card {
                     is_video = true;
                 }
 
-                let Some(current_frequency_mhz) =
-                    sysfs::readat_u32(gt_fd.as_fd(), "engines/cur_freq")
+                let Some(current_frequency_mhz) = io::readat_u32(gt_fd.as_fd(), "engines/cur_freq")
                 else {
                     continue;
                 };
-                let Some(max_frequency_mhz) = sysfs::readat_u32(gt_fd.as_fd(), "engines/max_freq")
+                let Some(max_frequency_mhz) = io::readat_u32(gt_fd.as_fd(), "engines/max_freq")
                 else {
                     continue;
                 };
@@ -220,18 +220,18 @@ impl Card {
 impl super::Card for Card {
     fn identify(&self) -> (String, String, Option<String>, Option<String>) {
         (
-            sysfs::readat_string(self.card_fd.as_fd(), "device/vendor")
+            io::readat_string(self.card_fd.as_fd(), "device/vendor")
                 .and_then(|v| v.strip_prefix("0x").map(|v| v.to_string()))
                 .map(String::from)
                 .unwrap_or_default(),
-            sysfs::readat_string(self.card_fd.as_fd(), "device/device")
+            io::readat_string(self.card_fd.as_fd(), "device/device")
                 .and_then(|d| d.strip_prefix("0x").map(|d| d.to_string()))
                 .map(String::from)
                 .unwrap_or_default(),
-            sysfs::readat_string(self.card_fd.as_fd(), "device/subsystem_vendor")
+            io::readat_string(self.card_fd.as_fd(), "device/subsystem_vendor")
                 .and_then(|sv| sv.strip_prefix("0x").map(|sv| sv.to_string()))
                 .map(String::from),
-            sysfs::readat_string(self.card_fd.as_fd(), "device/subsystem_device")
+            io::readat_string(self.card_fd.as_fd(), "device/subsystem_device")
                 .and_then(|sd| sd.strip_prefix("0x").map(|sd| sd.to_string()))
                 .map(String::from),
         )

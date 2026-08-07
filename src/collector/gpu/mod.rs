@@ -26,6 +26,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::collector::helpers::*;
+use crate::helpers::*;
 use crate::metrics::process;
 use rustix::fd::{AsFd, OwnedFd};
 
@@ -151,8 +152,8 @@ impl super::Collector for Collector {
             };
             // GPU name fallback
             if snap.brand_name.is_empty() {
-                snap.brand_name = sysfs::read_string_path("/usr/share/hwdata/pci.ids")
-                    .or_else(|| sysfs::read_string_path("/usr/share/misc/pci.ids"))
+                snap.brand_name = io::read_string_path("/usr/share/hwdata/pci.ids")
+                    .or_else(|| io::read_string_path("/usr/share/misc/pci.ids"))
                     .and_then(|pci_ids| self.pci_ids.probe(|| PciIds::parse(&pci_ids)))
                     .and_then(|pci_ids| {
                         let (vendor, device, subvendor, subdevice) = gpu.identify();

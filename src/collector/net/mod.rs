@@ -14,7 +14,8 @@
 //! ```
 mod wifi;
 
-use super::helpers::*;
+use crate::collector::helpers::*;
+use crate::helpers::*;
 use rustix::{
     fd::{AsFd, BorrowedFd},
     fs::{AtFlags, Mode, OFlags},
@@ -146,7 +147,7 @@ impl Collector {
             .unwrap_or_default();
         let adapter_type = classify_adapter(fd);
 
-        let is_up = sysfs::readat_string(fd, "operstate")
+        let is_up = io::readat_string(fd, "operstate")
             .map(|s| s == "up")
             .unwrap_or(false);
         let packet_counters = Counters::read(fd.clone());
@@ -161,11 +162,11 @@ impl Collector {
             .flatten();
         Adapter {
             interface_name: name.to_string(),
-            mac_address: sysfs::readat_string(fd, "address").unwrap_or_default(),
+            mac_address: io::readat_string(fd, "address").unwrap_or_default(),
             ipv4_addresses,
             ipv6_addresses,
             adapter_type: adapter_type as i32,
-            mtu: sysfs::readat_u32(fd, "mtu").unwrap_or_default(),
+            mtu: io::readat_u32(fd, "mtu").unwrap_or_default(),
             is_up,
             rx_bytes_total: packet_counters.rx_bytes,
             tx_bytes_total: packet_counters.tx_bytes,
@@ -223,14 +224,14 @@ struct Counters {
 impl Counters {
     fn read(fd: BorrowedFd) -> Self {
         Self {
-            rx_bytes: sysfs::readat_u64(fd.as_fd(), "statistics/rx_bytes").unwrap_or_default(),
-            tx_bytes: sysfs::readat_u64(fd.as_fd(), "statistics/tx_bytes").unwrap_or_default(),
-            rx_packets: sysfs::readat_u64(fd.as_fd(), "statistics/rx_packets").unwrap_or_default(),
-            tx_packets: sysfs::readat_u64(fd.as_fd(), "statistics/tx_packets").unwrap_or_default(),
-            rx_errors: sysfs::readat_u64(fd.as_fd(), "statistics/rx_errors").unwrap_or_default(),
-            tx_errors: sysfs::readat_u64(fd.as_fd(), "statistics/tx_errors").unwrap_or_default(),
-            rx_drops: sysfs::readat_u64(fd.as_fd(), "statistics/rx_dropped").unwrap_or_default(),
-            tx_drops: sysfs::readat_u64(fd.as_fd(), "statistics/tx_dropped").unwrap_or_default(),
+            rx_bytes: io::readat_u64(fd.as_fd(), "statistics/rx_bytes").unwrap_or_default(),
+            tx_bytes: io::readat_u64(fd.as_fd(), "statistics/tx_bytes").unwrap_or_default(),
+            rx_packets: io::readat_u64(fd.as_fd(), "statistics/rx_packets").unwrap_or_default(),
+            tx_packets: io::readat_u64(fd.as_fd(), "statistics/tx_packets").unwrap_or_default(),
+            rx_errors: io::readat_u64(fd.as_fd(), "statistics/rx_errors").unwrap_or_default(),
+            tx_errors: io::readat_u64(fd.as_fd(), "statistics/tx_errors").unwrap_or_default(),
+            rx_drops: io::readat_u64(fd.as_fd(), "statistics/rx_dropped").unwrap_or_default(),
+            tx_drops: io::readat_u64(fd.as_fd(), "statistics/tx_dropped").unwrap_or_default(),
         }
     }
 }
@@ -266,7 +267,7 @@ fn classify_adapter(fd: BorrowedFd) -> adapter::AdapterType {
     } else if rustix::fs::statat(fd, "bridge", AtFlags::empty()).is_ok() {
         adapter::AdapterType::Bridge
     } else {
-        match sysfs::readat_u32(fd, "type") {
+        match io::readat_u32(fd, "type") {
             Some(ARPHRD_LOOPBACK) => adapter::AdapterType::Loopback,
             Some(ARPHRD_ETHER) => adapter::AdapterType::Ethernet,
             Some(ARPHRD_NONE) | Some(ARPHRD_TUNNEL) | Some(ARPHRD_SIT) => {

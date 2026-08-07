@@ -7,7 +7,7 @@
 use rustix::fd::{AsFd, OwnedFd};
 use std::path::PathBuf;
 
-use crate::{collector::helpers::sysfs, metrics::gpu::*};
+use crate::{helpers::*, metrics::gpu::*};
 
 pub struct Card {
     card_fd: OwnedFd,
@@ -58,18 +58,18 @@ impl Card {
 impl super::Card for Card {
     fn identify(&self) -> (String, String, Option<String>, Option<String>) {
         (
-            sysfs::readat_string(self.card_fd.as_fd(), "device/vendor")
+            io::readat_string(self.card_fd.as_fd(), "device/vendor")
                 .and_then(|v| v.strip_prefix("0x").map(|v| v.to_string()))
                 .map(String::from)
                 .unwrap_or_default(),
-            sysfs::readat_string(self.card_fd.as_fd(), "device/device")
+            io::readat_string(self.card_fd.as_fd(), "device/device")
                 .and_then(|d| d.strip_prefix("0x").map(|d| d.to_string()))
                 .map(String::from)
                 .unwrap_or_default(),
-            sysfs::readat_string(self.card_fd.as_fd(), "device/subsystem_vendor")
+            io::readat_string(self.card_fd.as_fd(), "device/subsystem_vendor")
                 .and_then(|sv| sv.strip_prefix("0x").map(|sv| sv.to_string()))
                 .map(String::from),
-            sysfs::readat_string(self.card_fd.as_fd(), "device/subsystem_device")
+            io::readat_string(self.card_fd.as_fd(), "device/subsystem_device")
                 .and_then(|sd| sd.strip_prefix("0x").map(|sd| sd.to_string()))
                 .map(String::from),
         )
