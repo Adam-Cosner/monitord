@@ -11,20 +11,22 @@ pub mod service {
     pub use v1::*;
 }
 
+mod config;
 mod runtime;
 
 pub use monitord::collector;
 pub use monitord::metrics;
 
 #[tokio::main]
-pub async fn main() {
+pub async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let (snap_tx, _snap_rx) = tokio::sync::mpsc::channel(12);
     let (_stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
 
     tracing::info!("initializing monitord");
-    // let config = config::read();
+
+    let config = config::Config::init()?;
 
     tokio::select! {
         _ = runtime::runtime(snap_tx, stop_rx, config) => {}
@@ -42,38 +44,7 @@ mod tests {
         tracing_subscriber::fmt::init();
         let (snap_tx, mut snap_rx) = tokio::sync::mpsc::channel(12);
         let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
-        let config = metrics::Config {
-            cpu: Some(metrics::cpu::Config {
-                topology: true,
-                hwid: true,
-                drivers: true,
-            }),
-            memory: Some(metrics::memory::Config { dimms: true }),
-            gpu: Some(metrics::gpu::Config {
-                drivers: true,
-                engines: true,
-                clocks: true,
-                memory: true,
-                power: true,
-                thermals: true,
-                processes: true,
-            }),
-            network: Some(metrics::network::Config {
-                addresses: true,
-                wifi_info: true,
-            }),
-            storage: Some(metrics::storage::Config { usage: true }),
-            process: Some(metrics::process::Config {
-                identity: true,
-                status: true,
-                start_time: true,
-                cpu_usage: true,
-                memory_usage: true,
-                gpu_usage: true,
-                disk_usage: true,
-                net_usage: true,
-            }),
-        };
+        let config = config::Config::default();
 
         tokio::select! {
             // runtime
