@@ -57,6 +57,7 @@ impl super::Collector for Collector {
 
 impl Collector {
     pub fn new() -> Self {
+        tracing::debug!("creating collector");
         Self {
             counters: std::collections::HashMap::new(),
             wifi_reader: RetryCell::Pending { tries: 4 },

@@ -169,6 +169,7 @@ impl super::Collector for Collector {
 
 impl Collector {
     pub fn new() -> Self {
+        tracing::debug!("creating collector");
         Self {
             previous_samples: HashMap::new(),
         }

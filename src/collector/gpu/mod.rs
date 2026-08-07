@@ -51,6 +51,7 @@ impl Default for Collector {
 
 impl Collector {
     pub fn new() -> Self {
+        tracing::debug!("creating collector");
         Self {
             drm_root: RetryCell::Pending { tries: 4 },
             pci_ids: RetryCell::Pending { tries: 4 },
