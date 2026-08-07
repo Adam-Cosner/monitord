@@ -14,7 +14,7 @@ use rustix::fs::{AtFlags, Mode, OFlags};
 #[doc(inline)]
 pub use crate::metrics::storage::*;
 
-use super::helpers::*;
+use crate::helpers::*;
 
 pub struct Collector {
     previous_samples: HashMap<String, (u64, u64)>,
@@ -59,7 +59,7 @@ impl super::Collector for Collector {
             let device_id = entry.file_name().to_string_lossy().to_string();
 
             // Now we can read the data
-            let Some(name) = sysfs::readat_string(dir_fd.as_fd(), "device/model") else {
+            let Some(name) = io::readat_string(dir_fd.as_fd(), "device/model") else {
                 continue;
             };
 
@@ -76,7 +76,7 @@ impl super::Collector for Collector {
                 && link.contains("/usb")
             {
                 DeviceType::Usb
-            } else if let Some(rotational) = sysfs::readat_u32(dir_fd.as_fd(), "queue/rotational") {
+            } else if let Some(rotational) = io::readat_u32(dir_fd.as_fd(), "queue/rotational") {
                 if rotational == 1 {
                     DeviceType::Hdd
                 } else {
@@ -86,14 +86,14 @@ impl super::Collector for Collector {
                 DeviceType::Unknown
             } as i32;
 
-            let Some(capacity) = sysfs::readat_u64(dir_fd.as_fd(), "size").map(|s| s * 512) else {
+            let Some(capacity) = io::readat_u64(dir_fd.as_fd(), "size").map(|s| s * 512) else {
                 continue;
             };
 
             let usage = config
                 .usage
                 .then(|| {
-                    let Some(stat) = sysfs::readat_string(dir_fd.as_fd(), "stat") else {
+                    let Some(stat) = io::readat_string(dir_fd.as_fd(), "stat") else {
                         return None;
                     };
 
@@ -111,7 +111,7 @@ impl super::Collector for Collector {
                         return None;
                     };
 
-                    let Some(key) = sysfs::readat_string(dir_fd.as_fd(), "dev") else {
+                    let Some(key) = io::readat_string(dir_fd.as_fd(), "dev") else {
                         return None;
                     };
                     let Some(&(prev_read, prev_write)) = self.previous_samples.get(&key) else {
@@ -140,14 +140,13 @@ impl super::Collector for Collector {
                 })
                 .flatten();
 
-            let writable = if let Some(ro) = sysfs::readat_u32(dir_fd.as_fd(), "ro") {
+            let writable = if let Some(ro) = io::readat_u32(dir_fd.as_fd(), "ro") {
                 ro == 0
             } else {
                 false
             };
 
-            let removable = if let Some(removable) = sysfs::readat_u32(dir_fd.as_fd(), "removable")
-            {
+            let removable = if let Some(removable) = io::readat_u32(dir_fd.as_fd(), "removable") {
                 removable == 1
             } else {
                 false

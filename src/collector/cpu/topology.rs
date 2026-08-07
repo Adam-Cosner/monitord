@@ -11,6 +11,7 @@ use rustix::fd::{AsFd, BorrowedFd};
 use rustix::fs::{Mode, OFlags};
 
 use crate::collector::helpers::sysfs;
+use crate::helpers::*;
 
 // DATA STRUCTURES
 
@@ -196,7 +197,7 @@ impl Topology {
                 continue;
             };
 
-            let shared_count = sysfs::readat_string(cache_entry.as_fd(), "shared_cpu_list")
+            let shared_count = io::readat_string(cache_entry.as_fd(), "shared_cpu_list")
                 .and_then(|s| sysfs::count_cpu_list(&s))
                 .unwrap_or(1);
 
@@ -323,7 +324,7 @@ impl Core {
             Mode::empty(),
         )
         .ok()
-        .and_then(|fd| sysfs::read_u32(fd.as_fd()))
+        .and_then(|fd| io::read_u32(fd.as_fd()))
         .unwrap_or(0);
 
         let max_freq_mhz = rustix::fs::open(
@@ -332,7 +333,7 @@ impl Core {
             Mode::empty(),
         )
         .ok()
-        .and_then(|fd| sysfs::read_u32(fd.as_fd()))
+        .and_then(|fd| io::read_u32(fd.as_fd()))
         .unwrap_or(0);
         Self {
             min_freq_mhz,
@@ -346,13 +347,13 @@ impl Core {
 impl Cache {
     /// Creates a [`Cache`] from the sysfs information for a given cache path.
     fn from_sysfs(fd: BorrowedFd) -> Option<Self> {
-        let level = sysfs::readat_u32(fd, "level").unwrap_or(0);
-        let cache_type = sysfs::readat_string(fd, "type")
+        let level = io::readat_u32(fd, "level").unwrap_or(0);
+        let cache_type = io::readat_string(fd, "type")
             .map(|ty| CacheType::from(ty.as_str()))
             .unwrap_or(CacheType::Unknown);
-        let size_kb = sysfs::readat_u32(fd, "size").unwrap_or(0);
-        let line_size_bytes = sysfs::readat_u32(fd, "coherency_line_size").unwrap_or(0);
-        let associativity = sysfs::readat_u32(fd, "ways_of_associativity").unwrap_or(0);
+        let size_kb = io::readat_u32(fd, "size").unwrap_or(0);
+        let line_size_bytes = io::readat_u32(fd, "coherency_line_size").unwrap_or(0);
+        let associativity = io::readat_u32(fd, "ways_of_associativity").unwrap_or(0);
         Some(Self {
             level,
             cache_type,
@@ -375,7 +376,7 @@ impl From<&str> for CacheType {
 }
 
 fn read_cluster_id(cpu_idx: u32) -> u32 {
-    sysfs::read_u32_path(format!(
+    io::read_u32_path(format!(
         "/sys/devices/system/cpu/cpu{cpu_idx}/topology/die_id"
     ))
     .unwrap_or(0)
@@ -390,9 +391,9 @@ fn get_cpufreq_info(cpu_idx: u32) -> (String, String, Option<String>) {
     .ok() else {
         return (String::new(), String::new(), None);
     };
-    let driver = sysfs::readat_string(cpufreq.as_fd(), "scaling_driver").unwrap_or_default();
-    let governor = sysfs::readat_string(cpufreq.as_fd(), "scaling_governor").unwrap_or_default();
-    let mode = sysfs::read_string_path("/sys/devices/system/cpu/intel_pstate/status")
-        .or_else(|| sysfs::read_string_path("/sys/devices/system/cpu/amd_pstate/status"));
+    let driver = io::readat_string(cpufreq.as_fd(), "scaling_driver").unwrap_or_default();
+    let governor = io::readat_string(cpufreq.as_fd(), "scaling_governor").unwrap_or_default();
+    let mode = io::read_string_path("/sys/devices/system/cpu/intel_pstate/status")
+        .or_else(|| io::read_string_path("/sys/devices/system/cpu/amd_pstate/status"));
     (driver, governor, mode)
 }

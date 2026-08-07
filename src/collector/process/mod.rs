@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use rustix::fd::AsFd;
 use rustix::fs::{Mode, OFlags};
 
-use super::helpers::*;
+use crate::helpers::*;
 
 #[doc(inline)]
 pub use crate::metrics::process::*;
@@ -401,7 +401,7 @@ fn parse_fdinfo(proc: PidId, fd: u32) -> anyhow::Result<DrmFdinfo> {
     let path = format!("/proc/{}/fdinfo/{}", proc.pid, fd);
     let file = rustix::fs::open(path, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())?;
 
-    let contents = sysfs::read_string(file.as_fd())
+    let contents = io::read_string(file.as_fd())
         .ok_or_else(|| anyhow::anyhow!("failed to read fdinfo file"))?;
 
     let mut fdinfo = DrmFdinfo::default();

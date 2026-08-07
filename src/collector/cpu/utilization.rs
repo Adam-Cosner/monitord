@@ -11,6 +11,7 @@ use rustix::fd::AsFd;
 use rustix::fs::{Mode, OFlags};
 
 use crate::collector::helpers::*;
+use crate::helpers::*;
 
 pub struct Tracker {
     sampler: Sampler<procfs::KernelStats>,
@@ -94,7 +95,7 @@ fn get_cur_freq_mhz(cpu_idx: usize) -> u32 {
         Mode::empty(),
     )
     .ok()
-    .and_then(|fd| sysfs::read_u32(fd.as_fd()))
+    .and_then(|fd| io::read_u32(fd.as_fd()))
     .unwrap_or(0)
         / 1000
 }

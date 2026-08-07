@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use rustix::fd::{AsFd, BorrowedFd, OwnedFd};
 
 use crate::collector::helpers::*;
+use crate::helpers::*;
 use crate::metrics::gpu::*;
 
 mod gpu_metrics;
@@ -78,15 +79,15 @@ impl Card {
     fn memory(&mut self) -> Vec<Memory> {
         let mut memory = Vec::new();
         let vram_total = self.memory_total.probe(|| {
-            sysfs::readat_u64(self.card_fd.as_fd(), "device/mem_info_vram_total")
+            io::readat_u64(self.card_fd.as_fd(), "device/mem_info_vram_total")
                 .ok_or(anyhow::anyhow!("could not read mem_info_vram_total"))
         });
-        let vram_used = sysfs::readat_u64(self.card_fd.as_fd(), "device/mem_info_vram_used");
+        let vram_used = io::readat_u64(self.card_fd.as_fd(), "device/mem_info_vram_used");
         let system_total = self.system_total.probe(|| {
-            sysfs::readat_u64(self.card_fd.as_fd(), "device/mem_info_gtt_total")
+            io::readat_u64(self.card_fd.as_fd(), "device/mem_info_gtt_total")
                 .ok_or(anyhow::anyhow!("could not read mem_info_gtt_total"))
         });
-        let system_used = sysfs::readat_u64(self.card_fd.as_fd(), "device/mem_info_gtt_used");
+        let system_used = io::readat_u64(self.card_fd.as_fd(), "device/mem_info_gtt_used");
 
         if let Some(&vram_total) = vram_total {
             memory.push(Memory {
@@ -113,7 +114,7 @@ impl super::Card for Card {
 
     fn collect(&mut self, config: &super::Config) -> anyhow::Result<super::Gpu> {
         rustix::fs::seek(self.gpu_metrics.as_fd(), rustix::fs::SeekFrom::Start(0))?;
-        let bytes = sysfs::read_bin(self.gpu_metrics.as_fd())
+        let bytes = io::read_bin(self.gpu_metrics.as_fd())
             .ok_or_else(|| anyhow::anyhow!("could not read gpu_metrics file!"))?;
         let gpu_metrics = gpu_metrics::GpuMetrics::read(&bytes)?;
 
@@ -274,16 +275,16 @@ impl super::Card for Card {
 }
 
 fn get_brand_name(fd: BorrowedFd) -> anyhow::Result<String> {
-    let device = sysfs::readat_string(fd.as_fd(), "device/device")
+    let device = io::readat_string(fd.as_fd(), "device/device")
         .and_then(|dev| dev.strip_prefix("0x").map(|dev| dev.to_string()))
         .map(|dev| dev.to_string())
         .ok_or(anyhow::anyhow!("failed to read card device id"))?;
-    let revision = sysfs::readat_string(fd.as_fd(), "device/revision")
+    let revision = io::readat_string(fd.as_fd(), "device/revision")
         .and_then(|rev| rev.strip_prefix("0x").map(|rev| rev.to_string()))
         .map(|rev| rev.to_string())
         .ok_or(anyhow::anyhow!("failed to read card revision"))?;
 
-    let amdgpu_ids = sysfs::read_string_path("/usr/share/libdrm/amdgpu.ids").ok_or(
+    let amdgpu_ids = io::read_string_path("/usr/share/libdrm/amdgpu.ids").ok_or(
         anyhow::anyhow!("amdgpu.ids file not found, falling back to pci ids"),
     )?;
 
@@ -314,7 +315,7 @@ fn populate_max_clocks(fd: BorrowedFd, clocks: &mut [Clock]) {
         };
         let max_freq = match identifier.domain() {
             super::ClockDomain::Graphics => {
-                let Some(gfxclk) = sysfs::readat_string(fd, "device/pp_dpm_sclk") else {
+                let Some(gfxclk) = io::readat_string(fd, "device/pp_dpm_sclk") else {
                     continue;
                 };
                 let mut max_freq = 0u32;
@@ -332,7 +333,7 @@ fn populate_max_clocks(fd: BorrowedFd, clocks: &mut [Clock]) {
                 max_freq
             }
             super::ClockDomain::VideoUnified => {
-                let Some(vclk) = sysfs::readat_string(fd, "device/pp_dpm_vclk") else {
+                let Some(vclk) = io::readat_string(fd, "device/pp_dpm_vclk") else {
                     continue;
                 };
                 let mut max_freq = 0u32;
@@ -350,7 +351,7 @@ fn populate_max_clocks(fd: BorrowedFd, clocks: &mut [Clock]) {
                 max_freq
             }
             super::ClockDomain::VideoDecode => {
-                let Some(dclk) = sysfs::readat_string(fd, "device/pp_dpm_dclk") else {
+                let Some(dclk) = io::readat_string(fd, "device/pp_dpm_dclk") else {
                     continue;
                 };
                 let mut max_freq = 0u32;
@@ -368,7 +369,7 @@ fn populate_max_clocks(fd: BorrowedFd, clocks: &mut [Clock]) {
                 max_freq
             }
             super::ClockDomain::Soc => {
-                let Some(socclk) = sysfs::readat_string(fd, "device/pp_dpm_socclk") else {
+                let Some(socclk) = io::readat_string(fd, "device/pp_dpm_socclk") else {
                     continue;
                 };
                 let mut max_freq = 0u32;
@@ -386,7 +387,7 @@ fn populate_max_clocks(fd: BorrowedFd, clocks: &mut [Clock]) {
                 max_freq
             }
             super::ClockDomain::Memory => {
-                let Some(mclk) = sysfs::readat_string(fd, "device/pp_dpm_mclk") else {
+                let Some(mclk) = io::readat_string(fd, "device/pp_dpm_mclk") else {
                     continue;
                 };
                 let mut max_freq = 0u32;
@@ -414,7 +415,7 @@ fn populate_max_power(fd: BorrowedFd, power: Option<&mut Power>) {
         return;
     };
     let Some(power1_cap) = sysfs::first_hwmon_subdir_at(fd, "device/hwmon")
-        .and_then(|hwmon| sysfs::readat_u32(hwmon.as_fd(), "power1_cap"))
+        .and_then(|hwmon| io::readat_u32(hwmon.as_fd(), "power1_cap"))
     else {
         return;
     };
@@ -427,9 +428,9 @@ fn populate_max_thermal(fd: BorrowedFd, thermals: &mut [Thermal]) {
     };
     for thermal in thermals.iter_mut() {
         let Some(temp) = (match thermal.location() {
-            super::ThermalLocation::Edge => sysfs::readat_u32(hwmon.as_fd(), "temp1_crit"),
-            super::ThermalLocation::Hotspot => sysfs::readat_u32(hwmon.as_fd(), "temp2_crit"),
-            super::ThermalLocation::Memory => sysfs::readat_u32(hwmon.as_fd(), "temp3_crit"),
+            super::ThermalLocation::Edge => io::readat_u32(hwmon.as_fd(), "temp1_crit"),
+            super::ThermalLocation::Hotspot => io::readat_u32(hwmon.as_fd(), "temp2_crit"),
+            super::ThermalLocation::Memory => io::readat_u32(hwmon.as_fd(), "temp3_crit"),
             _ => continue,
         }) else {
             continue;
