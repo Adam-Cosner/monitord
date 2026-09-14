@@ -129,7 +129,7 @@ impl super::Card for Card {
             .brand_name
             .get_or_try_init(|| get_brand_name(self.card_fd.as_fd()))
             .cloned()
-            .unwrap_or_default();
+            .unwrap_or("AMD Radeon Graphics".to_string());
         gpu.drivers = config.drivers.then(|| Drivers {
             kernel: Some(KernelDriver {
                 name: "amdgpu".to_string(),
