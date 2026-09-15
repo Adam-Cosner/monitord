@@ -10,6 +10,7 @@
 //! ENV -> Default filepath (/etc/monitord/config.toml) -> Default config
 
 use monitord::helpers::io;
+use monitord::metrics;
 use rustix::fd::{AsFd, BorrowedFd};
 use rustix::fs::{Mode, OFlags};
 use serde::{Deserialize, Serialize};
@@ -17,70 +18,60 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub core: CoreConfig,
-    pub metrics: MetricsConfig,
+    pub metrics: metrics::Config,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct CoreConfig {
     pub interval_ms: u16,
-}
-
-#[derive(Serialize, Deserialize)]
-// uses lists of strings for whichever config fields it has enabled
-pub struct MetricsConfig {
-    pub cpu: Vec<String>,
-    pub mem: Vec<String>,
-    pub gpu: Vec<String>,
-    pub net: Vec<String>,
-    pub process: Vec<String>,
-    pub storage: Vec<String>,
+    pub max_tries: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             core: CoreConfig::default(),
-            metrics: Default::default(),
+            metrics: metrics::Config {
+                cpu: Some(metrics::cpu::Config {
+                    topology: true,
+                    hwid: true,
+                    drivers: true,
+                }),
+                memory: Some(metrics::memory::Config { dimms: true }),
+                gpu: Some(metrics::gpu::Config {
+                    drivers: true,
+                    engines: true,
+                    clocks: true,
+                    memory: true,
+                    power: true,
+                    thermals: true,
+                    processes: true,
+                }),
+                network: Some(metrics::network::Config {
+                    addresses: true,
+                    wifi_info: true,
+                }),
+                storage: Some(metrics::storage::Config { usage: true }),
+                process: Some(metrics::process::Config {
+                    identity: true,
+                    status: true,
+                    start_time: true,
+                    cpu_usage: true,
+                    memory_usage: true,
+                    gpu_usage: true,
+                    disk_usage: true,
+                    net_usage: true,
+                }),
+            },
         }
     }
 }
 
 impl Default for CoreConfig {
     fn default() -> Self {
-        Self { interval_ms: 1000 }
-    }
-}
-
-impl Default for MetricsConfig {
-    fn default() -> Self {
         Self {
-            cpu: vec![
-                "topology".to_string(),
-                "hwid".to_string(),
-                "drivers".to_string(),
-            ],
-            mem: vec!["dimms".to_string()],
-            gpu: vec![
-                "drivers".to_string(),
-                "engines".to_string(),
-                "clocks".to_string(),
-                "memory".to_string(),
-                "power".to_string(),
-                "thermals".to_string(),
-                "processes".to_string(),
-            ],
-            net: vec!["addresses".to_string(), "wifi_info".to_string()],
-            storage: vec!["usage".to_string()],
-            process: vec![
-                "identity".to_string(),
-                "status".to_string(),
-                "start_time".to_string(),
-                "cpu_usage".to_string(),
-                "memory_usage".to_string(),
-                "gpu_usage".to_string(),
-                "disk_usage".to_string(),
-                "net_usage".to_string(),
-            ],
+            interval_ms: 1000,
+            max_tries: 5,
         }
     }
 }
