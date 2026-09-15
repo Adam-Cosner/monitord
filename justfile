@@ -12,13 +12,13 @@ build-control:
     cargo build --release --bin monitordctl --no-default-features --features=control
 
 test TEST:
-    RUST_LOG=debug,wgpu=warn cargo test {{ TEST }} --release --features=daemon -- --nocapture
+    RUST_LOG=debug,wgpu=warn cargo test {{ TEST }} --release --no-default-features --features=daemon -- --nocapture
 
 test-all:
-    RUST_LOG=debug,wgpu=warn cargo test --release --features=daemon -- --show-output
+    RUST_LOG=debug,wgpu=warn cargo test --release --no-default-features --features=daemon -- --show-output
 
 run-daemon:
-    RUST_LOG=debug,wgpu=warn cargo run --release --features=daemon --bin monitord
+    RUST_LOG=debug,wgpu=warn cargo run --release --no-default-features --features=daemon --bin monitord
 
 clippy:
-    cargo clippy --release --features=daemon
+    cargo clippy --release --no-default-features --features=daemon
