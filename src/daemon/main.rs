@@ -4,33 +4,35 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-pub mod service {
-    pub mod v1 {
-        tonic::include_proto!("service.v1");
-    }
-    pub use v1::*;
-}
-
 mod config;
-mod runtime;
+mod server;
+mod worker;
 
 pub use monitord::collector;
 pub use monitord::metrics;
+use prost::bytes::Bytes;
 
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let (snap_tx, _snap_rx) = tokio::sync::mpsc::channel(12);
-    let (_stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
+    let (worker_tx, _) = tokio::sync::broadcast::channel::<Bytes>(1);
 
     tracing::info!("initializing monitord");
 
     let config = config::Config::init()?;
 
+    // note, when we get to the control component, the stop signal should be sent from the server component if no clients are connected for config's seconds
     tokio::select! {
-        _ = runtime::runtime(snap_tx, stop_rx, config) => {}
+        res = worker::run(worker_tx.clone(), &config) => {
+            tracing::info!("worker exited: {:?}", res);
+        }
+        res = server::run(worker_tx.clone(), &config) => {
+            tracing::info!("server exited: {:?}", res);
+        }
     }
+
+    tracing::info!("shutdown complete");
 
     Ok(())
 }
@@ -38,20 +40,20 @@ pub async fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use prost::Message;
 
     #[tokio::test]
     async fn test_runtime() {
         tracing_subscriber::fmt::init();
-        let (snap_tx, mut snap_rx) = tokio::sync::mpsc::channel(12);
-        let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
+        let (snap_tx, mut snap_rx) = tokio::sync::broadcast::channel(1);
         let config = config::Config::default();
 
         tokio::select! {
             // runtime
-            _ = runtime::runtime(snap_tx, stop_rx, config) => {}
+            _ = worker::run(snap_tx, &config) => {}
             // dummy server
             _ = async move {
-                while let Some(snap) = snap_rx.recv().await {
+                while let Ok(snap) = snap_rx.recv().await {
                     if let Ok(formatted) = format_snapshot(snap) {
                         tracing::info!("received snapshot: \n{}", formatted);
                     } else {
@@ -61,13 +63,14 @@ mod tests {
             } => {}
             _ = async move {
                 tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-                stop_tx.send(()).ok();
             } => {}
         }
     }
 
-    fn format_snapshot(snap: metrics::Snapshot) -> anyhow::Result<String> {
+    fn format_snapshot(bytes: Bytes) -> anyhow::Result<String> {
         let mut output = String::new();
+
+        let snap = metrics::Snapshot::decode(bytes)?;
 
         use std::fmt::Write;
 

@@ -6,28 +6,13 @@
 
 //! Contains the runtime manager for the collectors
 
-pub async fn runtime(
-    snap_tx: tokio::sync::mpsc::Sender<crate::metrics::Snapshot>,
-    stop_rx: tokio::sync::oneshot::Receiver<()>,
-    config: crate::config::Config,
-) -> anyhow::Result<()> {
-    tokio::select! {
-        _ = stop_rx => {
-            tracing::info!("received stop signal");
-            Ok(())
-        }
-        res =
-            run_collectors(snap_tx, config)
-         => { res }
-    }
-}
+use prost::{Message, bytes::Bytes};
 
-async fn run_collectors(
-    snap_tx: tokio::sync::mpsc::Sender<crate::metrics::Snapshot>,
-    dconfig: crate::config::Config,
+pub async fn run(
+    snap_tx: tokio::sync::broadcast::Sender<Bytes>,
+    config: &crate::config::Config,
 ) -> anyhow::Result<()> {
     use crate::collector::*;
-    let config = parse_dconfig(&dconfig);
     let mut cpu_collector = CollectorWrapper::new(cpu::Collector::new());
     let mut mem_collector = CollectorWrapper::new(mem::Collector::new());
     let mut gpu_collector = CollectorWrapper::new(gpu::Collector::new());
@@ -36,7 +21,7 @@ async fn run_collectors(
     let mut proc_collector = CollectorWrapper::new(process::Collector::new());
 
     let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(
-        dconfig.core.interval_ms as u64,
+        config.core.interval_ms as u64,
     ));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -80,12 +65,14 @@ async fn run_collectors(
             process: process_snapshot,
         };
 
-        snap_tx.send(snapshot).await?;
+        let response = crate::server::ReportResponse {
+            timestamp: Some(prost_types::Timestamp::from(std::time::SystemTime::now())),
+            report: Some(snapshot),
+        };
+
+        let _ = snap_tx.send(response.encode_to_vec().into());
     }
 }
-
-// TODO: Daemon config retry count
-const MAX_TRIES: u32 = 5;
 
 struct CollectorWrapper<C: crate::collector::Collector> {
     try_count: u32,
@@ -100,10 +87,10 @@ impl<C: crate::collector::Collector> CollectorWrapper<C> {
         }
     }
 
-    fn try_collect(&mut self, config: &crate::metrics::Config) -> Option<C::Output> {
-        if self.try_count < MAX_TRIES {
+    fn try_collect(&mut self, config: &crate::config::Config) -> Option<C::Output> {
+        if self.try_count < config.core.max_tries {
             self.collector
-                .collect(config)
+                .collect(&config.metrics)
                 .inspect_err(|e| {
                     tracing::error!("{} collector failed: {e}", C::name());
                     self.try_count += 1;
@@ -113,21 +100,5 @@ impl<C: crate::collector::Collector> CollectorWrapper<C> {
             tracing::warn!("no {} data collected due to too many fails!", C::name());
             None
         }
-    }
-}
-
-fn parse_dconfig(dconfig: &crate::config::Config) -> crate::metrics::Config {
-    use crate::metrics;
-    crate::metrics::Config {
-        cpu: Some(metrics::cpu::Config::from_strings(&dconfig.metrics.cpu)),
-        memory: Some(metrics::memory::Config::from_strings(&dconfig.metrics.mem)),
-        gpu: Some(metrics::gpu::Config::from_strings(&dconfig.metrics.gpu)),
-        network: Some(metrics::network::Config::from_strings(&dconfig.metrics.net)),
-        storage: Some(metrics::storage::Config::from_strings(
-            &dconfig.metrics.storage,
-        )),
-        process: Some(metrics::process::Config::from_strings(
-            &dconfig.metrics.process,
-        )),
     }
 }

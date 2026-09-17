@@ -25,6 +25,7 @@ pub struct Config {
 pub struct CoreConfig {
     pub interval_ms: u16,
     pub max_tries: u32,
+    pub auto_shutdown_seconds: u64,
 }
 
 impl Default for Config {
@@ -72,18 +73,24 @@ impl Default for CoreConfig {
         Self {
             interval_ms: 1000,
             max_tries: 5,
+            auto_shutdown_seconds: 10,
         }
     }
 }
 
 impl Config {
     pub fn init() -> anyhow::Result<Config> {
-        let mut config_path = String::from("/etc/monitord/config.toml");
+        let mut path_str = String::from("/etc/monitord/config.toml");
         if let Ok(env_path) = std::env::var("MONITORD_CONFIG") {
-            config_path = env_path;
+            path_str = env_path;
         }
+
+        let config_path = std::path::Path::new(&path_str);
+        let config_parent = config_path.parent().unwrap();
+        std::fs::create_dir_all(config_parent)?;
+
         let config_fd = rustix::fs::open(
-            &config_path,
+            config_path,
             OFlags::CLOEXEC | OFlags::RDWR | OFlags::CREATE,
             Mode::from(0o664),
         )?;
@@ -104,10 +111,10 @@ impl Config {
                     tracing::info!(
                         "moving old config to config.toml.old and generating new config"
                     );
-                    rustix::fs::rename(&config_path, config_path.clone() + ".old")
+                    rustix::fs::rename(config_path, config_path.with_added_extension("old"))
                         .expect("config.toml file was moved or deleted mid operation!");
                     let new_config_fd = rustix::fs::open(
-                        &config_path,
+                        config_path,
                         OFlags::CLOEXEC | OFlags::RDWR | OFlags::CREATE,
                         Mode::from(0o664),
                     )?;
