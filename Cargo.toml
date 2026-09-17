@@ -20,7 +20,7 @@ required-features = ["control"]
 [lib]
 name = "monitord"
 path = "src/lib.rs"
-required-features = ["metrics"]
+required-features = ["client"]
 
 [features]
 default = ["client"]
@@ -41,9 +41,8 @@ collector = [
     "procfs",
     "pollster",
     "dmidecode",
-    # we need both because rustix doesn't provide getifaddrs
+    # we need nix because rustix doesn't provide getifaddrs
     "nix",
-    "rustix",
     "neli",
     "num",
     "drm"
@@ -68,6 +67,7 @@ anyhow = "1.0"
 tracing = "0.1"
 tonic = "0.14"
 prost = "0.14"
+rustix = { version = "1.1", features = ["process", "fs"] }
 
 # Metrics dependencies
 prost-types = { version = "0.14", optional = true }
@@ -86,7 +86,6 @@ dmidecode = { version = "1.0", optional = true }
 nix = { version = "0.31", optional = true, default-features = false, features = ["net"] }
 neli = { version = "0.7", optional = true }
 num = { version = "0.4", optional = true }
-rustix = { version = "1.1", optional = true, features = ["process"] }
 drm = { version = "0.15", optional = true }
 
 # Daemon dependencies
