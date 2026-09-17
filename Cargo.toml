@@ -48,13 +48,14 @@ collector = [
     "drm"
 ]
 # Enabled for client usage
-client = ["metrics"]
+client = ["metrics", "tokio", "tracing-subscriber", "tokio-stream" ]
 # Enabled for daemon build
 daemon = [
     "collector",
     "tracing-subscriber",
     "tokio",
     "toml",
+    "tokio-stream",
 ]
 # Enabled for control utility build
 control = [
@@ -92,6 +93,8 @@ drm = { version = "0.15", optional = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
 tokio = { version = "1.52", features = ["full"], optional = true }
 toml = { version = "1.1", optional = true }
+tokio-stream = { version = "0.1", optional = true }
+
 
 [build-dependencies]
 tonic-prost-build = { version = "0.14", optional = true }
