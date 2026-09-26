@@ -80,17 +80,15 @@ impl Default for CoreConfig {
 
 impl Config {
     pub fn init() -> anyhow::Result<Config> {
-        let mut path_str = String::from("/etc/monitord/config.toml");
-        if let Ok(env_path) = std::env::var("MONITORD_CONFIG") {
-            path_str = env_path;
-        }
+        let path_str =
+            std::env::var("MONITORD_ROOT").unwrap_or_else(|_| "/etc/monitord".to_string());
+        let config_path = std::path::PathBuf::from(&path_str).join("config.toml");
 
-        let config_path = std::path::Path::new(&path_str);
         let config_parent = config_path.parent().unwrap();
         std::fs::create_dir_all(config_parent)?;
 
         let config_fd = rustix::fs::open(
-            config_path,
+            &config_path,
             OFlags::CLOEXEC | OFlags::RDWR | OFlags::CREATE,
             Mode::from(0o664),
         )?;
@@ -111,7 +109,7 @@ impl Config {
                     tracing::info!(
                         "moving old config to config.toml.old and generating new config"
                     );
-                    rustix::fs::rename(config_path, config_path.with_added_extension("old"))
+                    rustix::fs::rename(&config_path, &config_path.with_added_extension("old"))
                         .expect("config.toml file was moved or deleted mid operation!");
                     let new_config_fd = rustix::fs::open(
                         config_path,
