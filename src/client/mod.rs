@@ -21,10 +21,11 @@ mod tests {
     #[tokio::test]
     async fn client() {
         tracing_subscriber::fmt::init();
-        let mut client =
-            service::v1::monitord_client::MonitordClient::connect("http://[::1]:50051")
-                .await
-                .unwrap();
+        let mut client = service::v1::monitord_client::MonitordClient::connect(
+            "unix:///home/adamc/Projects/monitord/.testroot/local.sock",
+        )
+        .await
+        .unwrap();
 
         let stream = client.report(()).await.unwrap().into_inner();
 
@@ -35,7 +36,16 @@ mod tests {
                 tracing::warn!("No report in response");
                 continue;
             };
-            tracing::info!("Received metrics report: {:#?}", report)
+            let Some(timestamp) = response.timestamp else {
+                tracing::warn!("No timestamp in response");
+                continue;
+            };
+
+            let elapsed = std::time::SystemTime::try_from(timestamp)
+                .unwrap()
+                .elapsed()
+                .unwrap();
+            tracing::info!("Received metrics report: {}us", elapsed.as_micros())
         }
     }
 }
