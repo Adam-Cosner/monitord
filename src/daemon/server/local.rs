@@ -6,8 +6,6 @@
 
 //! Local machine snapshot reporting service
 
-use std::net::ToSocketAddrs;
-
 use prost::bytes::Bytes;
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::ReceiverStream;
@@ -76,9 +74,16 @@ impl super::monitord_server::Monitord for Service {
 pub async fn run(tx: broadcast::Sender<Bytes>) -> anyhow::Result<()> {
     let service = Service::new(tx)?;
 
+    let root = std::env::var("MONITORD_ROOT").unwrap_or_else(|_| "/etc/monitord".to_string());
+
+    let sock_path = std::path::PathBuf::from(&root).join("local.sock");
+
+    let uds = tokio::net::UnixListener::bind(&sock_path)?;
+    let uds_stream = tokio_stream::wrappers::UnixListenerStream::new(uds);
+
     tonic::transport::Server::builder()
         .add_service(super::monitord_server::MonitordServer::new(service))
-        .serve("[::1]:50051".to_socket_addrs()?.next().unwrap())
+        .serve_with_incoming(uds_stream)
         .await?;
 
     Ok(())
